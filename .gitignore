@@ -1,0 +1,15 @@
+
+# Python
+__pycache__/
+*.pyc
+
+# Build artifacts / generated outputs
+out/
+out_*/
+output.wav
+resampled.wav
+voices/
+
+# Large downloaded models (regenerable)
+models/opus-mt-vi-en-src/pytorch_model.bin
+models/opus-mt-vi-en-src/tf_model.h5
