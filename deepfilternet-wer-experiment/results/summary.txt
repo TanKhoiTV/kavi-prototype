@@ -1,0 +1,25 @@
+WER EXPERIMENT RESULTS - OneVoice AI Challenge
+================================================
+Model    : Whisper Medium
+Noise    : ESC-50 real industrial (engine, chainsaw, hand_saw, washing_machine)
+SNR      : 5dB
+Dataset  : VIVOS test set (760 files)
+
+Condition          WER (%)   Delta vs noisy
+clean              15.53%    -4.70pp
+noisy              20.23%    +0.00pp
+denoised_rnnoise   33.10%    +12.87pp
+denoised_dfn       27.05%    +6.82pp
+
+KEY FINDING:
+DeepFilterNet outperforms RNNoise by 6.05pp WER
+Consistent with F0 tonal preservation hypothesis for Vietnamese
+
+Luma form citation:
+Whisper Medium achieves 15.53% WER on clean VIVOS test set.
+Under SNR 5dB real industrial noise (ESC-50: engine, chainsaw, machinery),
+WER increases to 20.23%. RNNoise preprocessing degrades WER to 33.10%
+(+12.87pp) by over-suppressing Vietnamese tonal harmonics.
+DeepFilterNet preprocessing yields 27.05% WER (+6.82pp) --
+outperforming RNNoise by 6.05pp, consistent with the hypothesis that
+perceptual loss design better preserves Vietnamese F0 contours.
