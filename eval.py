@@ -23,7 +23,6 @@ import argparse
 import json
 import sys
 import tempfile
-import time
 from pathlib import Path
 
 import jiwer
@@ -42,8 +41,11 @@ def load_ref(ref_path: str) -> dict:
     if not path.exists():
         raise FileNotFoundError(f"Reference file not found: {ref_path}")
 
-    lines = [l.strip() for l in path.read_text().strip().splitlines()
-             if l.strip() and not l.startswith("#")]
+    lines = [
+        line.strip()
+        for line in path.read_text().strip().splitlines()
+        if line.strip() and not line.startswith("#")
+    ]
     if len(lines) < 2:
         raise ValueError(
             f"Reference file {ref_path} must have at least 2 lines "
@@ -83,9 +85,16 @@ def compute_chrf(reference: str, hypothesis: str) -> dict:
     return {"chrf": round(result.score, 2)}
 
 
-def evaluate_file(audio_path: str, ref_path: str | None = None,
-                  asr_model: str = "small", ref_dir: str = "refs",
-                  quiet: bool = True) -> dict:
+def evaluate_file(
+    audio_path: str,
+    ref_path: str | None = None,
+    asr_model: str = "small",
+    ref_dir: str = "refs",
+    quiet: bool = True,
+    vad: bool = True,
+    vad_threshold: float = 0.4,
+    normalize: bool = True,
+) -> dict:
     """Run pipeline on one audio file and compute evaluation metrics.
 
     Returns a dict with pipeline results and metrics.
@@ -103,7 +112,23 @@ def evaluate_file(audio_path: str, ref_path: str | None = None,
             asr_model_size=asr_model,
             output_dir=tmpdir,
             quiet=quiet,
+            vad=vad,
+            vad_threshold=vad_threshold,
+            normalize=normalize,
         )
+
+    if "error" in result:
+        return {
+            "audio": audio_path,
+            "reference": ref,
+            "vad_result": None,
+            "asr_result": {"text": None, "elapsed_s": 0},
+            "mt_result": {"translation": None, "elapsed_s": 0},
+            "tts_result": {"output": None, "elapsed_s": 0},
+            "total_s": 0,
+            "metrics": {},
+            "error": result["error"],
+        }
 
     # Compute metrics if reference available
     metrics = {}
@@ -123,6 +148,7 @@ def evaluate_file(audio_path: str, ref_path: str | None = None,
     return {
         "audio": audio_path,
         "reference": ref,
+        "vad_result": result.get("vad"),
         "asr_result": result["asr"],
         "mt_result": result["mt"],
         "tts_result": result["tts"],
@@ -139,6 +165,12 @@ def print_report(results: list[dict], json_output: bool = False):
         for r in results:
             cr = {
                 "audio": r["audio"],
+                "vad": {
+                    "speech_ratio": r["vad_result"]["speech_ratio"],
+                    "elapsed_s": r["vad_result"]["elapsed_s"],
+                }
+                if r.get("vad_result") and r["vad_result"].get("available", True)
+                else None,
                 "asr": {
                     "text": r["asr_result"]["text"],
                     "elapsed_s": r["asr_result"]["elapsed_s"],
@@ -150,6 +182,8 @@ def print_report(results: list[dict], json_output: bool = False):
                 "total_s": r["total_s"],
                 "metrics": r["metrics"],
             }
+            if "error" in r:
+                cr["error"] = r["error"]
             clean.append(cr)
         print(json.dumps(clean, indent=2, ensure_ascii=False))
         return
@@ -161,8 +195,21 @@ def print_report(results: list[dict], json_output: bool = False):
     print(sep)
 
     for r in results:
+        if "error" in r:
+            print(f"\n  File:        {r['audio']}")
+            print(f"  ─{'─' * 65}")
+            print(f"  ⚠ Error: {r['error']}")
+            continue
+
         print(f"\n  File:        {r['audio']}")
         print(f"  ─{'─' * 65}")
+
+        # VAD
+        vad_r = r.get("vad_result")
+        if vad_r and vad_r.get("available", True):
+            print(
+                f"  VAD speech:  {vad_r['speech_ratio'] * 100:.1f}%  ({vad_r['elapsed_s']}s)"
+            )
 
         # ASR
         asr = r["asr_result"]
@@ -171,9 +218,11 @@ def print_report(results: list[dict], json_output: bool = False):
             print(f"  Reference:   {r['reference']['vi']}")
         if r["metrics"].get("asr"):
             m = r["metrics"]["asr"]
-            print(f"  WER:         {m['wer']*100:.1f}%  "
-                  f"(H={m['hits']} S={m['substitutions']} "
-                  f"D={m['deletions']} I={m['insertions']})")
+            print(
+                f"  WER:         {m['wer'] * 100:.1f}%  "
+                f"(H={m['hits']} S={m['substitutions']} "
+                f"D={m['deletions']} I={m['insertions']})"
+            )
         print(f"  ASR time:    {asr['elapsed_s']}s")
 
         # MT
@@ -192,8 +241,7 @@ def print_report(results: list[dict], json_output: bool = False):
 
         # Total
         print(f"  ─{'─' * 65}")
-        print(f"  Total time:  {r['total_s']}s  "
-              f"(inference only, cold models)")
+        print(f"  Total time:  {r['total_s']}s  (inference only, cold models)")
 
     # Summary row for batch
     if len(results) > 1:
@@ -212,7 +260,7 @@ def print_report(results: list[dict], json_output: bool = False):
 
         if all(r["metrics"].get("asr") for r in results):
             avg_wer = sum(r["metrics"]["asr"]["wer"] for r in results) / len(results)
-            print(f"  Avg WER:     {avg_wer*100:.1f}%")
+            print(f"  Avg WER:     {avg_wer * 100:.1f}%")
 
         if all(r["metrics"].get("mt", {}).get("chrf") is not None for r in results):
             avg_chrf = sum(r["metrics"]["mt"]["chrf"] for r in results) / len(results)
@@ -221,15 +269,21 @@ def print_report(results: list[dict], json_output: bool = False):
     print(f"\n{sep}\n")
 
 
-def batch_eval(ref_dir: str = "refs", asr_model: str = "small",
-               json_output: bool = False) -> list[dict]:
+def batch_eval(
+    ref_dir: str = "refs",
+    asr_model: str = "small",
+    json_output: bool = False,
+    vad: bool = True,
+    vad_threshold: float = 0.4,
+    normalize: bool = True,
+) -> list[dict]:
     """Evaluate all audio files that have matching references."""
-    ref_dir = Path(ref_dir)
-    if not ref_dir.exists():
-        print(f"❌ Reference directory not found: {ref_dir}")
+    ref_dir_path = Path(ref_dir)
+    if not ref_dir_path.exists():
+        print(f"❌ Reference directory not found: {ref_dir_path}")
         sys.exit(1)
 
-    ref_files = sorted(ref_dir.glob("*.txt"))
+    ref_files = sorted(ref_dir_path.glob("*.txt"))
     if not ref_files:
         print(f"❌ No reference files found in {ref_dir}")
         sys.exit(1)
@@ -241,7 +295,7 @@ def batch_eval(ref_dir: str = "refs", asr_model: str = "small",
         for ext in [".wav", ".mp3", ".m4a", ".flac"]:
             audio_candidates = [
                 ref_file.with_suffix(ext),
-                Path(".") / ref_file.stem + ext,
+                Path(".") / (ref_file.stem + ext),
             ]
             for ac in audio_candidates:
                 if Path(ac).exists():
@@ -251,7 +305,10 @@ def batch_eval(ref_dir: str = "refs", asr_model: str = "small",
                 continue
             break
         else:
-            print(f"  ⚠ No audio file found for {ref_file.name}, skipping")
+            print(
+                f"  ⚠ No audio file found for {ref_file.name}, skipping",
+                file=sys.stderr,
+            )
             continue
 
         print(f"  Evaluating {audio_path} …")
@@ -260,6 +317,9 @@ def batch_eval(ref_dir: str = "refs", asr_model: str = "small",
             ref_path=str(ref_file),
             asr_model=asr_model,
             quiet=True,
+            vad=vad,
+            vad_threshold=vad_threshold,
+            normalize=normalize,
         )
         results.append(result)
 
@@ -269,20 +329,45 @@ def batch_eval(ref_dir: str = "refs", asr_model: str = "small",
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Evaluate ASR→MT→TTS pipeline against reference transcripts")
+        description="Evaluate ASR→MT→TTS pipeline against reference transcripts"
+    )
     parser.add_argument("audio", nargs="?", help="Audio file to evaluate")
-    parser.add_argument("--asr-model", default="small",
-                        help="Whisper model size [small]")
-    parser.add_argument("--ref", help="Reference transcript file "
-                        "(default: refs/<audio_stem>.txt)")
-    parser.add_argument("--ref-dir", default="refs",
-                        help="Reference directory for batch mode [refs]")
-    parser.add_argument("--batch", action="store_true",
-                        help="Batch evaluate all files in ref-dir")
-    parser.add_argument("--json", action="store_true",
-                        help="Output JSON instead of table")
-    parser.add_argument("--verbose", action="store_true",
-                        help="Show pipeline progress output")
+    parser.add_argument(
+        "--asr-model", default="small", help="Whisper model size [small]"
+    )
+    parser.add_argument(
+        "--ref", help="Reference transcript file (default: refs/<audio_stem>.txt)"
+    )
+    parser.add_argument(
+        "--ref-dir", default="refs", help="Reference directory for batch mode [refs]"
+    )
+    parser.add_argument(
+        "--batch", action="store_true", help="Batch evaluate all files in ref-dir"
+    )
+    parser.add_argument(
+        "--json", action="store_true", help="Output JSON instead of table"
+    )
+    parser.add_argument(
+        "--verbose", action="store_true", help="Show pipeline progress output"
+    )
+    parser.add_argument(
+        "--vad",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Enable VAD stage [default: enabled]",
+    )
+    parser.add_argument(
+        "--vad-threshold",
+        type=float,
+        default=0.4,
+        help="VAD speech probability threshold [0.4]",
+    )
+    parser.add_argument(
+        "--normalize",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="RMS-normalize audio to -20 dBFS [default: enabled]",
+    )
     args = parser.parse_args()
 
     if args.batch:
@@ -290,6 +375,9 @@ def main():
             ref_dir=args.ref_dir,
             asr_model=args.asr_model,
             json_output=args.json,
+            vad=args.vad,
+            vad_threshold=args.vad_threshold,
+            normalize=args.normalize,
         )
         return
 
@@ -307,6 +395,9 @@ def main():
         asr_model=args.asr_model,
         ref_dir=args.ref_dir,
         quiet=not args.verbose,
+        vad=args.vad,
+        vad_threshold=args.vad_threshold,
+        normalize=args.normalize,
     )
     print_report([result], json_output=args.json)
 

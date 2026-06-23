@@ -18,7 +18,7 @@ the pipeline is a pure ordered composition.
 audio.wav
    │
    ▼
-[1] Resample ───── 16 kHz mono (ffmpeg / scipy)
+[1] Resample ───── 16 kHz mono (ffmpeg / torchaudio)
    │
    ▼
 [2] ASR ─────────── faster-whisper (CTranslate2, CPU int8)
@@ -113,8 +113,8 @@ def run_pipeline(
 
 Convert arbitrary input audio to 16 kHz mono for Whisper.
 
-- **Tools tried (in order):** ffmpeg → sox → scipy.signal.resample
-- **Fallback:** Pure-Python resampling via scipy (no external deps)
+- **Tools tried (in order):** ffmpeg → sox → torchaudio.functional.resample
+- **Fallback:** torchaudio.functional.resample
 - **Output:** Temporary WAV in `output_dir/`
 
 ### 3.2 ASR — faster-whisper

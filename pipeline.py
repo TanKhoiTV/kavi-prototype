@@ -13,6 +13,9 @@ Pipeline:
 from __future__ import annotations
 
 import argparse
+import json
+import os
+import socket
 import subprocess
 import sys
 import time
@@ -21,11 +24,51 @@ from pathlib import Path
 
 import soundfile as sf
 
+from audio import get_speech_metadata, rms_normalize
+
+
+def _default_socket_path() -> str:
+    runtime_dir = os.environ.get("XDG_RUNTIME_DIR")
+    if runtime_dir:
+        return str(Path(runtime_dir) / "aivoice.sock")
+    return f"/tmp/aivoice-{os.getuid()}.sock"
+
+
+class PipelineClient:
+    def __init__(self, socket_path: str | None = None, timeout: float = 30.0):
+        self.socket_path = socket_path or _default_socket_path()
+        self.timeout = timeout
+        self._request_id = 0
+
+    def call(self, method: str, params: dict) -> dict:
+        self._request_id += 1
+        payload = {"id": self._request_id, "method": method, "params": params}
+        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        sock.settimeout(self.timeout)
+        try:
+            sock.connect(self.socket_path)
+            sock.sendall((json.dumps(payload) + "\n").encode())
+            with sock.makefile("rwb") as f:
+                line = f.readline()
+            if not line:
+                raise ConnectionError("Server closed connection")
+            response = json.loads(line.decode())
+            if response.get("id") != self._request_id:
+                raise RuntimeError(
+                    f"Request ID mismatch: sent {self._request_id}, "
+                    f"got {response.get('id')}"
+                )
+            return response
+        finally:
+            sock.close()
+
 
 # ── ASR: Whisper via faster-whisper ──────────────────────
 
+
 def load_asr(model_size: str = "small"):
     from faster_whisper import WhisperModel
+
     return WhisperModel(model_size, device="cpu", compute_type="int8")
 
 
@@ -87,8 +130,8 @@ def translate(translator, sp_src, sp_tgt, text: str) -> dict:
 
 # ── TTS: Piper-TTS (offline, fast) ────────────────────────
 
-def load_tts(voice_name: str = "en_US-lessac-medium",
-             voice_dir: str = "voices"):
+
+def load_tts(voice_name: str = "en_US-lessac-medium", voice_dir: str | Path = "voices"):
     from piper import PiperVoice
     from piper.download_voices import download_voice
 
@@ -124,13 +167,16 @@ def synthesize(voice, text: str, output_path: str = "output.wav") -> dict:
 
 # ── Audio helpers ─────────────────────────────────────────
 
+
 def resample_to_16k(input_path: str, output_path: str) -> str:
     if Path(output_path).exists():
         return output_path
 
-    for tool, args in [
-        ("ffmpeg", ["ffmpeg", "-y", "-i", input_path,
-                     "-ar", "16000", "-ac", "1", output_path]),
+    for _tool, args in [
+        (
+            "ffmpeg",
+            ["ffmpeg", "-y", "-i", input_path, "-ar", "16000", "-ac", "1", output_path],
+        ),
         ("sox", ["sox", input_path, "-r", "16000", "-c", "1", output_path]),
     ]:
         try:
@@ -141,11 +187,17 @@ def resample_to_16k(input_path: str, output_path: str) -> str:
 
     data, sr = sf.read(input_path)
     if sr != 16000:
-        import numpy as np
-        from scipy import signal
-        target_len = int(len(data) * 16000 / sr)
-        data_resampled = signal.resample(data, target_len)
-        sf.write(output_path, data_resampled.astype(data.dtype), 16000)
+        import torch
+        import torchaudio.functional as AF
+
+        data_t = torch.from_numpy(data).float()
+        # torchaudio AF.resample expects (channels, samples) — transpose if 2D
+        if data_t.dim() == 2:
+            data_t = data_t.T  # (samples, channels) → (channels, samples)
+        resampled = AF.resample(data_t, sr, 16000)
+        if resampled.dim() == 2:
+            resampled = resampled.T  # (channels, samples) → (samples, channels)
+        sf.write(output_path, resampled.numpy().astype(data.dtype), 16000)
     else:
         sf.write(output_path, data, sr)
     return output_path
@@ -153,13 +205,55 @@ def resample_to_16k(input_path: str, output_path: str) -> str:
 
 # ── Main pipeline ────────────────────────────────────────
 
-def run_pipeline(audio_path: str, asr_model_size: str = "small",
-                 output_dir: str = ".", quiet: bool = False) -> dict:
+
+def run_pipeline(
+    audio_path: str,
+    asr_model_size: str = "small",
+    output_dir: str = ".",
+    quiet: bool = False,
+    vad: bool = True,
+    vad_threshold: float = 0.4,
+    normalize: bool = True,
+    use_server: bool = True,
+) -> dict:
     audio_path = str(audio_path)
-    output_dir = Path(output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
+    out_dir = Path(output_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
 
     t0 = time.perf_counter()
+
+    # Try persistent server first
+    if use_server:
+        try:
+            client = PipelineClient(timeout=60.0)
+            params = {
+                "audio_path": str(Path(audio_path).resolve()),
+                "asr_model_size": asr_model_size,
+                "output_dir": str(Path(output_dir).resolve()),
+                "quiet": quiet,
+                "vad": vad,
+                "vad_threshold": vad_threshold,
+                "normalize": normalize,
+            }
+            response = client.call("run_pipeline", params)
+            if "error" in response:
+                return {"error": response["error"]}
+            return response["result"]
+        except (
+            TimeoutError,
+            FileNotFoundError,
+            ConnectionRefusedError,
+            OSError,
+            ConnectionError,
+        ) as e:
+            if not quiet:
+                print(
+                    f"      Server unavailable ({e}), falling back to direct loading…"
+                )
+    # Fall through to direct-loading code
+
+    total_steps = 6 if vad else 5
+    step = 0
 
     if not quiet:
         print("─" * 52)
@@ -167,19 +261,55 @@ def run_pipeline(audio_path: str, asr_model_size: str = "small",
         print("─" * 52)
 
     # ── Resample ──
+    step += 1
     if not quiet:
-        print(f"\n[1/4] Resampling audio to 16 kHz …")
-    resampled = resample_to_16k(audio_path, str(output_dir / "resampled.wav"))
+        print(f"\n[{step}/{total_steps}] Resampling audio to 16 kHz …")
+    resampled = resample_to_16k(audio_path, str(out_dir / "resampled.wav"))
     info = sf.SoundFile(resampled)
     if not quiet:
-        print(f"      {Path(audio_path).name} → {info.samplerate} Hz, {info.channels}ch")
+        print(
+            f"      {Path(audio_path).name} → {info.samplerate} Hz, {info.channels}ch"
+        )
+
+    # ── Normalize ──
+    step += 1
+    if not quiet:
+        print(f"\n[{step}/{total_steps}] RMS-normalizing audio …")
+    if normalize:
+        data, sr = sf.read(resampled)
+        data = rms_normalize(data)
+        sf.write(resampled, data, sr)
+        if not quiet:
+            print(f"      Normalized to -20 dBFS")
+    else:
+        if not quiet:
+            print("      Skipped")
+
+    # ── VAD ──
+    vad_result = None
+    if vad:
+        step += 1
+        if not quiet:
+            print(f"\n[{step}/{total_steps}] Running VAD …")
+        vad_result = get_speech_metadata(resampled, threshold=vad_threshold)
+        if not quiet:
+            if vad_result.get("available", True):
+                print(
+                    f"      speech: {vad_result['speech_ratio'] * 100:.1f}%  "
+                    f"({vad_result['elapsed_s']}s)"
+                )
+            else:
+                print("      VAD unavailable (silero-vad not installed), skipping")
 
     # ── ASR ──
+    step += 1
     if not quiet:
-        print(f"\n[2/4] Loading ASR (faster-whisper {asr_model_size}) …")
+        print(
+            f"\n[{step}/{total_steps}] Loading ASR (faster-whisper {asr_model_size}) …"
+        )
     asr_model = load_asr(asr_model_size)
     if not quiet:
-        print(f"      Transcribing …")
+        print("      Transcribing …")
     asr_result = transcribe(asr_model, resampled)
     if not quiet:
         print(f"      → {asr_result['text']!r}")
@@ -191,27 +321,31 @@ def run_pipeline(audio_path: str, asr_model_size: str = "small",
         return {"error": "no speech detected"}
 
     # ── MT ──
+    step += 1
     if not quiet:
-        print(f"\n[3/4] Loading MT (CTranslate2 int8 Opus-MT) …")
+        print(f"\n[{step}/{total_steps}] Loading MT (CTranslate2 int8 Opus-MT) …")
     translator, sp_src, sp_tgt = load_mt()
     if not quiet:
-        print(f"      Translating …")
+        print("      Translating …")
     mt_result = translate(translator, sp_src, sp_tgt, asr_result["text"])
     if not quiet:
         print(f"      → {mt_result['translation']!r}")
         print(f"      ({mt_result['elapsed_s']}s)")
 
     # ── TTS ──
+    step += 1
     if not quiet:
-        print(f"\n[4/4] Loading TTS (Piper: en_US-lessac-medium) …")
-    tts_model = load_tts(voice_dir=str(output_dir / "voices"))
-    output_wav = str(output_dir / "output.wav")
+        print(f"\n[{step}/{total_steps}] Loading TTS (Piper: en_US-lessac-medium) …")
+    tts_model = load_tts(voice_dir=str(out_dir / "voices"))
+    output_wav = str(out_dir / "output.wav")
     if not quiet:
-        print(f"      Synthesising …")
+        print("      Synthesising …")
     tts_result = synthesize(tts_model, mt_result["translation"], output_wav)
     if not quiet:
         print(f"      → {tts_result['output']}")
-        print(f"      ({tts_result['elapsed_s']}s, {tts_result['audio_duration_s']}s audio)")
+        print(
+            f"      ({tts_result['elapsed_s']}s, {tts_result['audio_duration_s']}s audio)"
+        )
 
     total = round(time.perf_counter() - t0, 2)
 
@@ -226,6 +360,7 @@ def run_pipeline(audio_path: str, asr_model_size: str = "small",
 
     return {
         "audio_input": audio_path,
+        "vad": vad_result,
         "asr": asr_result,
         "mt": mt_result,
         "tts": tts_result,
@@ -236,24 +371,62 @@ def run_pipeline(audio_path: str, asr_model_size: str = "small",
 
 # ── CLI ──────────────────────────────────────────────────
 
+
 def main():
     parser = argparse.ArgumentParser(
-        description="OneVoice AI Challenge — ASR→MT→TTS pipeline")
-    parser.add_argument("audio", help="Input WAV file (Vietnamese speech)")
-    parser.add_argument("--asr-model", default="small",
-                        help="Whisper model size [small]")
-    parser.add_argument("--output-dir", default=".",
-                        help="Output directory [.]")
+        description="OneVoice AI Challenge — ASR→MT→TTS pipeline"
+    )
+    parser.add_argument("audio", nargs="?", help="Input WAV file (Vietnamese speech)")
+    parser.add_argument(
+        "--serve", action="store_true", help="Start persistent model server"
+    )
+    parser.add_argument(
+        "--socket", help="Unix socket path for --serve mode (default: auto)"
+    )
+    parser.add_argument(
+        "--asr-model", default="small", help="Whisper model size [small]"
+    )
+    parser.add_argument("--output-dir", default=".", help="Output directory [.]")
+    parser.add_argument(
+        "--normalize",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="RMS-normalize audio to -20 dBFS [default: enabled]",
+    )
+    parser.add_argument(
+        "--vad",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Enable Silero VAD [default: enabled]",
+    )
+    parser.add_argument(
+        "--vad-threshold",
+        type=float,
+        default=0.4,
+        help="VAD confidence threshold [default: 0.4]",
+    )
+
     args = parser.parse_args()
 
+    if args.serve:
+        from server import run_server
+
+        run_server(socket_path=args.socket, asr_model_size=args.asr_model)
+        return
+
+    if not args.audio:
+        parser.print_help()
+        sys.exit(1)
     if not Path(args.audio).exists():
         print(f"❌ File not found: {args.audio}")
         sys.exit(1)
-
     result = run_pipeline(
         audio_path=args.audio,
         asr_model_size=args.asr_model,
         output_dir=args.output_dir,
+        normalize=args.normalize,
+        vad=args.vad,
+        vad_threshold=args.vad_threshold,
     )
     if "error" in result:
         sys.exit(1)

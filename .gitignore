@@ -13,3 +13,7 @@ voices/
 # Large downloaded models (regenerable)
 models/opus-mt-vi-en-src/pytorch_model.bin
 models/opus-mt-vi-en-src/tf_model.h5
+
+# Backup files
+*.bak
+*.testbak
