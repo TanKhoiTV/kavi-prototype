@@ -1,0 +1,5 @@
+Condition,WER (%),Files,Delta vs noisy
+clean,15.53,760,-4.70pp
+noisy,20.23,760,+0.00pp
+denoised_rnnoise,33.1,760,+12.87pp
+denoised_dfn,27.05,760,+6.82pp
