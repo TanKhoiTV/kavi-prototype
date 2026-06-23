@@ -22,13 +22,10 @@ Requires:
 Author: Scaffold by Worker — implementation via SpotMe
 """
 
-import json
-import os
-import random
-import sys
 from pathlib import Path
 
 import numpy as np
+import soundfile as sf
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -59,7 +56,9 @@ VIVOS_IDS: list[str] = [
 
 # Default directory paths — override via CLI args
 DEFAULT_VIVOS_DIR = Path("data/vivos")
-DEFAULT_NOISE_WAV = Path("experiments/denoising-validation/noise_samples/industrial_mix.wav")
+DEFAULT_NOISE_WAV = Path(
+    "experiments/denoising-validation/noise_samples/industrial_mix.wav"
+)
 OUTPUT_DIR = Path("experiments/denoising-validation/results")
 
 
@@ -145,6 +144,7 @@ def mix_noise(
     Raises:
         NotImplementedError: Scaffold — implement in SpotMe.
     """
+    import random
     raise NotImplementedError("SpotMe: implement mix_noise()")
 
 
@@ -262,6 +262,7 @@ def main(vivos_dir: Path, noise_path: Path) -> None:
         vivos_dir: Path to VIVOS dataset root.
         noise_path: Path to noise WAV file.
     """
+    import json
     raise NotImplementedError("SpotMe: implement main()")
 
 
