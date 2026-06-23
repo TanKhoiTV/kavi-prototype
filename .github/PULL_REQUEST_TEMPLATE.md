@@ -2,13 +2,10 @@
 Summary of changes and which Issue this PR closes (preferably at most _one_ issue).
 
 ## 🧪 Testing Proof
-- [ ] I have run `uv run pytest` and all tests passed.
-- [ ] I have verified the residual plots/metrics.
+- [ ] `make check` passed (lint, format, typecheck, pipeline smoke test).
 
-## 🧹 Quality Check (skip if `pre-commit` hook is installed, simply tick the boxes, do not delete)
-- [ ] `uv run ruff check .` passed (Style/Linting).
-- [ ] `uv run interrogate .` meets coverage threshold.
-- [ ] Docstrings follow the NumPy convention.
+## 🧹 Quality Check
+- [ ] `uv run ruff check .` passed (style/linting).
 
 ## 📸 Visuals (Optional)
-[Attach screenshots of residual plots or performance traces.]
+[Attach screenshots of performance traces or demo output.]
