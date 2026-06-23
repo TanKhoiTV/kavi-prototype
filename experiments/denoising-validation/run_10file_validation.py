@@ -61,6 +61,8 @@ DEFAULT_NOISE_WAV = Path(
 )
 OUTPUT_DIR = Path("experiments/denoising-validation/results")
 
+# Module-level cache for Whisper
+_whisper_model = None
 
 # ---------------------------------------------------------------------------
 # TODO: Implement each function below (SpotMe self-implementation)
@@ -84,7 +86,21 @@ def load_reference_transcripts(vivos_dir: Path) -> dict[str, str]:
         NotImplementedError: Scaffold — implement in SpotMe.
         FileNotFoundError: If prompts.txt is missing.
     """
-    raise NotImplementedError("SpotMe: implement load_reference_transcripts()")
+    
+    prompts_path = vivos_dir / "test" / "prompts.txt"
+    if not prompts_path.exists():
+        raise FileNotFoundError(f"prompts.txt not found at {prompts_path}")
+    
+    refs = {}
+    with prompts_path.open(encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            file_id, _, transcript = line.partition(" ")
+            if file_id in VIVOS_IDS:
+                refs[file_id] = transcript
+    return refs
 
 
 def load_audio(file_id: str, vivos_dir: Path) -> np.ndarray:
@@ -104,7 +120,21 @@ def load_audio(file_id: str, vivos_dir: Path) -> np.ndarray:
         NotImplementedError: Scaffold — implement in SpotMe.
         FileNotFoundError: If the WAV file is missing.
     """
-    raise NotImplementedError("SpotMe: implement load_audio()")
+    
+    speaker = file_id[:10]  # e.g. "VIVOSDEV02"
+    wav_path = vivos_dir / "test" / "waves" / speaker / f"{file_id}.wav"
+    if not wav_path.exists():
+        raise FileNotFoundError(f"WAV not found: {wav_path}")
+    
+    audio, sr = sf.read(wav_path, dtype="float32")
+    if audio.ndim > 1:
+        audio = audio.mean(axis=1)  # stereo -> mono
+    if sr != SR:
+        import torch, torchaudio
+        audio = torchaudio.functional.resample(
+            torch.from_numpy(audio), orig_freq=sr, new_freq=SR
+        ).numpy()  # resample rate safeguard
+    return audio
 
 
 def load_noise(noise_path: Path) -> np.ndarray:
@@ -119,7 +149,17 @@ def load_noise(noise_path: Path) -> np.ndarray:
     Raises:
         NotImplementedError: Scaffold — implement in SpotMe.
     """
-    raise NotImplementedError("SpotMe: implement load_noise()")
+    
+    noise, sr = sf.read(noise_path, dtype="float32")
+    if noise.ndim > 1:
+        noise = noise.mean(axis=1)  # stereo -> mono
+    if sr != SR:
+        import torch, torchaudio
+        noise = torchaudio.functional.resample(
+            torch.from_numpy(noise), orig_freq=sr, new_freq=SR
+        ).numpy()  # resample rate safeguard
+    return noise
+
 
 
 def mix_noise(
@@ -144,8 +184,27 @@ def mix_noise(
     Raises:
         NotImplementedError: Scaffold — implement in SpotMe.
     """
-    import random
-    raise NotImplementedError("SpotMe: implement mix_noise()")
+    rng = np.random.default_rng(SEED)
+
+    # Tile or slice noise to match audio length
+    if len(noise) < len(audio):
+        repeats = int(np.ceil(len(audio) / len(noise)))
+        noise = np.tile(noise, repeats)
+    if len(noise) > len(audio):
+        start = rng.integers(0, len(noise) - len(audio))
+        noise = noise[start : start + len(audio)]
+    
+    p_signal = np.mean(audio ** 2)
+    p_noise = np.mean(noise ** 2)
+
+    target_p_noise = p_signal / (10 ** (snr_db / 10))
+    scale = np.sqrt(target_p_noise / (p_noise + 1e-9))  # 1e-9 guard against silence noise profile
+    mixed = audio + scale * noise
+
+    peak = np.max(np.abs(mixed))
+    if peak > 1.0:
+        mixed /= peak
+    return mixed
 
 
 def apply_rnnoise(audio: np.ndarray, sr: int) -> np.ndarray:
@@ -165,7 +224,8 @@ def apply_rnnoise(audio: np.ndarray, sr: int) -> np.ndarray:
     Raises:
         NotImplementedError: Scaffold — implement in SpotMe.
     """
-    raise NotImplementedError("SpotMe: implement apply_rnnoise()")
+    import noisereduce as nr
+    return nr.reduce_noise(y=audio, sr=sr, stationary=False).astype(np.float32)
 
 
 def apply_deepfilternet(audio: np.ndarray, sr: int) -> np.ndarray:
@@ -186,7 +246,23 @@ def apply_deepfilternet(audio: np.ndarray, sr: int) -> np.ndarray:
     Raises:
         NotImplementedError: Scaffold — implement in SpotMe.
     """
-    raise NotImplementedError("SpotMe: implement apply_deepfilternet()")
+    from df.enhance import enhance, init_df
+    import torch, torchaudio
+
+    TARGET_SR = 48000  # 48 kHz
+
+    # Upsample
+    audio_48k = torchaudio.functional.resample(torch.from_numpy(audio), orig_freq=sr, new_freq=TARGET_SR).numpy()
+
+    # (channels, samples) preparation for DeepFilterNet
+    model, df_state, _ = init_df()
+    audio_48k_2d = audio_48k[np.newaxis, :]
+    enhanced_48k = enhance(model, df_state, audio_48k_2d)
+    enhanced_48k = enhanced_48k.squeeze()
+
+    # Resample
+    enhanced = torchaudio.functional.resample(enhanced_48k, orig_freq=TARGET_SR, new_freq=sr).numpy()
+    return enhanced.astype(np.float32)
 
 
 def load_whisper_model():
