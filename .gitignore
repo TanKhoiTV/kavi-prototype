@@ -17,3 +17,8 @@ models/opus-mt-vi-en-src/tf_model.h5
 # Backup files
 *.bak
 *.testbak
+
+# Denoising validation experiment outputs
+experiments/denoising-validation/data/
+experiments/denoising-validation/noise_samples/*.wav
+experiments/denoising-validation/vivos_10/wav/*.wav
