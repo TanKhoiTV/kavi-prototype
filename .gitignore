@@ -17,3 +17,6 @@ models/opus-mt-vi-en-src/tf_model.h5
 # Backup files
 *.bak
 *.testbak
+
+# macOS metadata
+.DS_Store
