@@ -64,6 +64,16 @@ OUTPUT_DIR = Path("experiments/denoising-validation/results")
 # Module-level cache for Whisper
 _whisper_model = None
 
+
+def _resample_to_16k(audio: np.ndarray, orig_sr: int) -> np.ndarray:
+    import torch
+    import torchaudio
+
+    return torchaudio.functional.resample(
+        torch.from_numpy(audio), orig_freq=orig_sr, new_freq=SR
+    ).numpy()
+
+
 # ---------------------------------------------------------------------------
 # TODO: Implement each function below (SpotMe self-implementation)
 # ---------------------------------------------------------------------------
@@ -83,7 +93,6 @@ def load_reference_transcripts(vivos_dir: Path) -> dict[str, str]:
         Only includes IDs present in VIVOS_IDS.
 
     Raises:
-        NotImplementedError: Scaffold — implement in SpotMe.
         FileNotFoundError: If prompts.txt is missing.
     """
 
@@ -117,7 +126,6 @@ def load_audio(file_id: str, vivos_dir: Path) -> np.ndarray:
         1D float32 array, values in [-1.0, 1.0].
 
     Raises:
-        NotImplementedError: Scaffold — implement in SpotMe.
         FileNotFoundError: If the WAV file is missing.
     """
 
@@ -130,12 +138,7 @@ def load_audio(file_id: str, vivos_dir: Path) -> np.ndarray:
     if audio.ndim > 1:
         audio = audio.mean(axis=1)  # stereo -> mono
     if sr != SR:
-        import torch
-        import torchaudio
-
-        audio = torchaudio.functional.resample(
-            torch.from_numpy(audio), orig_freq=sr, new_freq=SR
-        ).numpy()  # resample rate safeguard
+        audio = _resample_to_16k(audio, sr)
     return audio
 
 
@@ -147,27 +150,17 @@ def load_noise(noise_path: Path) -> np.ndarray:
 
     Returns:
         1D float32 noise array.
-
-    Raises:
-        NotImplementedError: Scaffold — implement in SpotMe.
     """
 
     noise, sr = sf.read(noise_path, dtype="float32")
     if noise.ndim > 1:
         noise = noise.mean(axis=1)  # stereo -> mono
     if sr != SR:
-        import torch
-        import torchaudio
-
-        noise = torchaudio.functional.resample(
-            torch.from_numpy(noise), orig_freq=sr, new_freq=SR
-        ).numpy()  # resample rate safeguard
+        noise = _resample_to_16k(noise, sr)
     return noise
 
 
-def mix_noise(
-    audio: np.ndarray, noise: np.ndarray, snr_db: float, sr: int
-) -> np.ndarray:
+def mix_noise(audio: np.ndarray, noise: np.ndarray, snr_db: float) -> np.ndarray:
     """Mix audio with noise at a target SNR, normalizing to prevent clipping.
 
     SNR definition: SNR = 10 * log10(P_signal / P_noise).
@@ -179,13 +172,9 @@ def mix_noise(
         audio: Clean speech array (1D float32).
         noise: Noise array (1D float32).
         snr_db: Target SNR in decibels.
-        sr: Sample rate (for potential resampling).
 
     Returns:
         Mixed audio array (1D float32, same length as input audio).
-
-    Raises:
-        NotImplementedError: Scaffold — implement in SpotMe.
     """
     rng = np.random.default_rng(SEED)
 
@@ -226,8 +215,6 @@ def apply_rnnoise(audio: np.ndarray, sr: int) -> np.ndarray:
     Returns:
         Denoised array (1D float32).
 
-    Raises:
-        NotImplementedError: Scaffold — implement in SpotMe.
     """
     import noisereduce as nr
 
@@ -267,10 +254,13 @@ def load_whisper_model():
     Returns:
         WhisperModel instance.
 
-    Raises:
-        NotImplementedError: Scaffold — implement in SpotMe.
     """
-    raise NotImplementedError("SpotMe: implement load_whisper_model()")
+    global _whisper_model
+    if _whisper_model is None:
+        from faster_whisper import WhisperModel
+
+        _whisper_model = WhisperModel("small", device="cpu", compute_type="int8")
+    return _whisper_model
 
 
 def transcribe(audio_path: Path, model) -> str:
@@ -283,10 +273,9 @@ def transcribe(audio_path: Path, model) -> str:
     Returns:
         Transcribed text string.
 
-    Raises:
-        NotImplementedError: Scaffold — implement in SpotMe.
     """
-    raise NotImplementedError("SpotMe: implement transcribe()")
+    segments, _ = model.transcribe(str(audio_path), language="vi", beam_size=5)
+    return " ".join(seg.text.strip() for seg in segments)
 
 
 def compute_wer(reference: str, hypothesis: str) -> float:
@@ -302,10 +291,17 @@ def compute_wer(reference: str, hypothesis: str) -> float:
     Returns:
         WER as a float in [0.0, 1.0].
 
-    Raises:
-        NotImplementedError: Scaffold — implement in SpotMe.
     """
-    raise NotImplementedError("SpotMe: implement compute_wer()")
+    import string
+
+    import jiwer
+
+    def normalize(text: str) -> str:
+        text = text.lower()
+        text = text.translate(str.maketrans("", "", string.punctuation))
+        return " ".join(text.split())
+
+    return jiwer.wer(normalize(reference), normalize(hypothesis))
 
 
 # ---------------------------------------------------------------------------
@@ -331,7 +327,49 @@ def main(vivos_dir: Path, noise_path: Path) -> None:
         vivos_dir: Path to VIVOS dataset root.
         noise_path: Path to noise WAV file.
     """
-    raise NotImplementedError("SpotMe: implement main()")
+    import json
+
+    refs = load_reference_transcripts(vivos_dir)
+    noise = load_noise(noise_path)
+    model = load_whisper_model()
+
+    results = []
+    header = f"{'ID':<20} {'clean':>7} {'noisy':>7} {'rnnoise':>8} {'wiener':>7}"
+    print(header)
+    print("-" * len(header))
+
+    for file_id in VIVOS_IDS:
+        reference = refs[file_id]
+        clean = load_audio(file_id, vivos_dir)
+        noisy = mix_noise(clean, noise, SNR_DB)
+
+        import tempfile
+
+        with tempfile.TemporaryDirectory(dir=OUTPUT_DIR) as tmp:
+            conditions = {
+                "clean": clean,
+                "noisy": noisy,
+                "rnnoise": apply_rnnoise(noisy, SR),
+                "wiener": apply_wiener(noisy, SR),
+            }
+
+            wers = {}
+            for name, audio in conditions.items():
+                wav_path = tmp / f"{file_id}_{name}.wav"
+                sf.write(wav_path, audio, SR)
+                hyp = transcribe(wav_path, model)
+                wers[name] = round(compute_wer(reference, hyp), 4)
+
+            results.append({"file_id": file_id, "reference": reference, **wers})
+            print(
+                f"{file_id:<20} {wers['clean']:>7.3f} {wers['noisy']:>7.3f} "
+                f"{wers['rnnoise']:>8.3f} {wers['wiener']:>7.3f}"
+            )
+
+    out_path = OUTPUT_DIR / "10file_results.json"
+    with out_path.open("w", encoding="utf-8") as f:
+        json.dump(results, f, ensure_ascii=False, indent=2)
+    print(f"\nSaved to: {out_path}")
 
 
 # ---------------------------------------------------------------------------
