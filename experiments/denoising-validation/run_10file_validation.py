@@ -2,9 +2,9 @@
 """
 10-file denoising validation — Phase 1 of denoising impact analysis.
 
-Validates whether DeepFilterNet and RNNoise degrade WER vs raw noisy audio
+Validates whether denoising (RNNoise, Wiener) degrades WER vs raw noisy audio
 on Vietnamese speech (VIVOS) at SNR 5dB with ESC-50 industrial noise,
-using Whisper Small int8 on CPU (our pipeline's actual ASR model).
+using Whisper Small int8 on CPU.
 
 Advisor finding (2026-06-23):
   SNR 5dB with industrial noise is a valid edge case but not the decision
@@ -17,7 +17,7 @@ Usage:
 Requires:
   - VIVOS test set downloaded: kaggle datasets download kynthesis/...
   - ESC-50 dataset downloaded for noise samples
-  - pip: faster-whisper, noisereduce, deepfilternet, soundfile, numpy, jiwer
+  - pip: faster-whisper, noisereduce, soundfile, numpy, jiwer
 
 Author: Scaffold by Worker — implementation via SpotMe
 """
@@ -64,6 +64,16 @@ OUTPUT_DIR = Path("experiments/denoising-validation/results")
 # Module-level cache for Whisper
 _whisper_model = None
 
+
+def _resample_to_16k(audio: np.ndarray, orig_sr: int) -> np.ndarray:
+    import torch
+    import torchaudio
+
+    return torchaudio.functional.resample(
+        torch.from_numpy(audio), orig_freq=orig_sr, new_freq=SR
+    ).numpy()
+
+
 # ---------------------------------------------------------------------------
 # TODO: Implement each function below (SpotMe self-implementation)
 # ---------------------------------------------------------------------------
@@ -83,14 +93,13 @@ def load_reference_transcripts(vivos_dir: Path) -> dict[str, str]:
         Only includes IDs present in VIVOS_IDS.
 
     Raises:
-        NotImplementedError: Scaffold — implement in SpotMe.
         FileNotFoundError: If prompts.txt is missing.
     """
-    
+
     prompts_path = vivos_dir / "test" / "prompts.txt"
     if not prompts_path.exists():
         raise FileNotFoundError(f"prompts.txt not found at {prompts_path}")
-    
+
     refs = {}
     with prompts_path.open(encoding="utf-8") as f:
         for line in f:
@@ -117,23 +126,19 @@ def load_audio(file_id: str, vivos_dir: Path) -> np.ndarray:
         1D float32 array, values in [-1.0, 1.0].
 
     Raises:
-        NotImplementedError: Scaffold — implement in SpotMe.
         FileNotFoundError: If the WAV file is missing.
     """
-    
+
     speaker = file_id[:10]  # e.g. "VIVOSDEV02"
     wav_path = vivos_dir / "test" / "waves" / speaker / f"{file_id}.wav"
     if not wav_path.exists():
         raise FileNotFoundError(f"WAV not found: {wav_path}")
-    
+
     audio, sr = sf.read(wav_path, dtype="float32")
     if audio.ndim > 1:
         audio = audio.mean(axis=1)  # stereo -> mono
     if sr != SR:
-        import torch, torchaudio
-        audio = torchaudio.functional.resample(
-            torch.from_numpy(audio), orig_freq=sr, new_freq=SR
-        ).numpy()  # resample rate safeguard
+        audio = _resample_to_16k(audio, sr)
     return audio
 
 
@@ -145,26 +150,17 @@ def load_noise(noise_path: Path) -> np.ndarray:
 
     Returns:
         1D float32 noise array.
-
-    Raises:
-        NotImplementedError: Scaffold — implement in SpotMe.
     """
-    
+
     noise, sr = sf.read(noise_path, dtype="float32")
     if noise.ndim > 1:
         noise = noise.mean(axis=1)  # stereo -> mono
     if sr != SR:
-        import torch, torchaudio
-        noise = torchaudio.functional.resample(
-            torch.from_numpy(noise), orig_freq=sr, new_freq=SR
-        ).numpy()  # resample rate safeguard
+        noise = _resample_to_16k(noise, sr)
     return noise
 
 
-
-def mix_noise(
-    audio: np.ndarray, noise: np.ndarray, snr_db: float, sr: int
-) -> np.ndarray:
+def mix_noise(audio: np.ndarray, noise: np.ndarray, snr_db: float) -> np.ndarray:
     """Mix audio with noise at a target SNR, normalizing to prevent clipping.
 
     SNR definition: SNR = 10 * log10(P_signal / P_noise).
@@ -176,13 +172,9 @@ def mix_noise(
         audio: Clean speech array (1D float32).
         noise: Noise array (1D float32).
         snr_db: Target SNR in decibels.
-        sr: Sample rate (for potential resampling).
 
     Returns:
         Mixed audio array (1D float32, same length as input audio).
-
-    Raises:
-        NotImplementedError: Scaffold — implement in SpotMe.
     """
     rng = np.random.default_rng(SEED)
 
@@ -193,12 +185,14 @@ def mix_noise(
     if len(noise) > len(audio):
         start = rng.integers(0, len(noise) - len(audio))
         noise = noise[start : start + len(audio)]
-    
-    p_signal = np.mean(audio ** 2)
-    p_noise = np.mean(noise ** 2)
+
+    p_signal = np.mean(audio**2)
+    p_noise = np.mean(noise**2)
 
     target_p_noise = p_signal / (10 ** (snr_db / 10))
-    scale = np.sqrt(target_p_noise / (p_noise + 1e-9))  # 1e-9 guard against silence noise profile
+    scale = np.sqrt(
+        target_p_noise / (p_noise + 1e-9)
+    )  # 1e-9 guard against silence noise profile
     mixed = audio + scale * noise
 
     peak = np.max(np.abs(mixed))
@@ -221,48 +215,34 @@ def apply_rnnoise(audio: np.ndarray, sr: int) -> np.ndarray:
     Returns:
         Denoised array (1D float32).
 
-    Raises:
-        NotImplementedError: Scaffold — implement in SpotMe.
     """
     import noisereduce as nr
+
     return nr.reduce_noise(y=audio, sr=sr, stationary=False).astype(np.float32)
 
 
-def apply_deepfilternet(audio: np.ndarray, sr: int) -> np.ndarray:
-    """Apply DeepFilterNet via df.enhance pipeline.
+def apply_wiener(audio: np.ndarray, sr: int) -> np.ndarray:
+    """Apply Wiener filtering via noisereduce with conservative settings.
 
-    DeepFilterNet operates at 48kHz internally — resample to 48k, enhance,
-    then resample back to original sr.
-
-    Note: First run triggers model download (~50MB).
+    Wiener filtering with prop_decrease=0.5 applies moderate noise reduction
+    while preserving speech structure. This is the primary denoising candidate
+    per ADR-002 — ASR penalizes speech distortion more than residual noise.
 
     Args:
         audio: Noisy speech array (1D float32).
         sr: Sample rate.
 
     Returns:
-        Denoised array (1D float32 at original sr).
+        Filtered array (1D float32).
 
     Raises:
-        NotImplementedError: Scaffold — implement in SpotMe.
+        ValueError: If audio is empty or contains only silence.
     """
-    from df.enhance import enhance, init_df
-    import torch, torchaudio
+    import noisereduce as nr
 
-    TARGET_SR = 48000  # 48 kHz
-
-    # Upsample
-    audio_48k = torchaudio.functional.resample(torch.from_numpy(audio), orig_freq=sr, new_freq=TARGET_SR).numpy()
-
-    # (channels, samples) preparation for DeepFilterNet
-    model, df_state, _ = init_df()
-    audio_48k_2d = audio_48k[np.newaxis, :]
-    enhanced_48k = enhance(model, df_state, audio_48k_2d)
-    enhanced_48k = enhanced_48k.squeeze()
-
-    # Resample
-    enhanced = torchaudio.functional.resample(enhanced_48k, orig_freq=TARGET_SR, new_freq=sr).numpy()
-    return enhanced.astype(np.float32)
+    if len(audio) == 0 or np.max(np.abs(audio)) < 1e-6:
+        raise ValueError("Audio is empty or silent")
+    return nr.reduce_noise(y=audio, sr=sr, prop_decrease=0.5).astype(np.float32)
 
 
 def load_whisper_model():
@@ -274,10 +254,13 @@ def load_whisper_model():
     Returns:
         WhisperModel instance.
 
-    Raises:
-        NotImplementedError: Scaffold — implement in SpotMe.
     """
-    raise NotImplementedError("SpotMe: implement load_whisper_model()")
+    global _whisper_model
+    if _whisper_model is None:
+        from faster_whisper import WhisperModel
+
+        _whisper_model = WhisperModel("small", device="cpu", compute_type="int8")
+    return _whisper_model
 
 
 def transcribe(audio_path: Path, model) -> str:
@@ -290,10 +273,9 @@ def transcribe(audio_path: Path, model) -> str:
     Returns:
         Transcribed text string.
 
-    Raises:
-        NotImplementedError: Scaffold — implement in SpotMe.
     """
-    raise NotImplementedError("SpotMe: implement transcribe()")
+    segments, _ = model.transcribe(str(audio_path), language="vi", beam_size=5)
+    return " ".join(seg.text.strip() for seg in segments)
 
 
 def compute_wer(reference: str, hypothesis: str) -> float:
@@ -309,10 +291,17 @@ def compute_wer(reference: str, hypothesis: str) -> float:
     Returns:
         WER as a float in [0.0, 1.0].
 
-    Raises:
-        NotImplementedError: Scaffold — implement in SpotMe.
     """
-    raise NotImplementedError("SpotMe: implement compute_wer()")
+    import string
+
+    import jiwer
+
+    def normalize(text: str) -> str:
+        text = text.lower()
+        text = text.translate(str.maketrans("", "", string.punctuation))
+        return " ".join(text.split())
+
+    return jiwer.wer(normalize(reference), normalize(hypothesis))
 
 
 # ---------------------------------------------------------------------------
@@ -327,8 +316,8 @@ def main(vivos_dir: Path, noise_path: Path) -> None:
       1. Load clean audio + reference transcript
       2. Mix noise at SNR_DB dB -> "raw_noisy"
       3. Apply RNNoise (stationary=False) -> "rnnoise"
-      4. Apply DeepFilterNet -> "dfn"
-      5. Transcribe all 4 conditions with Whisper Small int8
+      4. Apply Wiener (prop_decrease=0.5) -> "wiener"
+      5. Transcribe all 4 conditions (clean, raw_noisy, rnnoise, wiener) with Whisper Small int8
       6. Compute WER against reference
       7. Print row in results table
 
@@ -339,7 +328,48 @@ def main(vivos_dir: Path, noise_path: Path) -> None:
         noise_path: Path to noise WAV file.
     """
     import json
-    raise NotImplementedError("SpotMe: implement main()")
+
+    refs = load_reference_transcripts(vivos_dir)
+    noise = load_noise(noise_path)
+    model = load_whisper_model()
+
+    results = []
+    header = f"{'ID':<20} {'clean':>7} {'noisy':>7} {'rnnoise':>8} {'wiener':>7}"
+    print(header)
+    print("-" * len(header))
+
+    for file_id in VIVOS_IDS:
+        reference = refs[file_id]
+        clean = load_audio(file_id, vivos_dir)
+        noisy = mix_noise(clean, noise, SNR_DB)
+
+        import tempfile
+
+        with tempfile.TemporaryDirectory(dir=OUTPUT_DIR) as tmp:
+            conditions = {
+                "clean": clean,
+                "noisy": noisy,
+                "rnnoise": apply_rnnoise(noisy, SR),
+                "wiener": apply_wiener(noisy, SR),
+            }
+
+            wers = {}
+            for name, audio in conditions.items():
+                wav_path = tmp / f"{file_id}_{name}.wav"
+                sf.write(wav_path, audio, SR)
+                hyp = transcribe(wav_path, model)
+                wers[name] = round(compute_wer(reference, hyp), 4)
+
+            results.append({"file_id": file_id, "reference": reference, **wers})
+            print(
+                f"{file_id:<20} {wers['clean']:>7.3f} {wers['noisy']:>7.3f} "
+                f"{wers['rnnoise']:>8.3f} {wers['wiener']:>7.3f}"
+            )
+
+    out_path = OUTPUT_DIR / "10file_results.json"
+    with out_path.open("w", encoding="utf-8") as f:
+        json.dump(results, f, ensure_ascii=False, indent=2)
+    print(f"\nSaved to: {out_path}")
 
 
 # ---------------------------------------------------------------------------
