@@ -1,0 +1,29 @@
+# Pre-commit hooks for kavi-prototype
+# commitlint enforces Conventional Commits on every commit message.
+# Activate with: uv run pre-commit install
+# (writes .git/hooks/commit-msg so the hook runs on `git commit`)
+# The legacy project under ./archive is frozen reference and is excluded.
+exclude: '^archive/'
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-added-large-files
+        args: ['--maxkb=5000']
+
+  # commitlint runs in a Node env provisioned by pre-commit itself,
+  # so no package.json / node_modules is needed in this Python repo.
+  - repo: local
+    hooks:
+      - id: commitlint
+        name: commitlint (Conventional Commits)
+        entry: commitlint --edit
+        language: node
+        additional_dependencies:
+          - '@commitlint/cli@19'
+          - '@commitlint/config-conventional@19'
+        stages: [commit-msg]
