@@ -69,6 +69,24 @@ uv sync        # install dependencies
 make check     # lint
 ```
 
+## Tooling & standards
+
+- **Commit messages**: enforced by [`commitlint`](https://commitlint.js.org/)
+  via the `commit-msg` pre-commit hook. Titles must follow
+  [Conventional Commits](https://www.conventionalcommits.org/)
+  (`feat:`, `fix:`, `docs:`, `chore:`, …). The same rule is checked in CI.
+- **pre-commit**: install once with `uv run pre-commit install` (writes
+  `.git/hooks/commit-msg`). It also runs basic file hygiene
+  (trailing whitespace, EOF newline, YAML, large files).
+- **Linting / formatting**: [`ruff`](https://docs.astral.sh/ruff/) — run
+  `make check` (lint + format check) before pushing; `make fmt` to auto-fix.
+- **Changelog**: [`git-cliff`](https://git-cliff.org/) generates
+  `CHANGELOG.md` from Conventional Commits history (Keep a Changelog format).
+  CI regenerates it on every push to `main`; locally run
+  `git cliff -o CHANGELOG.md` after installing `git-cliff`.
+- **CI**: `.github/workflows/ci.yml` runs `make check` on PRs/pushes to `main`.
+- **License**: MIT (see `LICENSE`).
+
 ## Note on `archive/`
 
 The previous implementation lives under `archive/`. It is reference material,
