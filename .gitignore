@@ -19,3 +19,10 @@ models/opus-mt-vi-en-src/tf_model.h5
 # Backup files
 *.bak
 *.testbak
+
+# Tooling / environment caches
+.ruff_cache/
+.venv/
+
+# Runtime logs (legacy logs/ is tracked under archive/)
+logs/
