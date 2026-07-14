@@ -1,0 +1,99 @@
+# ADR-003: Hexagon runtime / compiler strategy (provisional)
+
+## Status
+
+Proposed
+
+## Date
+
+2026-07-14
+
+## Context
+
+ADR-001 establishes offline-first, on-device execution. ADR-002 fixes the target
+platform: Snapdragon 8 Gen 2 / Android 16, with the **Hexagon NPU (HTP v73)** as
+primary compute and a documented GPU → CPU fallback. This ADR selects the
+**runtime / compiler strategy** for reaching that NPU. It is intentionally
+*provisional* — to be finalized after on-device benchmarks.
+
+A key constraint surfaced while evaluating: the current prototype runtimes
+(**whisper.cpp / ggml** for ASR, **CTranslate2** for MT) are **not QNN-convertible**
+— QNN / QAIRT converters ingest PyTorch, TFLite, or ONNX, not ggml weights or the
+CT2 binary format. NPU acceleration therefore likely requires *re-sourcing* models
+in a convertible format. The concrete tech stack is **not yet decided** and is
+deferred to future per-stage ADRs (see Open Questions).
+
+## Decision (provisional)
+
+- **Primary NPU runtime:** **QAIRT / QNN** (Qualcomm AI Runtime SDK — the QNN SDK
+  rebranded as of v2.32) accessed via the **ONNX Runtime QNN Execution Provider**.
+  Target **Hexagon HTP v73**; deploy as **DLC** (preferred, forward-compatible) or a
+  QNN context binary.
+- **Fallback chain (runtime mapping):** NPU → GPU (Adreno via ORT OpenCL EP /
+  TFLite GPU delegate) → CPU (**ORT XNNPACK int8**). **NNAPI is explicitly
+  avoided** — deprecated in Android 15, and our target is Android 16.
+- **Quantization required:** the HTP only executes quantized graphs; **w8a16**
+  (int8 weights / int16 activations) is recommended to protect transformer
+  accuracy. HTP silently rejects unquantized graphs.
+- **No dynamic shapes:** batch / sequence length must be fixed (padding + masking).
+  This mainly affects the autoregressive ASR / MT decoders.
+- **Per-stage intent (evaluate, TBD by benchmark):**
+  - **ASR:** evaluate Qualcomm-optimized Whisper (e.g. Whisper-Small-Quantized,
+    w8a16) from AI Hub Models vs. the current whisper.cpp integration.
+  - **MT:** evaluate exporting **Opus-MT vi↔en** (Helsinki-NLP, PyTorch) to ONNX →
+    QAIRT compile + quantize (no prebuilt exists in AI Hub; the en-es recipe is a
+    template). The current CTranslate2 build is not QNN-convertible.
+  - **TTS:** evaluate Piper ONNX (already ONNX) → QAIRT; check Vietnamese coverage
+    in AI Hub PiperTTS.
+- **Toolchain:** QAIRT Community Edition (free, gated by a Qualcomm ID); Qualcomm
+  AI Hub optional (free device farm); AIMET-ONNX for quantization on an x86_64
+  host; ORT QNN EP. **AI Hub is build-time only** — artifacts run fully offline.
+- **Finalization:** after the on-device benchmark below. Per-stage model /
+  architecture selection is deferred to follow-up ADRs.
+
+## Determination method (how we finalize)
+
+- **De-risk sequencing:** stand up a **CPU-only baseline first** (ORT XNNPACK, or
+  the current Piper / CT2 stack lightly re-quantized) to prove RTF < 1.0 /
+  turnaround < 2.0 s; *then* layer QAIRT / QNN as an optimization pass. This avoids
+  a toolchain snag blocking the whole submission.
+- **Benchmark on real 8 Gen 2 (v73)** — emulators do not exercise the NPU
+  (ADR-002): for each stage × candidate runtime {QAIRT / QNN, ORT-CPU}, measure RTF,
+  end-to-end turnaround (EOS → SA < 2.0 s), and MOS / accuracy regression vs the CPU
+  baseline.
+- **Pick per stage.** If QNN conversion misses the budget or regresses accuracy,
+  fall back to CPU. This ADR is **amended / superseded** once numbers are in.
+
+## Alternatives Considered
+
+- **NNAPI** — **rejected**: deprecated in Android 15 (target is 16); no forward
+  guarantee from Qualcomm; loses fine-grained op control and context-binary caching.
+- **Model-native runtimes (ggml / CT2)** — kept only as CPU baselines; **not
+  QNN-convertible**, so unsuitable as the NPU path.
+- **QNN-only standardization** — chosen as the primary path; requires evaluating
+  model re-sourcing (above).
+- **TFLite + GPU delegate** — viable for the GPU tier; pairs with ORT-CPU, not NNAPI.
+
+## Consequences
+
+- **Model-format evaluation required:** NPU acceleration likely means re-sourcing
+  ASR / MT to PyTorch / ONNX (CT2 / ggml are not QNN-convertible). The final tech
+  stack and per-stage models are **deferred to future ADRs**.
+- **Toolchain sprawl risk:** QAIRT SDK + AIMET + ORT QNN EP + Android NDK, each with
+  version pins. The CPU-first sequencing mitigates deadline risk.
+- **Quantization + fixed-shape reformulation** is required engineering, not an
+  optional optimization.
+- **Artifact choice:** prefer **DLC** over context binary for forward-compat across
+  QAIRT SDK versions.
+- **OEM firmware drift:** the Hexagon driver ships in the vendor image; test on the
+  real 8 Gen 2 unit early, do not assume parity with AI Hub's hosted devices.
+- **Provisional:** this ADR will be amended / superseded after on-device benchmarks.
+
+## Open Questions
+
+- Tech stack (ASR / MT / TTS frameworks) **not yet decided** — future ADRs will
+  select per-stage models and runtimes.
+- Vietnamese **TTS coverage** in AI Hub PiperTTS?
+- **w8a16 vs w8a8** accuracy for Opus-MT vi↔en?
+- Which stages truly need HTP vs are CPU-sufficient?
+- Can we obtain QAIRT Community Edition (free Qualcomm ID)? Expected yes, confirm.
