@@ -34,4 +34,7 @@ ignore = ["E501"]
 quote-style = "double"
 
 [dependency-groups]
-dev = ["ruff>=0.15.18"]
+dev = [
+    "pre-commit>=4.6.0",
+    "ruff>=0.15.18",
+]
