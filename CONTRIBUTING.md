@@ -28,7 +28,8 @@ docs(adr): record Hy-MT decision
 
 ## Local Development
 
-Both repos are **private** — ask a maintainer to add you as a collaborator.
+The `aivoice-2026` parent repo is **public**; this `prototype/` submodule is
+**private** — ask a maintainer to add you as a collaborator for submodule access.
 
 ```bash
 # from the umbrella repo:
