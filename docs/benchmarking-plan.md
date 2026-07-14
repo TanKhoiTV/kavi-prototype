@@ -167,11 +167,14 @@ mode you have.
 
 ---
 
-## 4. ASR candidate landscape (models, not data)
+## 4. Model candidate landscape (ASR, MT, TTS)
 
-> **Input to ADR-004, not a decision here.** A candidate-model comparison for the ASR
-> stage, sourced from an external analysis pass. It refines the v0 candidate set (§8)
-> and the per-stage list (§9); the final ASR pick stays with ADR-004.
+> **Input to ADR-004, not a decision here.** Candidate-model comparisons for the ASR,
+> MT, and TTS stages. ASR (§4.1–4.3) is sourced from an external analysis pass; MT and
+> TTS (§4.4–4.5) are synthesized from the repo's archived docs (architecture.md,
+> ADR-001) plus Context7 library docs (CTranslate2, Piper, Transformers). It refines
+> the v0 candidate set (§8) and the per-stage list (§9); the final picks stay with
+> ADR-004.
 
 Four VI/EN ASR candidates were compared on accuracy, latency (Snapdragon 8 Gen 2
 estimates), memory, licensing, and Qualcomm AI Hub availability.
@@ -223,6 +226,65 @@ estimates), memory, licensing, and Qualcomm AI Hub availability.
 > more representative. No public head-to-head of Moonshine Tiny VI vs PhoWhisper Small
 > exists (different evaluation sets). Latencies are paper/architecture estimates, not
 > measured on our unit.
+
+### 4.4 MT candidate landscape (VI↔EN)
+
+> Sources: archived `architecture.md` + `docs/adr/001-prioritize-hy-mt-over-nllb.md`
+> (ADR-001, accepted 2026-06-14) + Context7 (CTranslate2, Transformers). The prototype
+> (`archive/pipeline.py`, `models/opus-mt-vi-en-ct2`) actually runs **Opus-MT vi-en via
+> CTranslate2 int8**; the archived ADR-001 instead selected **Hy-MT1.5** (NLLB only as
+> benchmark reference). MT is **bidirectional** — VI→EN and EN→VI.
+
+| Model | VI↔EN quality | Latency (SD8G2 est) | Size | License (commercial?) | AI Hub / SD8G2 | Notes |
+| --- | --- | --- | --- | --- | --- | --- |
+| **Opus-MT** (Helsinki-NLP/opus-mt-vi-en) | Moderate (small MarianMT, ~60M params) | Low (CPU int8, fast) | int8 CT2 ~70 MB (verify) | Apache-2.0 (OK) | No (DIY ONNX→QAIRT) | **Current prototype.** VN→EN only; EN→VN needs a separate opus-mt-en-vi. CTranslate2 is NOT QNN-convertible — NPU needs PyTorch→ONNX→QAIRT re-source (Transformers export confirmed). |
+| **NLLB-600M-Distilled** (Meta) | High | ~2 s / 75 tok (RTranslator optimized, CPU) | ~600 MB int8 | CC-BY-NC-4.0 (avoid) | No (DIY ONNX→QNN) | **Avoid for production** (non-commercial). NPU-acceleratable; benchmark reference only. Needs `forced_bos_token_id` per lang. |
+| **Hy-MT1.5-1.8B** (Tencent) | High (surpasses 72B-class on FLORES-200, per ADR-001) | ~400–800 ms CPU (SD888 tested; SD8G2 faster est.) | 440 MB (1.25-bit STQ) | HY Community — commercial OK *per ADR-001*, but regional carve-out flagged by current stance → avoid/verify | No (CPU-only STQ kernel, no NPU path) | Old ADR-001 sole pick; covers all pairs in one model. CPU-only, no NPU acceleration. |
+| **MADLAD-400** (Google) | Moderate–high | High (3B/7B, CPU-heavy) | 3B / 7B | Apache-2.0 (OK) | No | 450+ langs incl VI/EN; too large for 8G2 latency budget. |
+| **M2M-100** (Meta) | Moderate | Moderate (418M) | 418M–1.2B | MIT (OK) | No | 100 langs; 418M edge-plausible; older. |
+| **SeamlessM4T v2** (Meta) | High (unified S2ST) | Too slow (2.3B) | 2.3B | Custom (verify; likely research-only) | No | Unified speech-to-speech (bypasses ASR/MT/TTS split); server-scale, not 8G2-deployable. |
+
+- **Bidirectional coverage:** Opus-MT needs two models (vi-en + en-vi). NLLB / Hy-MT /
+  MADLAD / M2M / Seamless are multilingual (both directions in one).
+- **NPU path (ADR-003):** CTranslate2 (our current MT runtime) is **not** QNN-convertible.
+  Opus-MT and NLLB are standard PyTorch Seq2Seq → exportable to ONNX → QAIRT via
+  Transformers/optimum (confirmed by Context7). Hy-MT's STQ kernel is CPU-only with no
+  NPU path.
+- **Licensing gate:** commercial-clean = Opus-MT, MADLAD-400, M2M-100. **Avoid** =
+  NLLB (NC), and **Hy-MT** pending regional-carve-out verification. SeamlessM4T license
+  verify.
+
+### 4.5 TTS candidate landscape (VI + EN voices)
+
+> Sources: archived `architecture.md` (MeloTTS-VI primary, MMS-TTS-vie fallback) +
+> Context7 (Piper). The prototype (`archive/pipeline.py`, `voices/`) uses **Piper**
+> (`en_US-lessac-medium`). TTS must supply **both** a Vietnamese voice (EN→VI output)
+> and an English voice (VI→EN output).
+
+| Model | VI + EN voices | Quality (MOS) | Latency (SD8G2 est) | Size | License | AI Hub / SD8G2 | Notes |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| **Piper** (rhasspy) | EN yes (official); VI community voice (verify) | Good (non-AR VITS-like) | Very fast (< RTF 1, real-time+) | ~tens MB/voice | MIT (OK) | No (ONNX→QAIRT feasible; Piper is already ONNX) | **Current prototype.** Offline, CPU via onnxruntime. Phonemization needs espeak-ng. |
+| **MeloTTS** (myshell-ai) | EN/ZH/ES on AI Hub yes; VI absent (needs fine-tune from VIVOS/CommonVoice-VI) | Good (VITS, BERT-conditioned) | ~150–250 ms (target) | ~tens–100 MB | MIT (OK) | EN/ZH/ES on Hub (w8a16, SD8G2); VI needs self-export | Archived primary TTS. VITS-based, non-AR. VI is the known gap. |
+| **vietTTS / VITS-VI** | VI yes (VI-only) | Moderate–good (depends on data) | Low (CPU) | ~tens MB | MIT/Apache (verify) | No (DIY ONNX) | VI-native alternative to MeloTTS-VI fine-tune. |
+| **MMS-TTS-vie** (Meta) | VI yes | Lower (intelligibility tier) | Very low (~15 ms) | small | CC-BY-NC-4.0 (avoid) | No | **Avoid for production** (non-commercial). Was archived thermal-tier fallback. |
+| **Coqui XTTS-v2** | EN + 16 langs (not VI) | High | Higher (AR, larger) | ~1 GB+ | CPML (restrictive, avoid) | No | **Avoid for commercial.** High quality but license gating + no VI. |
+| **Kokoro** (hexgrad) | EN yes + growing multilingual (VI? verify) | Good (lightweight) | Very fast (~80M) | ~80 MB | Apache-2.0 (OK) | No | Lightweight EN TTS option; check VI coverage. |
+| **SpeechT5** (Microsoft) | Multilingual yes | Moderate | Higher (larger) | ~100s MB | MIT (OK) | No | General multilingual TTS; slower/heavier. |
+
+- **VI voice is the hard gap.** Our prototype's Piper has EN but VI needs a community
+  voice; MeloTTS-VI must be fine-tuned (archived plan's "contribution"); vietTTS is
+  VI-native. EN voice is easy (Piper EN, MeloTTS-EN on Hub).
+- **Offline guarantee:** Piper and MeloTTS both run fully offline (unlike RTranslator's
+  system-TTS dependency — see §5). This is a verifiable Kavi advantage.
+- **NPU path (ADR-003):** Piper/MeloTTS are ONNX → ORT QNN EP / QAIRT feasible (Piper
+  already ONNX). vietTTS/VITS also ONNX-exportable.
+- **Licensing gate:** commercial-clean = Piper, MeloTTS, vietTTS, Kokoro, SpeechT5.
+  **Avoid** = MMS-TTS-vie (NC), Coqui XTTS (CPML).
+
+> **Caveats (MT/TTS):** quality/latency figures for MT/TTS are mostly archived-plan
+> estimates or training-knowledge, not measured on our 8 Gen 2 — our v0 harness must
+> produce the real numbers. License fields marked (verify) need a model-card check
+> before any public release. Opus-MT / Piper sizes are approximate.
 
 ## 5. RTranslator as product baseline
 
