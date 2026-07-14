@@ -36,9 +36,9 @@ Kavi targets the **Snapdragon 8 Gen 2** mobile platform running **Android 16**,
 with inference **optimized for the Hexagon NPU** and a documented
 **GPU → CPU fallback** chain.
 
-- **SoC:** Snapdragon 8 Gen 2 (Kryo CPU + Adreno GPU + Hexagon NPU) — the
-  **exact target**; newer Snapdragon 8-series parts (8 Gen 3, 8 Elite) may work
-  as supersets but are **not guaranteed**.
+- **SoC:** Snapdragon 8 Gen 2 (Kryo CPU + Adreno GPU + Hexagon NPU — **HTP
+  v73**) — the **exact target**; newer Snapdragon 8-series parts (8 Gen 3, 8
+  Elite) may work as supersets but are **not guaranteed**.
 - **OS:** Android 16 (API level 36).
 - **Primary compute:** Hexagon NPU (the specific runtime / compiler is deferred
   to ADR-003).
@@ -86,6 +86,8 @@ with inference **optimized for the Hexagon NPU** and a documented
 - **Forward compatibility:** newer Snapdragon 8-series parts may run as
   supersets but are not guaranteed; if they become the test devices we
   re-validate.
+- **Hexagon HTP version:** the 8 Gen 2's NPU is **HTP v73** (reference: 8 Gen 3 =
+  v75, 8 Elite = v79 / v81); compiled NPU artifacts are version-locked to v73.
 - **Tooling / runtime:** the specific runtime / compiler is deferred to
   ADR-003; whatever is chosen must target the Hexagon NPU with the GPU → CPU
   fallback above.
