@@ -26,13 +26,13 @@ into harness code.
 
 | Doc | What it locks | What this plan adds |
 | --- | --- | --- |
-| **ADR-001** Offline-first, on-device | Zero cloud dependency | No-internet DQ is a scored gate in §6 |
+| **ADR-001** Offline-first, on-device | Zero cloud dependency | No-internet DQ is a scored gate in §7 |
 | **ADR-002** Target platform | Snapdragon 8 Gen 2 / Android 16, Hexagon HTP v73, GPU→CPU fallback | Datasets + noise must reflect the *noisy* deployment, not clean-room only |
-| **ADR-003** Hexagon runtime (Proposed) | QAIRT/QNN primary, ORT-XNNPACK CPU fallback, w8a16, fixed shapes | Determination method = **CPU baseline first, then on-device benchmark** (§5, §7) |
-| `docs/specifications.md` | The six objective metrics + hard thresholds | §6 restates them as harness outputs |
+| **ADR-003** Hexagon runtime (Proposed) | QAIRT/QNN primary, ORT-XNNPACK CPU fallback, w8a16, fixed shapes | Determination method = **CPU baseline first, then on-device benchmark** (§6, §8) |
+| `docs/specifications.md` | The six objective metrics + hard thresholds | §7 restates them as harness outputs |
 
 > **Out of scope here:** which models/frameworks we ship. That is ADR-004, fed by
-> the v0 results in §7.
+> the v0 results in §8.
 
 ---
 
@@ -167,7 +167,64 @@ mode you have.
 
 ---
 
-## 4. RTranslator as product baseline
+## 4. ASR candidate landscape (models, not data)
+
+> **Input to ADR-004, not a decision here.** A candidate-model comparison for the ASR
+> stage, sourced from an external analysis pass. It refines the v0 candidate set (§8)
+> and the per-stage list (§9); the final ASR pick stays with ADR-004.
+
+Four VI/EN ASR candidates were compared on accuracy, latency (Snapdragon 8 Gen 2
+estimates), memory, licensing, and Qualcomm AI Hub availability.
+
+### 4.1 Accuracy — Vietnamese WER (lower is better)
+
+| Model | CMV-Vi | VIVOS | VLSP T2 | EN support | License | AI Hub (SD8G2) |
+| --- | --- | --- | --- | --- | --- | --- |
+| **Whisper Small** (244M) | ~26–30% | ~20–25% | ~55–65% | Full multilingual | Apache-2.0 | Yes (w8a16) |
+| **PhoWhisper Small** (244M) | **11.08** | **6.33** | **32.96** | Inherited (unbench) | BSD-3 | No (DIY export) |
+| **Zipformer 30M VI** (~30M) | no public # | — | — | **None — VI only** | Apache-2.0 | No (untested) |
+| **Moonshine Tiny VI** (27M) | 18.8 (CV17) | — | — | **None — VI only** | Apache-2.0 | No (DIY) |
+
+- **PhoWhisper Small** is the VI-accuracy winner (~2.4× better than Whisper Small on
+  CMV-Vi) and is the same architecture as Whisper Small, so the AI Hub `SHA+conv` →
+  w8a16 trick applies — a QNN/HTP path is feasible, just not prebuilt.
+- **Whisper Small** is the only candidate with **confirmed EN + VI** support and the
+  only one with **published SD8G2 latency** (via Qualcomm AI Hub).
+- **Zipformer / Moonshine are VI-only** — they cannot serve the EN→VI direction's ASR
+  leg and can only compete for the VI→EN direction.
+
+### 4.2 Latency & memory (SD8G2 estimates)
+
+| Model | Encoder TTFT | Decoder/token | Params | INT8 size | Window |
+| --- | --- | --- | --- | --- | --- |
+| Whisper Small | ~400–800 ms | ~15–30 ms | 244M | ~244 MB | **30 s fixed** (overhead on short utts) |
+| PhoWhisper Small | ~400–800 ms | ~15–30 ms | 244M | ~244 MB | 30 s fixed |
+| Zipformer 30M VI | ~50–150 ms | ~5–15 ms | ~30M | ~32 MB | scales w/ duration (streaming) |
+| Moonshine Tiny VI | ~50 ms | ~10–20 ms | 27M | ~27–34 MB | scales w/ duration (streaming) |
+
+- Whisper/PhoWhisper's **fixed 30 s window** is pure overhead on short utterances and
+  directly pressures the **2.0 s turnaround budget** (§7).
+- Zipformer/Moonshine **stream and scale with actual duration** (~50 ms TTFT) — a
+  better structural fit for that budget, *if* we accept VI-only + a CPU/DIY-NPU path.
+
+### 4.3 Implications for the candidate matrix
+
+- **Kavi is bidirectional VI↔EN**, so the ASR candidate set is constrained *per
+  direction*: EN→VI needs an EN-capable ASR (Whisper Small, or PhoWhisper by
+  inheritance), while VI→EN may also evaluate PhoWhisper / Zipformer / Moonshine.
+- **Licensing is clean** across all four (Apache-2.0 / BSD-3, commercial OK) — no
+  NLLB-style blocker on the ASR side.
+- Only Whisper Small has published on-device numbers; the rest need the manual
+  profiling our v0 harness exists to produce — so this comparison *broadens* the
+  candidate set without answering the on-device question.
+
+> **Caveats:** FLEURS is read/quiet speech; real-world VI WER is 2–5× higher.
+> PhoWhisper/Zipformer numbers are on more conversational data (VLSP, VIVOS) and are
+> more representative. No public head-to-head of Moonshine Tiny VI vs PhoWhisper Small
+> exists (different evaluation sets). Latencies are paper/architecture estimates, not
+> measured on our unit.
+
+## 5. RTranslator as product baseline
 
 Kavi must not accept worse benchmark numbers than RTranslator (the closest reference
 product), while it narrows to VI↔EN on a fixed platform.
@@ -210,7 +267,7 @@ same references. Semi-manual (feed audio via UI, capture output), not scriptable
 
 ---
 
-## 5. Harness design (pluggable by construction)
+## 6. Harness design (pluggable by construction)
 
 One thin adapter interface per stage so candidates are swappable without harness
 changes:
@@ -240,7 +297,7 @@ registered candidate per stage with zero harness changes.
 
 ---
 
-## 6. Metrics (from `specifications.md` §3)
+## 7. Metrics (from `specifications.md` §3)
 
 | Metric | Requirement | Hard? |
 | --- | --- | --- |
@@ -253,10 +310,11 @@ registered candidate per stage with zero harness changes.
 
 ---
 
-## 7. Lean eval set & v0 minimal
+## 8. Lean eval set & v0 minimal
 
 **Lean eval set:** ~40–60 utterances per direction (VI ASR, EN ASR, VI→EN, EN→VI)
 from VIVOS (clean anchor) + a hand-verified VSS/Common Voice-vi slice (conversational)
+
 - Common Voice-en/LibriSpeech (EN) + the bespoke 150–300-sentence gold VI↔EN set
 skewed to factory/logistics vocabulary. Each run through the §3.5 SNR sweep
 (clean + 4 noisy × 2 noise types) ≈ 400–500 scored clips — small enough to re-run on
@@ -267,8 +325,8 @@ VSS/PhoST/FLEURS only after narrowing to 1–2 finalists per stage.
 
 1. ~30–50 utterance slice — clean + one moderate (+5 dB) + one hard (0 dB) condition,
    both languages, both directions.
-2. **Two candidates per stage** to start: whisper.cpp-int8 vs Whisper-Small-Quantized-
-   QNN; CTranslate2-int8-OpusMT vs ORT+QNN-OpusMT (once a vi↔en compile works);
+2. **Two candidates per stage** to start: whisper.cpp-int8 vs Whisper-Small-Quantized-QNN (the only confirmed EN+VI
+   pair; see §4 for the broader ASR landscape); CTranslate2-int8-OpusMT vs ORT+QNN-OpusMT (once a vi↔en compile works);
    Piper-CPU vs Piper-QNN if/when compiled.
 3. **Automated metrics only:** RTF, turnaround, WER, BLEU, RAM. Defer COMET + human
    MOS to v1 (slower to stand up; not needed to answer "does QNN beat CPU here").
@@ -283,7 +341,7 @@ slice is marginal, that's a cheap, legitimate signal to reconsider effort alloca
 
 ---
 
-## 8. Open questions / deferred decisions (→ ADR-004)
+## 9. Open questions / deferred decisions (→ ADR-004)
 
 - **Final dataset set** — confirm licenses for VSS / PhoST / InfoRe before relying.
 - **VI→EN ST corpus** — adopt FLEURS ID-alignment, the bespoke gold set, or both?
