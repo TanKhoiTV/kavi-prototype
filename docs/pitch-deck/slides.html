@@ -1,0 +1,797 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>OneVoice AI Challenge — Updated Team Briefing</title>
+    <style>
+      @page {
+        size: 280mm 158mm;
+        margin: 0;
+        background: #f5f4ed;
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      :root {
+        --parchment: #f5f4ed;
+        --ivory: #faf9f5;
+        --near-black: #141413;
+        --dark-warm: #3d3d3a;
+        --olive: #504e49;
+        --stone: #6b6a64;
+        --brand: #1b365d;
+        --brand-tint: #eef2f7;
+        --border: #e8e6dc;
+        --border-soft: #e5e3d8;
+        --serif: Charter, "EB Garamond", "Liberation Serif", Georgia, serif;
+        --sans: var(--serif);
+        --mono: "JetBrains Mono", "Liberation Mono", "Courier New", monospace;
+      }
+
+      body {
+        color: var(--near-black);
+        font-family: var(--serif);
+        font-size: 13pt;
+        line-height: 1.55;
+      }
+
+      .slide {
+        width: 280mm;
+        height: 158mm;
+        padding: 16mm 20mm;
+        background: var(--parchment);
+        break-after: page;
+        position: relative;
+        display: flex;
+        flex-direction: column;
+      }
+      .slide:last-child {
+        break-after: auto;
+      }
+
+      /* Cover */
+      .cover {
+        justify-content: center;
+        align-items: center;
+        text-align: center;
+        background: var(--parchment);
+      }
+      .cover h1 {
+        font-family: var(--serif);
+        font-size: 36pt;
+        font-weight: 500;
+        line-height: 1.15;
+        color: var(--near-black);
+        margin-bottom: 12pt;
+        max-width: 90%;
+      }
+      .cover .subtitle {
+        font-size: 14pt;
+        color: var(--olive);
+        font-weight: 400;
+        margin-bottom: 24pt;
+      }
+      .cover .meta {
+        font-family: var(--mono);
+        font-size: 9pt;
+        color: var(--stone);
+        letter-spacing: 1.5pt;
+        text-transform: uppercase;
+      }
+      .cover .brand-line {
+        width: 60pt;
+        height: 3pt;
+        background: var(--brand);
+        margin: 16pt auto;
+        border-radius: 1.5pt;
+      }
+
+      /* Content slides */
+      .eyebrow {
+        font-family: var(--mono);
+        font-size: 9.5pt;
+        letter-spacing: 2pt;
+        text-transform: uppercase;
+        color: var(--stone);
+        margin-bottom: 2pt;
+      }
+
+      .page-num {
+        position: absolute;
+        bottom: 10mm;
+        right: 20mm;
+        font-family: var(--mono);
+        font-size: 9pt;
+        color: var(--stone);
+        letter-spacing: 0.5pt;
+        font-variant-numeric: tabular-nums;
+      }
+      .footer-mark {
+        position: absolute;
+        bottom: 10mm;
+        left: 20mm;
+        font-family: var(--mono);
+        font-size: 9pt;
+        color: var(--stone);
+        letter-spacing: 1.5pt;
+      }
+
+      h2 {
+        font-family: var(--serif);
+        font-size: 24pt;
+        font-weight: 500;
+        line-height: 1.2;
+        letter-spacing: -0.3pt;
+        color: var(--near-black);
+        margin-bottom: 14pt;
+      }
+      h3 {
+        font-family: var(--serif);
+        font-size: 15pt;
+        font-weight: 500;
+        line-height: 1.3;
+        color: var(--brand);
+        margin-bottom: 8pt;
+      }
+
+      .lead {
+        font-size: 12pt;
+        font-weight: 400;
+        line-height: 1.5;
+        color: var(--olive);
+        margin-bottom: 8pt;
+      }
+
+      /* Module styles */
+      .c2 {
+        display: flex;
+        gap: 22pt;
+        flex: 1;
+      }
+      .c2 > div {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .mt {
+        font-size: 16pt;
+        font-weight: 500;
+        line-height: 1.3;
+        margin-bottom: 8pt;
+      }
+      .ml {
+        font-size: 24pt;
+        font-weight: 500;
+        color: var(--brand);
+        margin-right: 6pt;
+        float: left;
+        line-height: 1;
+      }
+      .mb {
+        font-size: 11pt;
+        line-height: 1.55;
+        color: var(--dark-warm);
+        margin-bottom: 14pt;
+      }
+      .mi {
+        font-size: 11pt;
+        line-height: 1.5;
+        color: var(--dark-warm);
+        padding: 8pt 0;
+        border-bottom: 0.3pt solid var(--border-soft);
+      }
+      .mi:last-child {
+        border-bottom: none;
+      }
+      .ms {
+        font-family: var(--mono);
+        font-size: 7.5pt;
+        letter-spacing: 1.5pt;
+        text-transform: uppercase;
+        color: var(--stone);
+        border-bottom: 0.3pt solid var(--border);
+        padding-bottom: 4pt;
+        margin-bottom: 14pt;
+      }
+      .mc {
+        font-size: 9.5pt;
+        color: var(--stone);
+        border-top: 0.3pt solid var(--border);
+        padding-top: 6pt;
+        margin-top: auto;
+      }
+
+      .co {
+        position: absolute;
+        bottom: 17mm;
+        left: 20mm;
+        right: 20mm;
+        font-size: 11pt;
+        font-weight: 500;
+        color: var(--brand);
+        border-top: 0.5pt solid var(--border);
+        padding-top: 8pt;
+      }
+
+      /* Data cards */
+      .metric-row {
+        display: flex;
+        gap: 16pt;
+        margin: 12pt 0;
+      }
+      .metric-card {
+        flex: 1;
+        background: var(--ivory);
+        border: 0.5pt solid var(--border);
+        border-radius: 6pt;
+        padding: 12pt 14pt;
+        text-align: center;
+      }
+      .metric-value {
+        font-size: 22pt;
+        font-weight: 500;
+        color: var(--brand);
+        font-variant-numeric: tabular-nums;
+        line-height: 1.2;
+      }
+      .metric-label {
+        font-size: 9pt;
+        color: var(--olive);
+        line-height: 1.4;
+      }
+
+      /* Table */
+      table.data {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 10pt;
+        margin: 8pt 0;
+      }
+      table.data th {
+        text-align: left;
+        font-weight: 500;
+        color: var(--dark-warm);
+        padding: 6pt 8pt;
+        border-bottom: 1pt solid var(--border);
+        font-size: 9.5pt;
+      }
+      table.data td {
+        padding: 5pt 8pt;
+        border-bottom: 0.3pt solid var(--border-soft);
+        vertical-align: top;
+      }
+      table.data td:first-child {
+        font-weight: 500;
+        color: var(--brand);
+      }
+
+      /* Tag */
+      .tag {
+        display: inline-block;
+        background: #eef2f7;
+        color: var(--brand);
+        font-size: 8pt;
+        font-weight: 600;
+        padding: 1pt 5pt;
+        border-radius: 2pt;
+        letter-spacing: 0.4pt;
+        text-transform: uppercase;
+        font-family: var(--mono);
+      }
+
+      /* Brand slide */
+      .brand-slide {
+        background: var(--brand);
+        color: var(--ivory);
+        justify-content: center;
+        align-items: center;
+        text-align: center;
+      }
+      .brand-slide h2 {
+        color: var(--ivory);
+        font-size: 28pt;
+        margin-bottom: 8pt;
+      }
+      .brand-slide .lead {
+        color: rgba(255, 255, 255, 0.7);
+        font-size: 13pt;
+      }
+
+      ul {
+        list-style: none;
+        padding: 0;
+      }
+      li {
+        font-size: 11pt;
+        line-height: 1.5;
+        color: var(--dark-warm);
+        padding: 4pt 0;
+        padding-left: 16pt;
+        position: relative;
+      }
+      li::before {
+        content: "•";
+        position: absolute;
+        left: 4pt;
+        color: var(--brand);
+      }
+    </style>
+  </head>
+  <body>
+    <!-- COVER -->
+    <section class="slide cover">
+      <div class="brand-line"></div>
+      <h1>OneVoice AI Challenge<br />Updated Team Briefing</h1>
+      <p class="subtitle">
+        Everything we've learned since the architecture draft — and what it
+        means for our plan
+      </p>
+      <p class="meta">June 13, 2026 · 11 days to registration deadline</p>
+    </section>
+
+    <!-- SLIDE 1: What changed -->
+    <section class="slide">
+      <p class="eyebrow">Context</p>
+      <h2>
+        The registration page revealed a different competition than we expected
+      </h2>
+      <div class="c2" style="margin-top: 8pt">
+        <div>
+          <p class="mt">What we thought</p>
+          <p class="mi">
+            Open-ended innovation challenge — bring your best idea
+          </p>
+          <p class="mi">Benchmarks unspecified, probably BLEU score only</p>
+          <p class="mi">Cloud dependency might be tolerated</p>
+          <p class="mi">Phone form factor is one option among many</p>
+        </div>
+        <div>
+          <p class="mt">What the Luma page actually says</p>
+          <p class="mi">
+            <span class="tag">Strict</span> BLEU + COMET accuracy, MOS by native
+            speakers
+          </p>
+          <p class="mi">
+            <span class="tag">Hard</span> RTF &lt; 1.0, turnaround latency &lt;
+            2.0s with deductions
+          </p>
+          <p class="mi">
+            <span class="tag">Red line</span> Cloud dependency →
+            disqualification
+          </p>
+          <p class="mi">
+            <span class="tag">Open</span> Any portable device — no hardware
+            category restrictions
+          </p>
+        </div>
+      </div>
+      <div class="co">
+        What changed most: the competition is a product-engineering hybrid with
+        strict on-device requirements, not a science fair.
+      </div>
+      <p class="page-num">01</p>
+      <p class="footer-mark">onevoice · briefing</p>
+    </section>
+
+    <!-- SLIDE 2: Competition type -->
+    <section class="slide">
+      <p class="eyebrow">Diagnosis</p>
+      <h2>
+        This is a product-engineering competition with academic evaluation rigor
+      </h2>
+      <p class="lead">
+        The judges are looking for working prototypes with real measurements —
+        not slides or theoretical models.
+      </p>
+      <div class="c2" style="margin-top: 4pt">
+        <div>
+          <p class="mt">Qualcomm's DNA</p>
+          <p class="mb">
+            Working on-device Snapdragon demos they can showcase. RTF &lt; 1.0,
+            sub-2s latency, no-cloud, field testing — all engineering gates.
+          </p>
+        </div>
+        <div>
+          <p class="mt">Saigon AI Hub's DNA</p>
+          <p class="mb">
+            Academically defensible winners. BLEU/COMET, MOS panel, proprietary
+            benchmark dataset, published scoring criteria.
+          </p>
+        </div>
+      </div>
+      <table class="data">
+        <tr>
+          <th>Dimension</th>
+          <th>Weight</th>
+          <th>What this means for us</th>
+        </tr>
+        <tr>
+          <td>Technical Excellence</td>
+          <td>50%</td>
+          <td>
+            Measured latency, accuracy, stability on device — not estimates
+          </td>
+        </tr>
+        <tr>
+          <td>Innovation &amp; Novelty</td>
+          <td>25%</td>
+          <td>MeloTTS-VI Hub contribution &gt; novel architecture</td>
+        </tr>
+        <tr>
+          <td>Business Viability</td>
+          <td>25%</td>
+          <td>Deployable on phones people already own — not custom hardware</td>
+        </tr>
+      </table>
+      <p class="page-num">02</p>
+      <p class="footer-mark">onevoice · briefing</p>
+    </section>
+
+    <!-- SLIDE 3: What we confirmed about similar competitions -->
+    <section class="slide">
+      <p class="eyebrow">Precedent</p>
+      <h2>
+        Most competition winners stay at prototype stage — this contest is wired
+        differently
+      </h2>
+      <div class="c2" style="margin-top: 8pt">
+        <div>
+          <p class="mt">The pattern</p>
+          <p class="mi">~9 out of 10 winners never commercialize</p>
+          <p class="mi">
+            Winners pivot, join companies, or stall after media coverage
+          </p>
+          <p class="mi">
+            RTranslator (closest cousin): Whisper+NLLB on Android, 2k GitHub
+            stars, never productized
+          </p>
+        </div>
+        <div>
+          <p class="mt">Why this one is different</p>
+          <p class="mi">
+            Market research confirms a real gap — not a synthetic problem
+          </p>
+          <p class="mi">
+            50% Technical weight forces engineering delivery, not slideware
+          </p>
+          <p class="mi">
+            Qualcomm + VNG have deployment incentives, not just PR
+          </p>
+          <p class="mi">
+            Finals require: working prototype + business case + pitch deck
+          </p>
+        </div>
+      </div>
+      <div class="co">
+        The conclusion: a functional pipeline with real measurements puts us in
+        the top tier.
+      </div>
+      <p class="page-num">03</p>
+      <p class="footer-mark">onevoice · briefing</p>
+    </section>
+
+    <!-- SLIDE 4: Our edge -->
+    <section class="slide">
+      <p class="eyebrow">Strategy</p>
+      <h2>Our edge is not invention — it's execution rigor on real hardware</h2>
+      <p class="lead">
+        The components are available to every team. What separates us is what we
+        measure and engineer around them.
+      </p>
+      <div class="c2" style="margin-top: 4pt">
+        <div>
+          <div class="mi">
+            <span style="color: var(--brand); font-weight: 500"
+              >DeepFilterNet tonal hypothesis</span
+            ><br /><span style="font-size: 10pt; color: var(--olive)"
+              >Real WER numbers for Vietnamese under industrial noise. Fastest
+              experiment, ownable data.</span
+            >
+          </div>
+          <div class="mi">
+            <span style="color: var(--brand); font-weight: 500"
+              >Thermal graceful degradation</span
+            ><br /><span style="font-size: 10pt; color: var(--olive)"
+              >Three planned fallback tiers. Most teams will overheat; we'll
+              have a staged demo.</span
+            >
+          </div>
+        </div>
+        <div>
+          <div class="mi">
+            <span style="color: var(--brand); font-weight: 500"
+              >MeloTTS-VI Hub contribution</span
+            ><br /><span style="font-size: 10pt; color: var(--olive)"
+              >Shipping a Vietnamese TTS checkpoint back to Qualcomm's catalog.
+              Institutionally aligned.</span
+            >
+          </div>
+          <div class="mi">
+            <span style="color: var(--brand); font-weight: 500"
+              >Real measurements vs estimates</span
+            ><br /><span style="font-size: 10pt; color: var(--olive)"
+              >Latency profiling, noise robustness, thermal calibration — all on
+              SD8G2, not on paper.</span
+            >
+          </div>
+        </div>
+      </div>
+      <div class="co">
+        "Specificity that can only come from having touched the problem" — §7.3
+        of the architecture doc
+      </div>
+      <p class="page-num">04</p>
+      <p class="footer-mark">onevoice · briefing</p>
+    </section>
+
+    <!-- SLIDE 5: Framing correction -->
+    <section class="slide">
+      <p class="eyebrow">Positioning</p>
+      <h2>
+        We are not building a luxury gadget — we are building a practical
+        industrial tool
+      </h2>
+      <div class="c2" style="margin-top: 8pt">
+        <div>
+          <p class="mt">The wrong framing</p>
+          <p class="mi">"Near-native real-time translation"</p>
+          <p class="mi">Requires specialized $300-500 hardware</p>
+          <p class="mi">Competing with Timekettle, iFLYTEK</p>
+          <p class="mi" style="color: var(--stone)">
+            Raises expectations we can't meet
+          </p>
+        </div>
+        <div>
+          <p class="mt">The correct framing</p>
+          <p class="mi">
+            "Good-enough translation on phones workers already own"
+          </p>
+          <p class="mi">No specialized hardware — deploy via MDM</p>
+          <p class="mi">Shift handovers, safety briefings, skills transfer</p>
+          <p class="mi" style="color: var(--brand); font-weight: 500">
+            This is the gap the contest problem statement identifies
+          </p>
+        </div>
+      </div>
+      <div class="co">
+        Constraint-honest design: we're back-pedalling from the ideal to
+        something that actually ships.
+      </div>
+      <p class="page-num">05</p>
+      <p class="footer-mark">onevoice · briefing</p>
+    </section>
+
+    <!-- SLIDE 6: Form factor -->
+    <section class="slide">
+      <p class="eyebrow">Form Factor</p>
+      <h2>Phone-in-pocket beats wearables for sustained Edge AI</h2>
+      <div class="c2" style="margin-top: 8pt">
+        <div>
+          <p class="mt">The "hands-free" concern</p>
+          <p class="mi">
+            Contest says "hands-busy" environments — not a wearable requirement
+          </p>
+          <p class="mi">No rule mandates hands-free device format</p>
+          <p class="mi">
+            Phone on lanyard + VAD trigger + Bluetooth earpiece = hands remain
+            free
+          </p>
+        </div>
+        <div>
+          <p class="mt">Phone vs. wearable compute</p>
+          <p class="mi">
+            Wearables: tiny battery, weak NPU, overheat under continuous AI load
+          </p>
+          <p class="mi">
+            Phone (SD8G2): 16GB RAM, dedicated NPU, thermal mass for hours of
+            inference
+          </p>
+          <p class="mi">
+            Zero additional hardware cost in enterprise deployment
+          </p>
+        </div>
+      </div>
+      <div class="metric-row">
+        <div class="metric-card">
+          <div class="metric-value">50M+</div>
+          <div class="metric-label">SD8G2 devices shipped (2023 flagships)</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-value">🟢</div>
+          <div class="metric-label">
+            Thermal sweet spot: TSMC 4nm, mature, stable
+          </div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-value">$2-9</div>
+          <div class="metric-label">
+            Per-device/month MDM cost in enterprise
+          </div>
+        </div>
+      </div>
+      <p class="page-num">06</p>
+      <p class="footer-mark">onevoice · briefing</p>
+    </section>
+
+    <!-- SLIDE 7: Tech findings -->
+    <section class="slide">
+      <p class="eyebrow">Tech Research</p>
+      <h2>
+        New discoveries change the component plan — mostly to our advantage
+      </h2>
+      <table class="data" style="margin-top: 8pt">
+        <tr>
+          <th>Layer</th>
+          <th>Old plan</th>
+          <th>New finding</th>
+          <th>Impact</th>
+        </tr>
+        <tr>
+          <td>TTS</td>
+          <td>Train MeloTTS-VI from scratch</td>
+          <td>Community checkpoint exists (MIT, ~25h data, PhoBERT-based)</td>
+          <td style="color: var(--brand)">
+            Saves months — use as base, fine-tune further
+          </td>
+        </tr>
+        <tr>
+          <td>MT</td>
+          <td>NLLB-600M int8</td>
+          <td>Hy-MT1.5 from Tencent (440MB, 33 languages, beats 72B models)</td>
+          <td>→ Backlog. Needs SD8G2 latency testing</td>
+        </tr>
+        <tr>
+          <td>MT License</td>
+          <td>CC-BY-NC-4.0 (flag raised)</td>
+          <td>Confirmed: non-commercial license conflicts with $20K prize</td>
+          <td style="color: #b03030">Needs resolution before Phase 2</td>
+        </tr>
+        <tr>
+          <td>ASR</td>
+          <td>Whisper Medium via Hub</td>
+          <td>Whisper-Medium reinstated v0.51, Voice AI runtime added</td>
+          <td style="color: var(--brand)">
+            Better export path, no change needed
+          </td>
+        </tr>
+      </table>
+      <div class="co">
+        MeloTTS-VI checkpoint is the biggest win: we don't start from zero.
+      </div>
+      <p class="page-num">07</p>
+      <p class="footer-mark">onevoice · briefing</p>
+    </section>
+
+    <!-- SLIDE 8: Timeline -->
+    <section class="slide">
+      <p class="eyebrow">Timeline</p>
+      <h2>
+        We have 11 days to registration — target June 18 with buffer to June 24
+      </h2>
+      <div class="c2" style="margin-top: 8pt">
+        <div>
+          <p class="ms">Phase 1 · Day 1 (Jun 13)</p>
+          <div class="mi" style="padding: 4pt 0">
+            Decisions: solo/team, project name
+          </div>
+          <div class="mi" style="padding: 4pt 0">
+            GitHub repo + Google Sheets template
+          </div>
+
+          <p class="ms" style="margin-top: 12pt">
+            Phase 2 · Day 2-3 (Jun 14-15)
+          </p>
+          <div class="mi" style="padding: 4pt 0">Pitch deck draft</div>
+          <div class="mi" style="padding: 4pt 0">
+            DeepFilterNet WER experiment running
+          </div>
+        </div>
+        <div>
+          <p class="ms">Phase 3 · Day 4-5 (Jun 16-17)</p>
+          <div class="mi" style="padding: 4pt 0">
+            Code scaffolding pushed to GitHub
+          </div>
+          <div class="mi" style="padding: 4pt 0">Luma long answers drafted</div>
+          <div class="mi" style="padding: 4pt 0">
+            Basic ASR→MT→TTS chain on laptop
+          </div>
+
+          <p class="ms" style="margin-top: 12pt">Submit · Day 6 (Jun 18)</p>
+          <div
+            class="mi"
+            style="padding: 4pt 0; font-weight: 500; color: var(--brand)"
+          >
+            Submit early — free Phase 2 focus
+          </div>
+          <div class="mi" style="padding: 4pt 0; color: var(--stone)">
+            Buffer Jun 19-24 if not ready
+          </div>
+        </div>
+      </div>
+      <p class="page-num">08</p>
+      <p class="footer-mark">onevoice · briefing</p>
+    </section>
+
+    <!-- SLIDE 9: Brand slide -->
+    <section class="slide brand-slide">
+      <h2>The core thesis</h2>
+      <p class="lead" style="max-width: 80%; margin: 0 auto">
+        We are the first team to build a complete, field-tested,
+        Snapdragon-NPU-validated<br />
+        speech-to-speech translation pipeline with Vietnamese as a primary
+        language,<br />
+        using exclusively open models that extend the Qualcomm AI Hub catalog.
+      </p>
+      <p class="page-num" style="color: rgba(255, 255, 255, 0.4)">09</p>
+      <p class="footer-mark" style="color: rgba(255, 255, 255, 0.4)">
+        onevoice · briefing
+      </p>
+    </section>
+
+    <!-- SLIDE 10: Ask -->
+    <section class="slide">
+      <p class="eyebrow">Next Steps</p>
+      <h2>Three decisions to make today — then we build</h2>
+      <div class="c2" style="margin-top: 8pt">
+        <div>
+          <p class="mt">Today's decisions</p>
+          <div
+            class="metric-card"
+            style="margin-bottom: 10pt; text-align: left"
+          >
+            <div style="font-weight: 500; color: var(--brand)">
+              1. Solo or team?
+            </div>
+            <div style="font-size: 10pt; color: var(--olive)">
+              If team: who, what roles, who submits the form
+            </div>
+          </div>
+          <div
+            class="metric-card"
+            style="margin-bottom: 10pt; text-align: left"
+          >
+            <div style="font-weight: 500; color: var(--brand)">
+              2. Project name?
+            </div>
+            <div style="font-size: 10pt; color: var(--olive)">
+              Memorable, available on GitHub, pitch-worthy
+            </div>
+          </div>
+          <div class="metric-card" style="text-align: left">
+            <div style="font-weight: 500; color: var(--brand)">
+              3. Pitch deck style?
+            </div>
+            <div style="font-size: 10pt; color: var(--olive)">
+              Technical or investor-facing? Sets tone for registration
+            </div>
+          </div>
+        </div>
+        <div>
+          <p class="mt">This week's focus</p>
+          <div class="mi">
+            <span style="font-weight: 500">DeepFilterNet experiment</span> —
+            highest evidence-to-effort ratio. CPU-runnable. WER comparison table
+            possible by Wednesday.
+          </div>
+          <div class="mi">
+            <span style="font-weight: 500">Pipeline scaffolding</span> — Silero
+            VAD + Whisper + NLLB/MeloTTS stubs on GitHub. Shows architecture
+            alive.
+          </div>
+          <div class="mi">
+            <span style="font-weight: 500">Luma answers draft</span> — 7
+            long-text fields. Source material in architecture.md.
+          </div>
+        </div>
+      </div>
+      <div class="co">Let's ship.</div>
+      <p class="page-num">10</p>
+      <p class="footer-mark">onevoice · briefing</p>
+    </section>
+  </body>
+</html>
