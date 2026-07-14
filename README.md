@@ -1,0 +1,35 @@
+# Kavi — Offline Speech-to-Speech Translation (Prototype)
+
+Kavi is a fully **offline, on-device** speech-to-speech translation system for
+**Vietnamese ↔ English** (Chinese/Korean planned), built for the
+**OneVoice AI Challenge** (Saigon AI Hub × Qualcomm, May–Nov 2026) and targeting
+a Snapdragon 8 Gen 2 Android phone.
+
+This repository is the **private implementation** submodule of
+[`aivoice-2026`](https://github.com/TanKhoiTV/aivoice-2026) — the public parent
+that hosts documentation and CI. Code, model weights, and internal docs live
+here.
+
+## Repository layout
+
+| Path | Purpose |
+| ------ | --------- |
+| `models/` | MT weights kept at the repo root for immediate reuse (Opus-MT VI→EN). |
+| `docs/` | Internal documentation (architecture, design, ADRs, pitch deck). |
+| `src/` | (planned) application source — to be scaffolded from scratch. |
+| `archive/` | The previous implementation, preserved in full for reference. |
+
+## Quickstart
+
+```bash
+uv sync            # install dependencies
+uv run ruff check .   # lint
+```
+
+> Public contest documentation (contest-info, registration checklist, Luma
+> answers, pitch deck) lives in the parent repo `aivoice-2026/docs/`.
+
+## Status
+
+Early-stage scaffold. The prior implementation is archived under `archive/`;
+the project is being rebuilt from scratch on this branch.

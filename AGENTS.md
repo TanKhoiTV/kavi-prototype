@@ -1,0 +1,39 @@
+# AGENTS.md
+
+Guidance for AI coding agents working in this repository.
+
+## What this repo is
+
+- **Kavi** — offline on-device speech-to-speech translation (VI↔EN), for the
+  OneVoice AI Challenge.
+- This is the **private implementation submodule** of `aivoice-2026`. It holds
+  all code, model weights, and internal docs.
+
+## Repository visibility
+
+- **Parent `aivoice-2026`** is **public** and hosts documentation + CI.
+- **This repo (`kavi-prototype`)** is **private** and holds code, models, and
+  internal docs. Do not move private implementation details into the public
+  parent.
+
+## Layout (current)
+
+- `models/` — MT weights at root (kept for reuse; see `.gitignore`).
+- `docs/` — internal docs.
+- `archive/` — the entire previous implementation, preserved for reference.
+  Read here before re-implementing anything.
+- `src/` — (planned) new application code.
+
+## Conventions
+
+- Commits follow **Conventional Commits** (`feat:`, `fix:`, `chore:`, …).
+- Branch per task: `feat/<topic>`, `fix/<topic>`, `chore/<topic>`; PR into
+  `main`.
+- Run `make check` (ruff) before committing.
+- Keep the project **fully offline / on-device**: no network calls at runtime.
+
+## Working here
+
+1. Check `archive/` first — much of the prior logic is reusable.
+2. Prefer reusing `models/` weights over re-downloading.
+3. Keep the public/private boundary: internal notes stay here, not in the parent.
