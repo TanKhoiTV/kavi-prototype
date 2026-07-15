@@ -1,11 +1,11 @@
 # License Situation & Gate
 
 **Status:** Proposed — clean/avoid resolved; **Piper engine GPL split (fork #1)
-
-+ QAIRT runtime redistribution EULA (escalate to Qualcomm) still open**; Hy-MT
-regional carve-out research-resolved (Vietnam not excluded). All dataset/voice
-licenses now closed via Claude lookup (see #3 / #4 / #7). This record **gates
-ADR-004 (architecture / tech-stack)**.
+deferred** (MIT-era Piper is the clean option; GPL build not decided); **QAIRT
+runtime redistribution EULA (escalate to Qualcomm) still open**; **Hy-MT
+ADOPT** (Vietnam contest, no blocked-region launch; 100M MAU = sky-high
+ceiling). All dataset/voice licenses closed via Claude lookup (see #3 / #4 / #7).
+This record **gates ADR-004 (architecture / tech-stack)**.
 **Date:** 2026-07-15
 **Author:** Project lead
 
@@ -54,6 +54,7 @@ Two nuances:
 | TTS | Kokoro | Apache-2.0 | EN-leg only (no VI confirmed) |
 | TTS | SpeechT5 | MIT | EN only (needs VI fine-tune) |
 | TTS voice | Piper `vais1000` (VI) | CC BY 4.0 | attribution required (VAIS/IEEE DataPort); clean VI voice |
+| TTS engine | Piper (MIT-era `rhasspy/piper`) | MIT | **option**; run via subprocess isolation; GPL build (`OHF-Voice/piper1-gpl`) deferred |
 | SDK | QAIRT Community Edition | free for contest | via free Qualcomm ID; AI Hub build-time only |
 | Data (eval-only) | VIVOS, viVoice, NOISEX-92 | NC / ambiguous | internal eval, never bundle |
 | Data (public-safe) | Common Voice (CC0), LibriSpeech/FLEURS/LibriTTS (CC-BY-4.0), MUSAN (PD), RIRS_NOISES (CC-BY-4.0), DEMAND (CC-BY-SA-3.0), VietSuperSpeech (MIT; labels Zipformer pseudo-labeled, not gold) | various | credit / share-alike as noted; VSS usable but verify labels |
@@ -71,18 +72,22 @@ Two nuances:
 | Voice | Piper `25hours_single` (VI) | unclear / no license grant (re-uploader self-tagged only; InfoRe gave none) | AVOID until verified from the voice's own MODEL_CARD |
 | Data | InfoRe (vietTTS corpus) | no formal license; informal donation | AVOID — no commercial grant; taints any voice trained on it |
 
-### Open — policy forks (require a human/business call)
+### Open — policy forks (fork #1 requires a decision; fork #2 resolved)
 
-1. **Piper engine GPL split.** Pin MIT-era `rhasspy/piper` (frozen) + run via
-   **subprocess isolation** (espeak-ng / GPL engine stays a separate non-linked
-   process), **or** accept GPL-3.0 (`OHF-Voice/piper1-gpl`) source-disclosure,
-   **or** switch TTS engine (MeloTTS / Kokoro). Shapes *all* TTS.
-2. **Hy-MT1.5 regional carve-out.** **Research-resolved:** the HY Community
-   License excludes only the **EU, UK, and South Korea**; **Vietnam is NOT
-   excluded**, so geographically **ADOPT**. Caveats: commercial use above
-   **100M MAU** needs a separate Tencent license; outputs can't train
-   non-Hunyuan models. **Business call still needed:** confirm MAU < 100M and no
-   EU/UK launch; if so → Hy-MT is a usable MT candidate, else → Opus-MT / M2M-100.
+1. **Piper engine — GPL split deferred.** MIT-era `rhasspy/piper` (frozen,
+   archived Oct 2025) is a **licensed-clean option** (MIT) and can run via
+   **subprocess isolation** so the GPL `espeak-ng`/engine never links into our
+   binary. The GPL build `OHF-Voice/piper1-gpl` (GPL-3.0) is **deferred** — not
+   decided now. **No tech-stack decision yet:** Piper (MIT-era) is one TTS
+   *option* alongside MeloTTS (MIT) / Kokoro (Apache-2.0); the final pick waits
+   for the benchmark harness. Shapes *all* TTS.
+2. **Hy-MT1.5 regional carve-out — RESOLVED: ADOPT.** Contest is in
+   **Vietnam**; no launch planned for the excluded regions (EU / UK / South
+   Korea). The HY Community License therefore **permits commercial use** of
+   Hy-MT1.5. The **100M MAU** threshold is noted as a **sky-high ceiling** (not
+   a current concern) — if we ever approach it, a separate Tencent license is
+   required. Outputs must not train non-Hunyuan models. Hy-MT is a usable MT
+   candidate alongside Opus-MT / M2M-100.
 
 ### Open — verification lookups (facts pending, no judgment)
 
@@ -113,11 +118,13 @@ Two nuances:
 
 ## Open items → ADR-004
 
-ADR-004 (architecture / tech-stack) is recorded once the remaining gates close:
-**fork #1** (Piper engine GPL split), the **QAIRT runtime redistribution EULA**
-(escalate to Qualcomm), and **business confirmation of Hy-MT MAU / global-launch**.
-Lookups #3–#8 are now closed or advanced. The candidate shortlist in
-`docs/benchmarking-plan.md` §4 stands, with the avoid-list already dropped.
+ADR-004 (architecture / tech-stack) records the licensed-clean candidate set
+but **defers the final tech-stack pick** until the v0 benchmark harness runs.
+Remaining gates: **Piper engine GPL split** (deferred — MIT-era is the clean
+option), the **QAIRT runtime redistribution EULA** (escalate to Qualcomm), and
+harness confirmation that the CPU-default stack is license-clean. Lookups #3–#8
+are closed or advanced. Candidate shortlist in `docs/benchmarking-plan.md` §4
+stands, with the avoid-list already dropped.
 
 ## References
 
