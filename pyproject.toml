@@ -25,6 +25,8 @@ extra-index-url = ["https://download.pytorch.org/whl/cpu"]
 [tool.ruff]
 target-version = "py312"
 line-length = 88
+# Archived legacy code (pre-restructure) is intentionally not linted.
+extend-exclude = ["archive"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "W", "N", "UP", "B", "SIM"]
