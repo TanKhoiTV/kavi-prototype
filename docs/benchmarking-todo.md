@@ -211,8 +211,22 @@ RIRS_NOISES = public-safe.
 
 ### Phase 5 — RTranslator row (full)
 
-- [ ] Document exact APK version/commit + date tested.
-- [ ] Score RTranslator outputs on the same references (WER/BLEU/MOS).
+Pre-conditions: airplane mode on, Play Services network blocked if possible; compare
+against **WalkieTalkie** mode (not Conversation — see plan §5.1). Record per the §5.5
+checklist.
+
+- [ ] Document exact APK **version + commit hash** + date tested (2.1.5 = commit
+      `49e7f20`, tagged 2026-02-22 — grab the hash, not just the tag).
+- [ ] Record device / chipset / RAM / Android version / thermal state, and which
+      **mode** was tested (Conversation / WalkieTalkie / Text).
+- [ ] Record **system-TTS engine + version** (TTS is not bundled — see plan §5.3) and
+      the **RAM-mode switch** state (0.9 GB vs 0.5 GB Whisper variant).
+- [ ] Confirm **network state** during the run (airplane mode on; verify no calls,
+      given the system-TTS / ML Kit first-use download caveats).
+- [ ] Score RTranslator outputs on the same references (WER/BLEU/MOS) via the lean set.
+- [ ] Flag all RTranslator latency/RAM as **author-reported**; re-measure on our unit.
+- [ ] If a **3.0 beta** is tested, label every number with its backend generation
+      (NLLB vs HY-MT/Bergamot/Madlad) — they are not the same product.
 
 ### Phase 6 — Pre-ASR denoising gate
 
