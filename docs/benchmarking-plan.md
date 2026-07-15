@@ -429,6 +429,41 @@ these specific models, before we sink more days into harder QNN engineering*
 slice is marginal, that's a cheap, legitimate signal to reconsider effort allocation
 — exactly what the experiments were meant to gate.
 
+### Pre-ASR denoising — status & open gate
+
+> Sourced from a scouting pass over `archive/` (the old implementation). **Not a
+> decision here** — it is an open pipeline question that ADR-004 should record, and
+> this harness (§6/§8) is the vehicle to close it.
+
+- **Current state:** `pipeline.py` has **Silero VAD but no denoising stage**.
+  Denoising is a CPU/numpy stage (`noisereduce` Wiener / RNNoise), **not**
+  NPU-accelerated — it competes with ASR int8 for the CPU budget that ADR-003 /
+  RTF<1 guards.
+- **What we had (archived):** the only run with results is a 760-utt VIVOS run on
+  **Whisper Medium**, ESC-50 industrial mix @ **SNR 5 dB**: clean **15.53%**, raw
+  noisy **20.23%**, RNNoise (`stationary=True`) **33.10%**, DeepFilterNet **27.05%**
+  WER. Both denoisers *hurt* WER — but RNNoise used the wrong `stationary` setting
+  and the wrong ASR model (Medium, not Small int8).
+- **Decision on record** (archived denoising-scope ADR,
+  `archive/docs/adr/002-denoising-experiment-scope.md`): Wiener (`noisereduce`,
+  `prop_decrease=0.5`) = primary, RNNoise `stationary=False` = secondary.
+  **Binary gate:** if denoisers beat raw-noisy WER → tune `prop_decrease` on
+  50–100 files; else **VAD-only pipeline**. Phase-1 was scoped to 10 VIVOS files ×
+  4 conditions on Whisper Small int8.
+- **That Phase-1 re-run was never executed** —
+  `archive/experiments/denoising-validation/results/` holds only `.gitkeep` and the
+  live `noise_samples/` is empty. So the gate was never triggered; "do denoisers
+  actually help on our pipeline?" is **still open**.
+- **DeepFilterNet dropped** (unresolved `torchaudio 2.x` PyPI bug; fix only on
+  GitHub main). The old `architecture.md` "tonal-preservation" Anchor-2 rested on
+  that now-dropped model + the flawed run → **treat as obsolete** unless
+  re-validated.
+- **Recommendation:** add a denoising toggle (raw vs Wiener vs RNNoise) as a
+  fixed-factors comparison in the §8 v0 lean slice (clean / +5 dB / 0 dB, both
+  languages). Keep the mixing method consistent with §3.5 (`torchaudio.add_noise`),
+  *not* the archived script's custom RMS mix, so the historical "noisy 20.23%"
+  ceiling stays comparable. Outcome feeds the ADR-004 gate directly.
+
 ---
 
 ## 9. Open questions / deferred decisions (→ ADR-004)
@@ -440,5 +475,9 @@ slice is marginal, that's a cheap, legitimate signal to reconsider effort alloca
 - **MOS proxy** — DNSMOS vs small human panel (5–10 raters, 20–30 clips) for v1.
 - **Per-stage candidate list** — which two (and later finalist) models per stage,
   contingent on ADR-003 runtime availability (QAIRT Community Edition access).
+- **Pre-ASR denoising gate** — execute the archived denoising-scope ADR's Phase-1
+  (Wiener / RNNoise on Whisper Small int8, lean slice) to trigger its binary
+  gate; decide tune-`prop_decrease` vs VAD-only **before** ADR-004 records the
+  pipeline architecture (see §8 subsection).
 - **Architecture (ASR/MT/TTS frameworks)** — **not decided here**; selected by ADR-004
   once v0/v1 numbers exist.
