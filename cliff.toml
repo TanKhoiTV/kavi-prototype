@@ -28,13 +28,13 @@ body = """
 """
 footer = """
 {% for release in releases -%}
-    {% if release.version -%}
-        {% if release.previous.version -%}
+    {% if release.previous -%}
+        {% if release.version -%}
             [{{ release.version | trim_start_matches(pat="v") }}]: \
                 https://github.com/TanKhoiTV/kavi-prototype/compare/{{ release.previous.version }}...{{ release.version }}
+        {% else -%}
+            [unreleased]: https://github.com/TanKhoiTV/kavi-prototype/compare/{{ release.previous.version }}...HEAD
         {% endif -%}
-    {% else -%}
-        [unreleased]: https://github.com/TanKhoiTV/kavi-prototype/compare/{{ release.previous.version }}...HEAD
     {% endif -%}
 {% endfor %}
 """
