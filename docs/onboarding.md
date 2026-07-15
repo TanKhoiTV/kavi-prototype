@@ -133,11 +133,17 @@ The contest can lead to **commercialization**, so every model must permit
 commercial use. This single rule eliminates several otherwise-attractive models.
 Full detail is in `docs/benchmarking-plan.md` §4.4–§4.5.
 
-- **Commercial-clean (use these):** Opus-MT (Apache-2.0), Piper (MIT),
-  MeloTTS (MIT), MADLAD-400 (Apache-2.0), M2M-100 (MIT), Kokoro (Apache-2.0),
-  vietTTS / VITS (MIT / Apache), SpeechT5 (MIT).
+- **Commercial-clean (use these):** Opus-MT (Apache-2.0), MeloTTS (MIT),
+  MADLAD-400 (Apache-2.0), M2M-100 (MIT), Kokoro (Apache-2.0),
+  vietTTS / VITS (MIT / Apache, verify InfoRe terms), SpeechT5 (MIT).
+- **Live license decision — Piper:** **split / time-sensitive.** The old
+  `rhasspy/piper` is **MIT** (frozen, no fixes); the active `OHF-Voice/piper1-gpl`
+  is **GPL-3.0** (copyleft — problematic for a commercial product), and its
+  `espeak-ng` phonemizer is also GPL. Our prototype pins an MIT-era build today,
+  but we must decide pinned-version + distribution model (subprocess vs bundled)
+  before shipping. See `docs/benchmarking-plan.md` §4.5.
 - **Avoid (license blocks):** **NLLB** (CC-BY-NC), **MMS-TTS-vie** (CC-BY-NC),
-  **Coqui XTTS** (CPML — restrictive).
+  **Coqui XTTS** (CPML — restrictive; Coqui Inc. shut down Jan 2024).
 - **Caution (verify):** **Hy-MT** (HY Community License — commercial-permitted
   *per old ADR-001*, but a regional carve-out is flagged by our current stance).
 
