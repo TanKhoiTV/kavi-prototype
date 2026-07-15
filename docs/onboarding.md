@@ -5,6 +5,72 @@
 > can read the rest of the docs without a translator. Pair this with
 > `README.md` (the quickstart) and `CONTRIBUTING.md` (how we work).
 
+## Start here — reading order (from zero to productive)
+
+You probably arrived at the **public parent repo** (`aivoice-2026`). That repo
+only holds the *story and public docs*; the **real code and internal docs live
+in the private submodule** (`kavi-prototype`, under `prototype/`). Read in this
+order — each step builds the mental model you need for the next.
+
+```
+aivoice-2026/                 (PUBLIC parent — what we tell the world)
+├─ README.md                  ①  landing page
+└─ docs/
+   ├─ contest-info.md         ②  the contest + how we're graded
+   └─ specifications.md       ③  our concrete targets + glossary
+kavi-prototype/               (PRIVATE submodule — the real repo)
+├─ README.md                  ④  pipeline + layout + how to run
+├─ CONTRIBUTING.md            ⑤  cloning + tooling
+└─ docs/
+   ├─ onboarding.md           ⑥  this file — architecture, decoded
+   ├─ benchmarking-plan.md    ⑪  datasets + candidate landscape + harness
+   ├─ benchmarking-todo.md    ⑫  execution checklist
+   └─ decisions/
+      ├─ ADR-001 …            ⑦  100% offline, forever
+      ├─ ADR-002 …            ⑧  one phone: Snapdragon 8 Gen 2
+      ├─ ADR-003 …            ⑨  CPU now, NPU later
+      ├─ ADR-004 …            ⑩  tech stack NOT decided yet
+      └─ license-situation …  ⑬  license gate
+```
+
+**What to conclude from each:**
+
+1. **Parent `README.md`** → the public landing page; the code is in the private
+   `prototype/` submodule; public docs are just the contest brief + our spec.
+2. **`docs/contest-info.md`** → Kavi is an entry to the **OneVoice AI Challenge**
+   (Saigon AI Hub × Qualcomm, May–Nov 2026); an offline VI↔EN speech-to-speech
+   translator; here are the contest rules + the six grading metrics.
+3. **`docs/specifications.md`** → our translated targets — offline, RTF < 1.0,
+   turnaround < 2.0 s, BLEU/COMET both ways, TTS MOS, stability — plus a newcomer
+   acronym glossary. This is the scoreboard "good" is measured against.
+4. **Submodule `README.md`** → the pipeline is **ASR → MT → TTS**, fully offline,
+   VI↔EN; repo layout + how to run.
+5. **Submodule `CONTRIBUTING.md`** (Cloning) → clone with `--recurse-submodules`;
+   a plain parent clone skips the private submodule. Tooling: ruff + commitlint +
+   pre-commit.
+6. **`docs/onboarding.md`** (this file) → plain-language walkthrough of the three
+   architecture decisions, so the ADRs below make sense without prior context.
+7. **`ADR-001` (offline-first)** → **zero cloud, ever.** A network call during
+   testing is an instant disqualification.
+8. **`ADR-002` (target platform)** → we optimize for **one device** — Snapdragon
+   8 Gen 2, Android 16, Hexagon HTP v73. Phone-only.
+9. **`ADR-003` (Hexagon runtime)** → start on **CPU (ORT-XNNPACK int8)** —
+   license-clean, ships today; add **NPU / QAIRT later** after on-device
+   benchmarks. NNAPI rejected.
+10. **`ADR-004` (architecture, draft)** → the **actual ASR / MT / TTS model
+    choices are NOT made yet** — they wait for benchmark numbers. The doc the
+    whole benchmarking effort feeds.
+11. **`docs/decisions/license-situation.md`** → most candidates are license-clean;
+    this gate is *why* we can pick safely. Two open items: the **Qualcomm QAIRT
+    EULA** and the **Piper GPL split**.
+12. **`docs/benchmarking-plan.md`** → we **benchmark before choosing** — datasets,
+    the ASR/MT/TTS candidate landscape, the pluggable harness design, the lean v0.
+13. **`docs/benchmarking-todo.md`** → the **execution checklist** (phases 0–7,
+    checkboxes) to produce those numbers — what you'd actually pick up and work on.
+
+> **Skip for now:** `archive/` (historical, superseded) and `docs/README.md`
+> (just an index).
+
 ## What Kavi is, in one breath
 
 Kavi is an entry to the **OneVoice AI Challenge** (Saigon AI Hub × Qualcomm,
@@ -121,7 +187,7 @@ under `archive/` for reference.
 | `models/` | Checked-in model weights. Today: **Opus-MT vi-en** (CTranslate2 + SentencePiece) — our current MT. |
 | `voices/` | TTS voice model(s) (Piper). Usually gitignored / downloaded at runtime. |
 | `docs/` | Internal docs (this file's siblings). |
-| `docs/decisions/` | The ADRs (001–003). The source of truth for architecture choices. |
+| `docs/decisions/` | The ADRs (001–004) + `license-situation.md`. Source of truth for architecture + licensing. |
 | `docs/benchmarking-plan.md` | The plan to *measure* models before picking them (gates ADR-004). **Read this next.** |
 | `AGENTS.md`, `CONTRIBUTING.md`, `README.md` | Project / agent guidance, how we work, quickstart. |
 | `Makefile`, `pyproject.toml`, `LICENSE` | Build / run, deps (uv), MIT license. |
@@ -171,8 +237,9 @@ shortlist; the harness is what turns it into a decision.
    make check
    ```
 
-3. **Read in this order:** `README.md` → this guide →
-   `docs/benchmarking-plan.md` → `docs/decisions/*`.
+3. **Read in order** — see **Start here** (top of this guide): parent
+   `README.md` → `contest-info.md` → `specifications.md`, then the submodule docs
+   (`README.md` → this guide → `benchmarking-plan.md` → `docs/decisions/*`).
 4. **When the v0 harness lands**, run the lean eval set against the candidate
    models to feed ADR-004.
 
