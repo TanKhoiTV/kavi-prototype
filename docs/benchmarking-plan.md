@@ -317,16 +317,38 @@ estimates), memory, licensing, and Qualcomm AI Hub availability.
 
 ## 5. RTranslator as product baseline
 
-Kavi must not accept worse benchmark numbers than RTranslator (the closest reference
-product), while it narrows to VI↔EN on a fixed platform.
+Kavi must not accept worse benchmark numbers than RTranslator (`niedev/RTranslator`,
+app code **Apache-2.0**) — the closest reference product — while it narrows to
+VI↔EN on a fixed platform. Claims below are repo-confirmed (README / releases /
+LICENSE) unless tagged **[INFER]**.
 
 > **Correction:** RTranslator does **not** bundle Piper or any embedded TTS — it uses
 > the **Android system TTS** the user has installed (defaults to Google TTS). That
 > *strengthens* our "bundled Piper = verifiable 100% offline" advantage: RTranslator's
 > offline guarantee for the output leg depends on the user's phone having an offline
-> voice pack, which the app doesn't control or verify.
+> voice pack, which the app doesn't control or verify — and a fresh/flashed device may
+> lazy-download that voice pack on first use, which could trip a no-network grading
+> rule.
 
-**Latency / RAM table (author-reported, published in the README — cite as-is):**
+### 5.1 Two different pipelines (not one)
+
+"RTranslator's pipeline" is not singular, so pick the right comparison target:
+
+- **Conversation mode (flagship, two phones):** each phone runs its *own* full
+  ASR→MT→TTS on its *own* speech and ships only **translated text over Bluetooth LE**
+  (no audio in transit, no runtime language detection — each user sets their own
+  language). This is a split-brain two-phone design and a **different, easier** problem
+  than Kavi's single-phone speech-to-speech. **Do not benchmark Conversation mode as
+  Kavi's counterpart.**
+- **WalkieTalkie mode (one phone):** listens continuously; **ML Kit** (closed-source,
+  Google) performs live language-ID to steer Whisper/NLLB. The *only* place a
+  proprietary ML component sits in RTranslator's critical path.
+- **Text mode:** NLLB only — not relevant to speech-to-speech.
+
+Kavi's architecture (single phone, full on-device ASR→MT→TTS) should be compared
+against RTranslator's **WalkieTalkie** path, not Conversation.
+
+### 5.2 Latency / RAM table (author-reported, published in the README)
 
 | Model | Variant | RAM | Latency |
 | --- | --- | --- | --- |
@@ -337,24 +359,63 @@ product), while it narrows to VI↔EN on a fixed platform.
 | Whisper-Small-244M | Low-RAM mode (<8 GB phones) | 0.5 GB | 2.1 s / 11 s audio |
 
 Use this as the **latency/RAM anchor** — order-of-magnitude reference; re-measure on
-our actual 8 Gen 2 unit (author's device unknown).
+our actual 8 Gen 2 unit (author's test device is never named in the docs).
+
+> **Gap:** RTranslator publishes **no end-to-end (mic→speaker) or EOS→speech latency
+> figure** — only the isolated per-model numbers above. There is therefore **no
+> RTranslator number to literally "beat"**; we must construct our own full-pipeline
+> figure, and we get to be the **first to publish a defensible mic→speaker number** for
+> this device class. Treat RTF < 1.0 and turnaround < 2.0 s as **Kavi's own internal
+> bar**, not a value RTranslator has published.
+
+### 5.3 Quality + offline behavior
 
 **Quality (BLEU/COMET/MOS):** no published number. Budget an explicit early task to
 **install the APK** (latest v2.1.5 on 8 Gen 2) and run our lean eval set through it
 manually, capturing transcribed/translated/synthesized output for scoring against the
 same references. Semi-manual (feed audio via UI, capture output), not scriptable.
+**RTranslator publishes no per-language WER/BLEU either**, so any Vietnamese accuracy
+claim we make must come from our own benchmark.
 
-**Caveats to record:**
+**Offline behavior (verified):** core ASR+MT are on-device once the ~1.2 GB model
+bundle is downloaded on first launch; no telemetry backend. The **two real offline
+gotchas** to verify on a grading rig:
 
-- **VI is in RTranslator's full-quality tier**, not the low-quality fallback — a fair,
-  non-degraded VI↔EN comparison.
+- system-TTS voice-pack **first-use download** on a fresh device (output leg only);
+- **ML Kit** language-ID may use an *unbundled* model fetched via Play Services on
+  first WalkieTalkie use (only relevant to that mode). **[INFER — verify `build.gradle`**]
+
+### 5.4 Structural gaps Kavi can exploit
+
+- **Commercial license:** NLLB-600M is **CC-BY-NC-4.0** — RTranslator's own README
+  hedges it as "(almost) open-source," so it is **not commercially shippable as-is**.
+  This is an *admitted* gap; Kavi's cleared MT stack (Opus-MT / Hy-MT1.5) is a genuine
+  structural advantage, not just a technical one.
+- **TTS ownership:** RTranslator's VI voice quality is whatever the grading device's
+  system TTS provides (uncontrolled, untested by them). Kavi's bundled, license-cleared
+  Piper voice is deterministic and reproducible on any device.
+- **No confirmed NPU/Hexagon acceleration:** the README credits "OnnxRuntime" with **no
+  execution provider named** (no NNAPI/QNN/GPU). **[INFER]** If RTranslator is CPU-only
+  ORT, a real QAIRT/Hexagon-HTP pipeline on our 8 Gen 2 is a legitimate, testable
+  latency/RAM edge — verify by profiling their APK (`build.gradle` EP selection), don't
+  assume from docs silence.
+
+### 5.5 Caveats to record when benchmarking
+
+- **VI is in RTranslator's full-quality tier** — a fair, non-degraded VI↔EN comparison
+  (translation quality, at least; TTS voice still depends on the system engine).
 - **RTranslator 3.0 is imminent** (NGI Mobifree-funded; first beta Jun–Aug 2026):
-  drops NLLB for Bergamot / Madlad-400-3B / **HY-MT-1.5-1.8B** (the HY-MT we avoid
-  for its regional license carve-out). **Snapshot the exact version/commit + date** you
+  drops NLLB for Bergamot / Madlad-400-3B / **HY-MT-1.5-1.8B** (the HY-MT we avoid for
+  its regional license carve-out). **Snapshot the exact version/commit + date** you
   test; if later citations use "3.0 numbers," check which backend variant was used.
+- **What to record (checklist):** exact APK **version + commit hash** + date · model-
+  bundle hash · device / chipset / RAM / Android version / thermal state · mode tested
+  (Conversation / WalkieTalkie / Text) · system-TTS engine + version · RAM-mode switch
+  state (0.9 GB vs 0.5 GB Whisper) · network state (airplane mode on, verify no calls) ·
+  ML Kit model pre-warmed? (WalkieTalkie only) · audio input source (built-in vs BT) ·
+  beam-search on/off · **2.x (NLLB) vs 3.0 (HY-MT/Bergamot/Madlad)** backend generation.
 - App code is **Apache-2.0** — its ONNX conversion/optimization scripts are fair game
-  to study/adapt (not the NLLB weights). **ML Kit** (closed) is only for language
-  auto-detect in WalkieTalkie mode, irrelevant to quality benchmarking.
+  to study/adapt (not the NLLB weights).
 
 ---
 
