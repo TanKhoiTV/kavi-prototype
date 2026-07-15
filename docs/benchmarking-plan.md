@@ -57,7 +57,7 @@ Plus a **noise bank** for the contest's factory / construction / logistics setti
 | Dataset | Size | Style | Transcripts | License | Obtain |
 | --- | --- | --- | --- | --- | --- |
 | **VIVOS** | 15 h, 11,660 train / 760 test | Read speech, 65 speakers, quiet studio | Human-annotated (gold) | **CC BY-NC-SA 4.0** ("academic purposes only") | `AILAB-VNUHCM/vivos` |
-| **VietSuperSpeech (VSS)** | 267.4 h, 52,023 utterances (240.7 h train / 26.7 h dev-test) | Casual conversational — YouTube vlogs, informal, diaspora dialogue | **Pseudo-labeled** via Zipformer-30M-RNNT (not human-verified) | Not clearly stated — **verify HF page before relying** | `thanhnew2001/VietSuperSpeech` |
+| **VietSuperSpeech (VSS)** | 267.4 h, 52,023 utterances (240.7 h train / 26.7 h dev-test) | Casual conversational — YouTube vlogs, informal, diaspora dialogue | **Pseudo-labeled** via Zipformer-30M-RNNT (not human-verified) | **MIT** (confirmed) — commercial-safe; pseudo-labeled refs are a quality, not license, caveat | `thanhnew2001/VietSuperSpeech` |
 | **FOSD / FPTVIET** | clean studio | clean anchor | — | verify | — |
 
 **Use them as complements, not substitutes:**
@@ -103,7 +103,7 @@ What actually exists / is usable:
 - **PhoST** (VinAI, Interspeech 2022) — 508 audio h, 331K triplets of (EN audio, EN
   transcript, VI subtitle text). `github.com/VinAIResearch/PhoST`. A real,
   purpose-built **EN audio → VI text** corpus → tests the **EN→VI** direction.
-  **Verify license on the repo directly** (not confirmed here).
+  **Research/educational use only, no redistribution** (VinAI terms) — eval-only; do not bundle in the shipped app (see license decision record).
 - **VI→EN direction has no equivalent large purpose-built corpus.** Two workarounds:
   1. **FLEURS-vi** is built from FLoRes-101, so each VI recording's transcript is a
      translation of the *same underlying sentence* that exists in **FLEURS-en** (and
@@ -159,8 +159,9 @@ mode you have.
 - **Attribution + share-alike:** DEMAND (CC BY-SA 3.0).
 - **Research/eval-only, don't ship:** VIVOS (CC BY-NC-SA), viVoice (CC BY-NC-SA),
   NOISEx-92 (ambiguous redistribution).
-- **Verify before relying on:** VietSuperSpeech license, PhoST license, InfoRe
-  donation terms — none pinned down precisely here.
+- **Verify before relying on:** InfoRe donation terms (VSS = MIT and PhoST =
+  research-only / no-redistribution are now resolved — see the license decision
+  record).
 - **NLLB** (RTranslator ships it; we already avoid it): CC BY-NC 4.0 — confirmed
   non-commercial. Do not let RTranslator's NLLB weights leak into anything we
   distribute, even for comparison.
@@ -184,7 +185,7 @@ estimates), memory, licensing, and Qualcomm AI Hub availability.
 
 | Model | CMV-Vi | VIVOS | VLSP T2 | EN support | License | AI Hub (SD8G2) |
 | --- | --- | --- | --- | --- | --- | --- |
-| **Whisper Small** (244M) | ~26–30% | ~20–25% | ~55–65% | Full multilingual | Apache-2.0 | Yes (w8a16) |
+| **Whisper Small** (244M) | ~26–30% | ~20–25% | ~55–65% | Full multilingual | MIT | Yes (w8a16) |
 | **PhoWhisper Small** (244M) | **11.08** | **6.33** | **32.96** | Inherited (unbench) | BSD-3 | No (DIY export) |
 | **Zipformer 30M VI** (~30M) | no public # | — | — | **None — VI only** | Apache-2.0 | No (untested) |
 | **Moonshine Tiny VI** (27M) | 18.8 (CV17) | — | — | **None — VI only** | Apache-2.0 | No (DIY) |
@@ -468,7 +469,7 @@ slice is marginal, that's a cheap, legitimate signal to reconsider effort alloca
 
 ## 9. Open questions / deferred decisions (→ ADR-004)
 
-- **Final dataset set** — confirm licenses for VSS / PhoST / InfoRe before relying.
+- **Final dataset set** — VSS (MIT) and PhoST (research-only) licenses now resolved; confirm **InfoRe** donation terms before relying.
 - **VI→EN ST corpus** — adopt FLEURS ID-alignment, the bespoke gold set, or both?
 - **RTranslator snapshot** — which version/commit tested + dated in writeup; APK-eval
   task owner & timeline.
