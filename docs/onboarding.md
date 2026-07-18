@@ -138,9 +138,9 @@ to CPU if the NPU path isn't ready.
 **Why provisional:** we haven't benchmarked on the real phone yet, so this ADR
 will be amended once numbers exist.
 
-**The catch that matters most:** our *current prototype* runs ASR via
-**whisper.cpp** and MT via **CTranslate2** — and **neither can be converted to
-QNN**. QNN only ingests PyTorch / TFLite / ONNX. So getting NPU speed likely
+**The catch that matters most:** our *current v0 harness* runs ASR via
+**faster-whisper** (CTranslate2-backed) and MT via **CTranslate2** — and **neither
+can be converted to QNN**. QNN only ingests PyTorch / TFLite / ONNX. So getting NPU speed likely
 means **re-sourcing models in a convertible format** (e.g. Opus-MT → ONNX →
 QAIRT). **NNAPI is explicitly avoided** (deprecated in Android 15; we target
 16). The safe path is **CPU-first**, then layer NPU.
@@ -173,7 +173,7 @@ QAIRT). **NNAPI is explicitly avoided** (deprecated in Android 15; we target
 | **EOS→SA** | End Of Speech → Start of Audio | The < 2.0 s turnaround we must hit. |
 | **VAD** | Voice Activity Detection | Finds speech, drops silence. |
 | **CT2 / CTranslate2** | CPU MT runtime we currently use | Fast on CPU, but **not QNN-convertible**. |
-| **whisper.cpp / ggml** | CPU ASR runtime we currently use | Same problem — **not QNN-convertible**. |
+| **faster-whisper / whisper.cpp** | Current v0 ASR runtime (faster-whisper, CTranslate2-backed) / alternative (whisper.cpp) | Same problem — **neither is QNN-convertible**; NPU needs re-sourcing. |
 | **DQ** | Disqualification | What a network call during testing causes. |
 
 ## Repository layout — what lives where
@@ -240,8 +240,15 @@ shortlist; the harness is what turns it into a decision.
 3. **Read in order** — see **Start here** (top of this guide): parent
    `README.md` → `contest-info.md` → `specifications.md`, then the submodule docs
    (`README.md` → this guide → `benchmarking-plan.md` → `docs/decisions/*`).
-4. **When the v0 harness lands**, run the lean eval set against the candidate
-   models to feed ADR-004.
+4. **The v0 harness is built** (`bench/`) — build the eval set and run it:
+
+   ```bash
+   make bench-data   # -> eval_manifest_v1.json (offline fallback until FLEURS downloads)
+   make bench        # run the harness (offline smoke: Opus-MT vi->en + Piper EN TTS)
+   make test         # run the pytest suite
+   ```
+
+   Feed the numbers into ADR-004.
 
 > **If you remember nothing else:** Kavi is a fully-offline phone translator
 > (VI↔EN); we target **one chip** (Snapdragon 8 Gen 2 / Hexagon HTP v73); the
