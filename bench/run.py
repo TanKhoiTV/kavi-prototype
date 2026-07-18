@@ -42,8 +42,6 @@ def run_manifest(
         cid_label = cid
         if cid_label is None:
             cid_label = "unknown"
-        if candidate_filter is None:
-            pass
         elif cid != candidate_filter:
             continue
         try:
