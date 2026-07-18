@@ -11,6 +11,7 @@
 - **bench:** Stop Opus-MT decode loops; scope WER/CER to ASR only
 - **bench:** Bound FLEURS audio read to sampled rows (resolve #34)
 - **bench:** Select FLEURS audio by id, not position([#28](https://github.com/TanKhoiTV/kavi-prototype/pull/28))
+- **bench:** Drop no-op candidate_filter pass in run.py
 
 ### Documentation
 
@@ -21,9 +22,11 @@
 
 - Scaffold host-side v0 benchmark harness (Phases 0-3)
 - Build lean eval set + SNR recipe in data_prep (Phase 1)
+- **bench:** Support a real noise bank in data_prep([#36](https://github.com/TanKhoiTV/kavi-prototype/pull/36))
 
 ### Miscellaneous
 
+- Update CHANGELOG
 - Update CHANGELOG
 - Update CHANGELOG
 - Update CHANGELOG
@@ -37,6 +40,10 @@
 
 - **bench:** Make manifest candidate-agnostic + cheap FLEURS reads
 - **bench:** Cache candidate instances per cid in run_manifest
+
+### Testing
+
+- Add bench harness tests + pytest config
 
 ### Ci
 
