@@ -250,23 +250,24 @@ def _load_fleurs_ids_texts(path: str) -> dict[str, str]:
 
 def _emit_asr_items(items, mixed_dir, lang, idx, uid, transcript, audio, sample_rate):
     """Emit the SNR-sweep ASR items for one utterance (clean + noisy)."""
-    for snr in SNR_LEVELS:
-        for kind in NOISE_TYPES:
+    # Clean reference condition: identical regardless of noise type, so emit once.
+    clean_wav = mixed_dir / f"{lang}_{uid}_clean.wav"
+    sf.write(str(clean_wav), audio.transpose(0, 1).numpy(), sample_rate)
+    items.append(
+        EvalItem(
+            id=f"{lang}-asr-{uid}-clean",
+            stage="ASR",
+            language=lang,
+            direction="",
+            audio_ref=str(clean_wav),
+            reference_text=transcript,
+            snr=None,
+            noise_type="clean",
+        )
+    )
+    for kind in NOISE_TYPES:
+        for snr in SNR_LEVELS:
             if snr is None:
-                wav = mixed_dir / f"{lang}_{uid}_{kind}_clean.wav"
-                sf.write(str(wav), audio.transpose(0, 1).numpy(), sample_rate)
-                items.append(
-                    EvalItem(
-                        id=f"{lang}-asr-{uid}-{kind}-clean",
-                        stage="ASR",
-                        language=lang,
-                        direction="",
-                        audio_ref=str(wav),
-                        reference_text=transcript,
-                        snr=None,
-                        noise_type=kind,
-                    )
-                )
                 continue
             noise = _synth_noise(kind, audio.shape[-1], sample_rate, seed=idx + 1)
             mixed = _mix(audio, noise, snr)
