@@ -28,10 +28,10 @@ def score_item(
         metrics.notes.append(f"error: {result.error}")
         return metrics
 
-    if item.stage in ("ASR", "MT"):
+    if item.stage == "ASR":
         ref = item.resolve_reference()
         if not ref:
-            metrics.notes.append("no reference text -> skipped WER/BLEU")
+            metrics.notes.append("no reference text -> skipped WER/CER")
             return metrics
         hyp = result.output_text or ""
         try:
@@ -41,13 +41,18 @@ def score_item(
             metrics.cer = jiwer.cer(ref, hyp)
         except Exception as exc:  # noqa: BLE001
             metrics.notes.append(f"wer/cer failed: {exc}")
-        if item.stage == "MT":
-            try:
-                import sacrebleu
+    elif item.stage == "MT":
+        ref = item.resolve_reference()
+        if not ref:
+            metrics.notes.append("no reference text -> skipped BLEU")
+            return metrics
+        hyp = result.output_text or ""
+        try:
+            import sacrebleu
 
-                metrics.bleu = sacrebleu.corpus_bleu([hyp], [[ref]]).score
-            except Exception as exc:  # noqa: BLE001
-                metrics.notes.append(f"bleu failed: {exc}")
+            metrics.bleu = sacrebleu.corpus_bleu([hyp], [[ref]]).score
+        except Exception as exc:  # noqa: BLE001
+            metrics.notes.append(f"bleu failed: {exc}")
     elif item.stage == "TTS":
         metrics.notes.append("TTS MOS deferred to v1 (DNSMOS / human panel)")
 
