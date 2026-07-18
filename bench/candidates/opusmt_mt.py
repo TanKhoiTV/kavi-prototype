@@ -34,13 +34,13 @@ class OpusMTMTCandidate(Candidate):
             str(model_dir), device="cpu", compute_type="int8"
         )
         self.sp_src = spm.SentencePieceProcessor()
-        self.sp_src.load(str(MT_SRC_DIR / "source.spm"))
+        self.sp_src.load(str(MT_SRC_DIR / "source.spm"))  # pyright: ignore[reportAttributeAccessIssue]
         self.sp_tgt = spm.SentencePieceProcessor()
-        self.sp_tgt.load(str(MT_SRC_DIR / "target.spm"))
+        self.sp_tgt.load(str(MT_SRC_DIR / "target.spm"))  # pyright: ignore[reportAttributeAccessIssue]
 
     def _infer(self, item: EvalItem) -> tuple[str | None, str | None]:
         text = item.resolve_input()
-        tokens = self.sp_src.encode(text, out_type=str)
+        tokens = self.sp_src.encode(text, out_type=str)  # pyright: ignore[reportAttributeAccessIssue]
         results = self.translator.translate_batch([tokens])
-        translation = self.sp_tgt.decode(results[0].hypotheses[0])
+        translation = self.sp_tgt.decode(results[0].hypotheses[0])  # pyright: ignore[reportAttributeAccessIssue]
         return translation, None

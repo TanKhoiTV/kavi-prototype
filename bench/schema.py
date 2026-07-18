@@ -73,6 +73,10 @@ class RunManifest:
 
     @classmethod
     def from_json(cls, path: str | Path) -> RunManifest:
-        data = json.loads(Path(path).read_text(encoding="utf-8"))
+        try:
+            raw = Path(path).read_text(encoding="utf-8")
+            data = json.loads(raw)
+        except (OSError, json.JSONDecodeError) as exc:
+            raise ValueError(f"invalid eval manifest {path}: {exc}") from exc
         items = [EvalItem(**i) for i in data.get("items", [])]
         return cls(version=data.get("version", MANIFEST_VERSION), items=items)
