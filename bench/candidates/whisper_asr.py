@@ -35,6 +35,8 @@ class WhisperASRCandidate(Candidate):
         audio_path = item.audio_ref or item.input_text
         if not audio_path or not os.path.exists(audio_path):
             raise FileNotFoundError(f"ASR needs an audio_ref path; got {audio_path!r}")
-        segments, _info = self.model.transcribe(audio_path, language=self.language)
+        segments, _info = self.model.transcribe(
+            audio_path, language=item.language or self.language
+        )
         text = " ".join(seg.text for seg in segments).strip()
         return text or "", None

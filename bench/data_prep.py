@@ -232,6 +232,46 @@ def _load_fleurs_ids_texts(path: str) -> dict[str, str]:
     }
 
 
+def _emit_asr_items(items, mixed_dir, lang, idx, uid, transcript, audio, sample_rate):
+    """Emit the SNR-sweep ASR items for one utterance (clean + noisy)."""
+    for snr in SNR_LEVELS:
+        for kind in NOISE_TYPES:
+            if snr is None:
+                wav = mixed_dir / f"{lang}_{uid}_{kind}_clean.wav"
+                sf.write(str(wav), audio.transpose(0, 1).numpy(), sample_rate)
+                items.append(
+                    EvalItem(
+                        id=f"{lang}-asr-{uid}-{kind}-clean",
+                        stage="ASR",
+                        language=lang,
+                        direction="",
+                        candidate_id="whisper-small-faster-whisper-cpu",
+                        audio_ref=str(wav),
+                        transcript_ref=transcript,
+                        snr=None,
+                        noise_type=kind,
+                    )
+                )
+                continue
+            noise = _synth_noise(kind, audio.shape[-1], sample_rate, seed=idx + 1)
+            mixed = _mix(audio, noise, snr)
+            wav = mixed_dir / f"{lang}_{uid}_{kind}_{snr:g}.wav"
+            sf.write(str(wav), mixed.transpose(0, 1).numpy(), sample_rate)
+            items.append(
+                EvalItem(
+                    id=f"{lang}-asr-{uid}-{kind}-{snr:g}",
+                    stage="ASR",
+                    language=lang,
+                    direction="",
+                    candidate_id="whisper-small-faster-whisper-cpu",
+                    audio_ref=str(wav),
+                    transcript_ref=transcript,
+                    snr=snr,
+                    noise_type=kind,
+                )
+            )
+
+
 def build_lean_manifest(
     out_path: str,
     workdir: str = "eval_data",
@@ -249,46 +289,12 @@ def build_lean_manifest(
     en_path = wd / "raw" / "fleurs_en_us_test.parquet"
     if use_fleurs and vi_path.exists() and en_path.exists():
         vi = _load_fleurs(str(vi_path), n_per_lang, sample_rate)
+        en_audio = _load_fleurs(str(en_path), n_per_lang, sample_rate)
         en_text_by_id = _load_fleurs_ids_texts(str(en_path))
         for idx, (uid, transcript, audio) in enumerate(vi):
-            for snr in SNR_LEVELS:
-                for kind in NOISE_TYPES:
-                    if snr is None:
-                        wav = mixed_dir / f"vi_{uid}_{kind}_clean.wav"
-                        sf.write(str(wav), audio.transpose(0, 1).numpy(), sample_rate)
-                        items.append(
-                            EvalItem(
-                                id=f"vi-asr-{uid}-{kind}-clean",
-                                stage="ASR",
-                                language="vi",
-                                direction="",
-                                candidate_id="whisper-small-faster-whisper-cpu",
-                                audio_ref=str(wav),
-                                transcript_ref=transcript,
-                                snr=None,
-                                noise_type=kind,
-                            )
-                        )
-                        continue
-                    noise = _synth_noise(
-                        kind, audio.shape[-1], sample_rate, seed=idx + 1
-                    )
-                    mixed = _mix(audio, noise, snr)
-                    wav = mixed_dir / f"vi_{uid}_{kind}_{snr:g}.wav"
-                    sf.write(str(wav), mixed.transpose(0, 1).numpy(), sample_rate)
-                    items.append(
-                        EvalItem(
-                            id=f"vi-asr-{uid}-{kind}-{snr:g}",
-                            stage="ASR",
-                            language="vi",
-                            direction="",
-                            candidate_id="whisper-small-faster-whisper-cpu",
-                            audio_ref=str(wav),
-                            transcript_ref=transcript,
-                            snr=snr,
-                            noise_type=kind,
-                        )
-                    )
+            _emit_asr_items(
+                items, mixed_dir, "vi", idx, uid, transcript, audio, sample_rate
+            )
             en_tr = en_text_by_id.get(uid)
             if en_tr:
                 items.append(
@@ -302,7 +308,14 @@ def build_lean_manifest(
                         reference_text=en_tr,
                     )
                 )
-        print(f"FLEURS: added {len(vi)} VI speakers of ASR + VI->EN MT items")
+        for idx, (uid, transcript, audio) in enumerate(en_audio):
+            _emit_asr_items(
+                items, mixed_dir, "en", idx, uid, transcript, audio, sample_rate
+            )
+        print(
+            f"FLEURS: added {len(vi)} VI + {len(en_audio)} EN ASR speakers "
+            f"+ VI->EN MT items"
+        )
     elif use_fleurs:
         print(
             f"FLEURS parquets not found in {wd / 'raw'} "
