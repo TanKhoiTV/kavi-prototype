@@ -15,6 +15,7 @@
 ### Documentation
 
 - Refresh stale layout/index docs to match current repo
+- Verify InfoRe + 25hours_single licenses (stay avoid)([#35](https://github.com/TanKhoiTV/kavi-prototype/pull/35))
 
 ### Features
 
@@ -23,6 +24,7 @@
 
 ### Miscellaneous
 
+- Update CHANGELOG
 - Update CHANGELOG
 - Update CHANGELOG
 - Update CHANGELOG
