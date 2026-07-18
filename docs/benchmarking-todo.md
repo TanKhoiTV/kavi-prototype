@@ -10,6 +10,20 @@
 > **Why this exists:** we run experiments *before* picking ASR / MT / TTS. The
 > numbers this harness produces are what ADR-004 records as the architecture.
 
+> **Progress & to-do snapshot (2026-07-18):**
+>
+> - **Done (Phase 0–3):** v0 host-side harness **built and running** in `bench/`
+>   (PR #28, #36). Data prep, pluggable ASR/MT/TTS adapters, CPU-default candidates
+>   (**faster-whisper** Small int8 ASR, CTranslate2 Opus-MT vi→en int8 MT, Piper EN
+>   TTS), and the off-device scorer (WER/CER via jiwer, BLEU via sacrebleu; COMET/MOS
+>   deferred to v1) are implemented. First CPU numbers obtained (MT BLEU ~76, TTS RTF
+>   0.06–0.22). Doc drift from this work resolved by PR #43 (issues #37–#42).
+> - **To-do (Phase 4–7):** on-device QNN runner (blocked on the Qualcomm QAIRT EULA);
+>   fetch real FLEURS / MUSAN / RIRS_NOISES assets (large-file download currently
+>   limited); RTranslator baseline row (Phase 5); pre-ASR denoising gate (Phase 6);
+>   COMET + human MOS depth (Phase 7); then finalize ADR-004 once on-device numbers
+>   exist.
+
 ---
 
 ## 0. Goal
