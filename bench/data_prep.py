@@ -187,9 +187,11 @@ def _load_fleurs(path: str, n: int, sample_rate: int, seed: int = 42):
     """Return list of (id, transcript, audio_tensor) from a FLEURS parquet.
 
     FLEURS stores the `audio` column as encoded bytes (WAV); decode via
-    soundfile and resample/downmix to `sample_rate`. Reads only the needed
-    columns, and random-samples `n` utterances with a fixed seed so the lean
-    set is reproducible and not biased by file order.
+    soundfile and resample/downmix to `sample_rate`. Sampling is seeded so
+    the lean set is reproducible and unbiased by file order. Peak memory is
+    bounded: the audio column is streamed in small batches and only the
+    `n` sampled rows are retained, rather than materializing the full
+    (~690 MB) audio column up front.
     """
     import io
     import random
@@ -200,19 +202,31 @@ def _load_fleurs(path: str, n: int, sample_rate: int, seed: int = 42):
 
     try:
         pf = pq.ParquetFile(path)
-        # Cheap pass: ids + transcripts only (no audio bytes) for sampling.
-        meta = pf.read_row_groups([0], columns=["id", "transcription"]).to_pylist()
+        num_rg = pf.metadata.num_row_groups
+        # Cheap pass: ids + transcripts for ALL row groups (no audio bytes),
+        # so seeded sampling draws from the full utterance pool regardless of
+        # row-group layout (no per-row-group sampling bias).
+        meta = pf.read_row_groups(
+            list(range(num_rg)), columns=["id", "transcription"]
+        ).to_pylist()
+        total = len(meta)
         idxs = (
-            list(range(len(meta)))
-            if len(meta) <= n
-            else random.Random(seed).sample(range(len(meta)), n)
+            list(range(total))
+            if total <= n
+            else random.Random(seed).sample(range(total), n)
         )
-        # Audio pass: read only the audio column for the needed row group, then
-        # keep just the sampled rows. (Parquet is read at row-group granularity,
-        # so for a single-row-group file the audio column is still materialized
-        # once -- true peak-memory reduction would need smaller row groups.)
-        audio_rows = pf.read_row_groups([0], columns=["id", "audio"]).to_pylist()
-        audio_by_id = {str(r["id"]): (r.get("audio") or {}) for r in audio_rows}
+        # Bounded-peak audio read: stream the audio column in small batches
+        # and keep only rows whose global index is in `idxs`. Peak RAM is
+        # bounded by `batch_size` rows of audio, NOT the full ~690 MB column
+        # (fixes the row-group-0-only + full-column materialization issue).
+        need = set(idxs)
+        audio_by_id: dict[str, dict] = {}
+        seen = 0
+        for batch in pf.iter_batches(columns=["id", "audio"], batch_size=64):
+            for offset, r in enumerate(batch.to_pylist()):
+                if seen + offset in need:
+                    audio_by_id[str(r["id"])] = r.get("audio") or {}
+            seen += batch.num_rows
     except Exception as exc:  # noqa: BLE001
         raise ValueError(f"cannot read FLEURS parquet {path}: {exc}") from exc
     out = []
