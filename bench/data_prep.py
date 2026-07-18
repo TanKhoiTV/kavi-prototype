@@ -215,18 +215,19 @@ def _load_fleurs(path: str, n: int, sample_rate: int, seed: int = 42):
             if total <= n
             else random.Random(seed).sample(range(total), n)
         )
-        # Bounded-peak audio read: stream the audio column in small batches
-        # and keep only rows whose global index is in `idxs`. Peak RAM is
-        # bounded by `batch_size` rows of audio, NOT the full ~690 MB column
-        # (fixes the row-group-0-only + full-column materialization issue).
-        need = set(idxs)
+        # Select by id, not by position. The audio pass below uses a
+        # different pyarrow API (iter_batches) than this metadata pass
+        # (read_row_groups); relying on matching row order between the two
+        # is unsafe (no cross-version/engine guarantee) and would silently
+        # drop or mis-align rows. Keying on the stable `id` makes the audio
+        # read order-independent.
+        sampled_ids = {str(meta[i]["id"]) for i in idxs}
         audio_by_id: dict[str, dict] = {}
-        seen = 0
         for batch in pf.iter_batches(columns=["id", "audio"], batch_size=64):
-            for offset, r in enumerate(batch.to_pylist()):
-                if seen + offset in need:
-                    audio_by_id[str(r["id"])] = r.get("audio") or {}
-            seen += batch.num_rows
+            for r in batch.to_pylist():
+                rid = str(r.get("id"))
+                if rid in sampled_ids:
+                    audio_by_id[rid] = r.get("audio") or {}
     except Exception as exc:  # noqa: BLE001
         raise ValueError(f"cannot read FLEURS parquet {path}: {exc}") from exc
     out = []
