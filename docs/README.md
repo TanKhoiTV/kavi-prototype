@@ -6,12 +6,17 @@ parent repo `aivoice-2026/docs/`.
 
 ## Index
 
-- `onboarding.md` — new-member guide: decodes the jargon, the three ADRs, and
+- `onboarding.md` — new-member guide: decodes the jargon, the ADRs, and
 the repo layout. **Start here.**
+- `onboarding-quiz.md` — comprehension checkpoint: 12 questions to verify a
+new member understands the current state.
 - `benchmarking-plan.md` — datasets, candidate models (ASR / MT / TTS), harness
 design, metrics, and the v0 minimal. Gates ADR-004.
+- `benchmarking-todo.md` — execution checklist / pitch for the v0 benchmark
+harness (what to build, in what order).
 - `decisions/` — Architecture Decision Records (ADR-001 offline-first,
-  ADR-002 target platform, ADR-003 Hexagon runtime). Source of truth for
+  ADR-002 target platform, ADR-003 Hexagon runtime, ADR-004 ASR/MT/TTS
+  architecture, plus `license-situation.md`). Source of truth for
   architecture choices.
 
 ## Planned / deferred

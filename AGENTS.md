@@ -19,10 +19,14 @@ Guidance for AI coding agents working in this repository.
 ## Layout (current)
 
 - `models/` — MT weights at root (kept for reuse; see `.gitignore`).
+- `voices/` — Piper TTS voice models.
+- `bench/` — v0 benchmark harness (candidate adapters, scorer, eval-manifest schema, data prep).
 - `docs/` — internal docs.
+- `eval_data/` — generated eval audio / downloaded corpora.
+- `experiments/` — slot for pipeline experiments.
 - `archive/` — the entire previous implementation, preserved for reference.
   Read here before re-implementing anything.
-- `src/` — (planned) new application code.
+- `src/` — (planned) new application code — not yet scaffolded.
 
 ## Conventions
 
