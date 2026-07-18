@@ -55,7 +55,7 @@ git checkout main  # submodules start on a detached commit; switch to a branch
      `docs:` documentation · `refactor:` restructure · `test:` tests.
 3. Keep changes offline/on-device friendly.
 4. Open a PR into `main`. Use the PR template.
-5. Run `make check` before pushing.
+5. Run `make check` and `make test` before pushing.
 
 ## Versioning
 
@@ -67,6 +67,7 @@ stabilizes.
 ```bash
 uv sync        # install dependencies
 make check     # lint
+make test      # run the test suite (pytest)
 ```
 
 ## Tooling & standards

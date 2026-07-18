@@ -33,7 +33,7 @@ Guidance for AI coding agents working in this repository.
 - Commits follow **Conventional Commits** (`feat:`, `fix:`, `chore:`, …).
 - Branch per task: `feat/<topic>`, `fix/<topic>`, `chore/<topic>`; PR into
   `main`.
-- Run `make check` (ruff) before committing.
+- Run `make check` (ruff) before committing; `make test` for the bench harness suite.
 - Keep the project **fully offline / on-device**: no network calls at runtime.
 
 ## Working here
@@ -41,3 +41,5 @@ Guidance for AI coding agents working in this repository.
 1. Check `archive/` first — much of the prior logic is reusable.
 2. Prefer reusing `models/` weights over re-downloading.
 3. Keep the public/private boundary: internal notes stay here, not in the parent.
+4. Benchmark harness: `make bench-data` (build eval set), `make bench` (run),
+   `make test` (suite) — see `bench/` + `docs/benchmarking-*.md`.
