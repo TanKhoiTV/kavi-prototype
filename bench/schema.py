@@ -16,7 +16,9 @@ class EvalItem:
     stage: str  # "ASR" | "MT" | "TTS"
     language: str  # "vi" | "en"
     direction: str = ""  # "vi->en" | "en->vi" | ""
-    candidate_id: str = ""
+    candidate_id: str | None = (
+        None  # None -> harness resolves the default candidate for `stage`
+    )
     model_path: str | None = None
     config: dict[str, Any] = field(default_factory=dict)
     audio_ref: str | None = None  # input audio (ASR) or input text file (MT/TTS)
