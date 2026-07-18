@@ -132,25 +132,50 @@ def mix_noise(clean_wav: str, noise_wav: str, snr_db: float, out_path: str) -> N
     torchaudio.save(out_path, mixed, sr)
 
 
-def download_fleurs(workdir: str, max_retries: int = 3) -> None:
-    """Fetch FLEURS vi_vn/en_us test parquets via curl (needs working HF access)."""
+def download_fleurs(
+    workdir: str,
+    max_retries: int = 20,
+    langs: tuple[str, ...] = ("vi_vn", "en_us"),
+) -> None:
+    """Fetch FLEURS parquets via curl (needs working HF access).
+
+    Uses `-C -` (resume) + `--retry-all-errors` so a dropped connection
+    continues from the downloaded offset instead of restarting -- required
+    because the proxy here drops large (~690 MB) parquet downloads.
+    """
     import subprocess
 
     wd = Path(workdir)
     (wd / "raw").mkdir(parents=True, exist_ok=True)
     base = "https://huggingface.co/datasets/google/fleurs/resolve/main/parquet-data"
-    for lang in ("vi_vn", "en_us"):
+    for lang in langs:
         url = f"{base}/{lang}/test-00000-of-00001.parquet"
         out = wd / "raw" / f"fleurs_{lang}_test.parquet"
         for attempt in range(1, max_retries + 1):
             print(f"downloading {lang} (attempt {attempt}/{max_retries})...")
             rc = subprocess.run(
-                ["curl", "-sSL", "--retry", "3", "-o", str(out), url], check=False
+                [
+                    "curl",
+                    "-sSL",
+                    "--retry",
+                    "20",
+                    "--retry-delay",
+                    "2",
+                    "--retry-all-errors",
+                    "--max-time",
+                    "600",
+                    "-C",
+                    "-",
+                    "-o",
+                    str(out),
+                    url,
+                ],
+                check=False,
             ).returncode
             if rc == 0 and out.exists() and out.stat().st_size > 1_000_000:
                 print(f"  ok: {out} ({out.stat().st_size} bytes)")
                 break
-            print(f"  failed (rc={rc}); retrying")
+            print(f"  incomplete (rc={rc}); resuming")
 
 
 def _load_fleurs(path: str, n: int, sample_rate: int):
@@ -302,13 +327,19 @@ def main() -> None:
         help="curl FLEURS parquets first (needs working HF access)",
     )
     ap.add_argument(
+        "--lang",
+        action="append",
+        help="limit FLEURS download to these langs (repeatable)",
+    )
+    ap.add_argument(
         "--no-fleurs",
         action="store_true",
         help="skip FLEURS even if present (offline fallback only)",
     )
     args = ap.parse_args()
     if args.download_fleurs:
-        download_fleurs(args.workdir)
+        langs = tuple(args.lang) if args.lang else ("vi_vn", "en_us")
+        download_fleurs(args.workdir, langs=langs)
     build_lean_manifest(
         args.out,
         workdir=args.workdir,
