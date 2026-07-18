@@ -17,6 +17,8 @@
 
 - Refresh stale layout/index docs to match current repo
 - Verify InfoRe + 25hours_single licenses (stay avoid)([#35](https://github.com/TanKhoiTV/kavi-prototype/pull/35))
+- Sync harness docs with the implemented v0 benchmark harness
+- **benchmarking-todo:** Add progress & to-do snapshot at top([#43](https://github.com/TanKhoiTV/kavi-prototype/pull/43))
 
 ### Features
 
@@ -26,6 +28,7 @@
 
 ### Miscellaneous
 
+- Update CHANGELOG
 - Update CHANGELOG
 - Update CHANGELOG
 - Update CHANGELOG
