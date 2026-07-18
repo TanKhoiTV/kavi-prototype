@@ -3,10 +3,23 @@
 ### Bug Fixes
 
 - Resolve pi-lens false positives via pyrightconfig.json([#26](https://github.com/TanKhoiTV/kavi-prototype/pull/26))
+- Resume large FLEURS parquet downloads in download_fleurs
+- Build real-speech FLEURS set (decode audio bytes, pair VI->EN)
+- Emit EN ASR items and honor per-item language in Whisper
+- **bench:** Set ASR reference via reference_text, not transcript_ref
+- **bench:** Emit clean ASR condition once instead of per-noise-type
+- **bench:** Stop Opus-MT decode loops; scope WER/CER to ASR only
+- **bench:** Bound FLEURS audio read to sampled rows (resolve #34)
+- **bench:** Select FLEURS audio by id, not position([#28](https://github.com/TanKhoiTV/kavi-prototype/pull/28))
+
+### Documentation
+
+- Refresh stale layout/index docs to match current repo
 
 ### Features
 
 - Scaffold host-side v0 benchmark harness (Phases 0-3)
+- Build lean eval set + SNR recipe in data_prep (Phase 1)
 
 ### Miscellaneous
 
@@ -16,6 +29,12 @@
 - Update CHANGELOG
 - Update CHANGELOG
 - Update CHANGELOG
+- Update CHANGELOG
+
+### Refactoring
+
+- **bench:** Make manifest candidate-agnostic + cheap FLEURS reads
+- **bench:** Cache candidate instances per cid in run_manifest
 
 ### Ci
 
