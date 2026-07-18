@@ -15,8 +15,12 @@ here.
 | Path | Purpose |
 | ------ | --------- |
 | `models/` | MT weights kept at the repo root for immediate reuse (Opus-MT VI→EN). |
-| `docs/` | Internal documentation (architecture, design, ADRs, pitch deck). |
-| `src/` | (planned) application source — to be scaffolded from scratch. |
+| `voices/` | Piper TTS voice models (e.g. `en_US-lessac-medium`). |
+| `bench/` | v0 benchmark harness: candidate adapters, scorer, eval-manifest schema, data prep. |
+| `docs/` | Internal documentation (onboarding, benchmarking plan, ADRs). |
+| `eval_data/` | Generated eval audio / downloaded corpora used by the harness. |
+| `experiments/` | Slot for pipeline experiments (e.g. denoising validation). |
+| `bench-results/` | Benchmark run outputs (gitignored). |
 | `archive/` | The previous implementation, preserved in full for reference. |
 
 ## Quickstart
@@ -38,5 +42,6 @@ License: MIT (see [`LICENSE`](LICENSE)).
 
 ## Status
 
-Early-stage scaffold. The prior implementation is archived under `archive/`;
-the project is being rebuilt from scratch on this branch.
+Early-stage prototype. The prior implementation is archived under `archive/`;
+the v0 benchmark harness lives in `bench/`. Application source (`src/`) is
+still to be scaffolded.
