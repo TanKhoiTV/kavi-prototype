@@ -27,7 +27,6 @@ def build_smoke_manifest(workdir: Path | None = None) -> RunManifest:
             stage="MT",
             language="vi",
             direction="vi->en",
-            candidate_id="opus-mt-vi-en-ct2-cpu",
             input_text="Xin chào, tôi cần giúp đỡ.",
             reference_text="Hello, I need help.",
         ),
@@ -36,7 +35,6 @@ def build_smoke_manifest(workdir: Path | None = None) -> RunManifest:
             stage="TTS",
             language="en",
             direction="",
-            candidate_id="piper-en-lessac-cpu",
             input_text="Hello, I need help.",
         ),
         # ASR needs a one-time Whisper-Small weight fetch (setup, not runtime).
@@ -46,7 +44,6 @@ def build_smoke_manifest(workdir: Path | None = None) -> RunManifest:
             stage="ASR",
             language="vi",
             direction="",
-            candidate_id="whisper-small-faster-whisper-cpu",
             audio_ref=str(workdir / "smoke-asr-tone.wav"),
             reference_text="",
         ),
