@@ -26,3 +26,8 @@ models/opus-mt-vi-en-src/tf_model.h5
 
 # Runtime logs (legacy logs/ is tracked under archive/)
 logs/
+
+# Benchmark harness outputs (generated)
+bench-results/
+eval_data/
+eval_manifest_v1.json
