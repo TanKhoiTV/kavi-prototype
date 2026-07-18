@@ -1,53 +1,291 @@
 """Phase 1 data prep: build the lean eval set + noise/SNR variants -> manifest.
 
-This module is the Phase 1 runner. It needs network + Hugging Face access, so it
-is NOT exercised by the offline smoke (`bench.run --smoke`). Run it explicitly:
+The eval set is built from locally-available FLEURS parquets when present
+(download them with `download_fleurs()` / `make bench-data --download-fleurs`
+once Hugging Face large-file downloads work in your environment). When they are
+not present, a runnable **offline fallback** set is emitted instead: an authored
+VI<->EN factory/logistics gold set scored as MT (vi->en) + TTS items, using
+synthetic noise for the SNR recipe.
 
-    uv run python -m bench.data_prep --out eval_manifest_v1.json
+Speech corpora (FLEURS `vi_vn`/`en_us`, CC BY 4.0) give:
+  - VI ASR + EN ASR items (real speech, transcript references)
+  - VI<->EN speech-translation items via FLEURS' shared sentence IDs (plan S3.3)
+The authored gold set adds domain-flavored MT/TTS references that need no
+download. ASR items are only emitted when FLEURS parquets are available; the
+offline fallback covers MT + TTS, which the v0 CPU candidates score fully
+offline (Opus-MT vi->en + Piper EN).
 
-Implemented here: the reusable noise-mixing core (torchaudio.add_noise) and the
-manifest emitter. The corpus download (VIVOS / Common Voice / LibriSpeech /
-bespoke VI<->EN gold) and noise bank (MUSAN / RIRS_NOISES / DEMAND) are scaffolded
-but intentionally minimal -- flesh out per docs/benchmarking-plan.md S3-S4.
+Noise is applied at eval time (plan S3.5): synthetic steady/impulsive noise mixed
+to a target SNR via torchaudio.add_noise. Swap in MUSAN/RIRS_NOISES later by
+replacing `_synth_noise` with real clips (the manifest schema is unchanged).
 """
 
 from __future__ import annotations
+
+import random
+from pathlib import Path
 
 from .schema import EvalItem, RunManifest
 
 SNR_LEVELS = [None, 15.0, 10.0, 5.0, 0.0]  # clean + mild/moderate/hard/severe
 NOISE_TYPES = ["steady", "impulsive"]
 
+# Authored VI<->EN factory/logistics gold set (text only, no download needed).
+# Domain-skewed per the benchmarking plan (S8): equipment, safety, numbers,
+# short imperatives. Use as MT (vi->en) + TTS reference texts.
+GOLD_SET: list[tuple[str, str]] = [
+    (
+        "Xin hãy đeo kính bảo hộ trước khi vào khu vực làm việc.",
+        "Please wear safety goggles before entering the work area.",
+    ),
+    (
+        "Cần kiểm tra áp suất lốp xe nâng mỗi ca làm việc.",
+        "Check the forklift tire pressure at the start of every shift.",
+    ),
+    (
+        "Máy nén khí đang quá nhiệt, hãy tắt ngay lập tức.",
+        "The air compressor is overheating, switch it off immediately.",
+    ),
+    (
+        "Kho hàng số tám đã nhận đủ năm mươi thùng hàng.",
+        "Warehouse number eight has received the full fifty cartons.",
+    ),
+    (
+        "Cảnh báo: khu vực này có nguy cơ rơi vật thể từ trên cao.",
+        "Warning: this area has a risk of falling objects from above.",
+    ),
+    (
+        "Vui lòng giữ khoảng cách hai mét với băng chuyền.",
+        "Please keep a two meter distance from the conveyor belt.",
+    ),
+    (
+        "Đèn báo hiệu đang nhấp nháy, không được đi qua.",
+        "The signal light is flashing, do not walk through.",
+    ),
+    (
+        "Hôm nay chúng ta xuất kho tổng cộng một trăm hai mươi đơn.",
+        "Today we shipped a total of one hundred and twenty orders.",
+    ),
+    (
+        "Mặt hàng dễ vỡ, xếp nhẹ tay và dán nhãn cẩn thận.",
+        "Fragile goods, handle with care and label them properly.",
+    ),
+    (
+        "Cần bổ sung ba kiện hàng vào chuyến giao buổi chiều.",
+        "We need to add three packages to the afternoon delivery.",
+    ),
+    (
+        "Van an toàn đã mở, xả áp suất dư thừa ra ngoài.",
+        "The relief valve opened and vented the excess pressure outside.",
+    ),
+    (
+        "Cấm sử dụng điện thoại di động gần trạm biến áp.",
+        "Mobile phones are prohibited near the transformer station.",
+    ),
+]
+
+
+def _synth_noise(kind: str, length: int, sample_rate: int, seed: int):
+    import torch
+    import torchaudio
+
+    g = torch.Generator().manual_seed(seed)
+    if kind == "steady":
+        noise = torch.randn(1, length, generator=g)
+        noise = torchaudio.functional.lowpass_biquad(noise, sample_rate, 1200)
+    else:  # impulsive: periodic bursts -> forklift/clatter impulses
+        noise = torch.zeros(1, length)
+        burst = round(0.02 * sample_rate)
+        spacing = round(0.25 * sample_rate)
+        rng = random.Random(seed)
+        pos = rng.randint(0, max(1, burst))
+        while pos < length:
+            end = min(pos + burst, length)
+            noise[0, pos:end] = torch.randn(end - pos, generator=g) * 4.0
+            pos += spacing
+    return noise
+
+
+def _mix(clean, noise, snr_db: float):
+    import torch
+    import torchaudio
+
+    if noise.shape[-1] < clean.shape[-1]:
+        reps = (clean.shape[-1] + noise.shape[-1] - 1) // noise.shape[-1]
+        noise = noise.repeat(1, reps)
+    noise = noise[:, : clean.shape[-1]]
+    try:
+        return torchaudio.functional.add_noise(clean, noise, torch.tensor([snr_db]))
+    except Exception as exc:  # noqa: BLE001
+        raise ValueError(f"noise mix failed (snr={snr_db}): {exc}") from exc
+
 
 def mix_noise(clean_wav: str, noise_wav: str, snr_db: float, out_path: str) -> None:
     """Mix `noise_wav` into `clean_wav` at `snr_db` dB and write to `out_path`."""
-    import torch
     import torchaudio
 
     clean, sr = torchaudio.load(clean_wav)
     noise, nsr = torchaudio.load(noise_wav)
     if nsr != sr:
         noise = torchaudio.functional.resample(noise, nsr, sr)
-    mixed = torchaudio.functional.add_noise(clean, noise, torch.tensor([snr_db]))
+    mixed = _mix(clean, noise, snr_db)
     torchaudio.save(out_path, mixed, sr)
 
 
-def emit_manifest(items: list[EvalItem], out_path: str) -> None:
+def download_fleurs(workdir: str, max_retries: int = 3) -> None:
+    """Fetch FLEURS vi_vn/en_us test parquets via curl (needs working HF access)."""
+    import subprocess
+
+    wd = Path(workdir)
+    (wd / "raw").mkdir(parents=True, exist_ok=True)
+    base = "https://huggingface.co/datasets/google/fleurs/resolve/main/parquet-data"
+    for lang in ("vi_vn", "en_us"):
+        url = f"{base}/{lang}/test-00000-of-00001.parquet"
+        out = wd / "raw" / f"fleurs_{lang}_test.parquet"
+        for attempt in range(1, max_retries + 1):
+            print(f"downloading {lang} (attempt {attempt}/{max_retries})...")
+            rc = subprocess.run(
+                ["curl", "-sSL", "--retry", "3", "-o", str(out), url], check=False
+            ).returncode
+            if rc == 0 and out.exists() and out.stat().st_size > 1_000_000:
+                print(f"  ok: {out} ({out.stat().st_size} bytes)")
+                break
+            print(f"  failed (rc={rc}); retrying")
+
+
+def _load_fleurs(path: str, n: int, sample_rate: int):
+    """Return list of (id, transcript, audio_tensor) from a FLEURS parquet."""
+    import pyarrow.parquet as pq
+    import torch
+    import torchaudio
+
+    try:
+        table = pq.read_table(path).slice(0, n)
+    except Exception as exc:  # noqa: BLE001
+        raise ValueError(f"cannot read FLEURS parquet {path}: {exc}") from exc
+    rows = table.select(["id", "transcription", "audio"]).to_pylist()
+    out = []
+    for r in rows:
+        a = r.get("audio") or {}
+        arr = a.get("array")
+        if arr is None:
+            continue
+        audio = torch.tensor(arr).float().unsqueeze(0)
+        sr = a.get("sampling_rate") or sample_rate
+        if sr != sample_rate:
+            audio = torchaudio.functional.resample(audio, sr, sample_rate)
+        out.append((str(r.get("id")), (r.get("transcription") or "").strip(), audio))
+    return out
+
+
+def build_lean_manifest(
+    out_path: str,
+    workdir: str = "eval_data",
+    n_per_lang: int = 30,
+    sample_rate: int = 16000,
+    use_fleurs: bool = True,
+) -> None:
+    import torchaudio
+
+    wd = Path(workdir)
+    mixed_dir = wd / "mixed"
+    mixed_dir.mkdir(parents=True, exist_ok=True)
+    items: list[EvalItem] = []
+
+    vi_path = wd / "raw" / "fleurs_vi_vn_test.parquet"
+    en_path = wd / "raw" / "fleurs_en_us_test.parquet"
+    if use_fleurs and vi_path.exists() and en_path.exists():
+        vi = _load_fleurs(str(vi_path), n_per_lang, sample_rate)
+        en = _load_fleurs(str(en_path), n_per_lang, sample_rate)
+        en_by_id = {i: t for i, t, _ in en}
+        for idx, (uid, transcript, audio) in enumerate(vi):
+            for snr in SNR_LEVELS:
+                for kind in NOISE_TYPES:
+                    if snr is None:
+                        wav = mixed_dir / f"vi_{uid}_{kind}_clean.wav"
+                        torchaudio.save(str(wav), audio, sample_rate)
+                        items.append(
+                            EvalItem(
+                                id=f"vi-asr-{uid}-{kind}-clean",
+                                stage="ASR",
+                                language="vi",
+                                direction="",
+                                candidate_id="whisper-small-faster-whisper-cpu",
+                                audio_ref=str(wav),
+                                transcript_ref=transcript,
+                                snr=None,
+                                noise_type=kind,
+                            )
+                        )
+                        continue
+                    noise = _synth_noise(
+                        kind, audio.shape[-1], sample_rate, seed=idx + 1
+                    )
+                    mixed = _mix(audio, noise, snr)
+                    wav = mixed_dir / f"vi_{uid}_{kind}_{snr:g}.wav"
+                    torchaudio.save(str(wav), mixed, sample_rate)
+                    items.append(
+                        EvalItem(
+                            id=f"vi-asr-{uid}-{kind}-{snr:g}",
+                            stage="ASR",
+                            language="vi",
+                            direction="",
+                            candidate_id="whisper-small-faster-whisper-cpu",
+                            audio_ref=str(wav),
+                            transcript_ref=transcript,
+                            snr=snr,
+                            noise_type=kind,
+                        )
+                    )
+            en_tr = en_by_id.get(uid)
+            if en_tr:
+                items.append(
+                    EvalItem(
+                        id=f"vi-en-mt-{uid}",
+                        stage="MT",
+                        language="vi",
+                        direction="vi->en",
+                        candidate_id="opus-mt-vi-en-ct2-cpu",
+                        input_text=transcript,
+                        reference_text=en_tr,
+                    )
+                )
+        print(f"FLEURS: added {len(vi)} VI speakers of ASR + VI->EN MT items")
+    elif use_fleurs:
+        print(
+            f"FLEURS parquets not found in {wd / 'raw'} "
+            f"-- emitting offline fallback (MT + TTS only)."
+        )
+
+    for i, (vi_text, en_text) in enumerate(GOLD_SET):
+        items.append(
+            EvalItem(
+                id=f"gold-mt-{i:02d}",
+                stage="MT",
+                language="vi",
+                direction="vi->en",
+                candidate_id="opus-mt-vi-en-ct2-cpu",
+                input_text=vi_text,
+                reference_text=en_text,
+            )
+        )
+        items.append(
+            EvalItem(
+                id=f"gold-tts-{i:02d}",
+                stage="TTS",
+                language="en",
+                direction="",
+                candidate_id="piper-en-lessac-cpu",
+                input_text=en_text,
+            )
+        )
+
     RunManifest(items=items).to_json(out_path)
-
-
-def build_lean_manifest(out_path: str, workdir: str = "eval_data") -> None:
-    """Download lean eval set + noise, generate SNR variants, emit the manifest.
-
-    Phase 1 work: replace the placeholder below with real corpus loading via
-    `datasets` and the noise bank from benchmarking-plan.md S3.4, then call
-    `mix_noise` across SNR_LEVELS x NOISE_TYPES and `emit_manifest`.
-    """
-    # TODO(phase-1): load VIVOS / Common Voice-en / LibriSpeech / bespoke VI<->EN gold.
-    # TODO(phase-1): stage MUSAN / RIRS_NOISES / DEMAND noise bank.
-    raise NotImplementedError(
-        "Phase 1 data prep not yet wired -- see docs/benchmarking-plan.md S3-S4. "
-        "Use `bench.run --smoke` for an offline harness proof today."
+    print(
+        f"Wrote {out_path} with {len(items)} items "
+        f"({sum(1 for it in items if it.stage == 'ASR')} ASR, "
+        f"{sum(1 for it in items if it.stage == 'MT')} MT, "
+        f"{sum(1 for it in items if it.stage == 'TTS')} TTS)"
     )
 
 
@@ -57,9 +295,26 @@ def main() -> None:
     ap = argparse.ArgumentParser(description="Kavi bench data prep (Phase 1)")
     ap.add_argument("--out", default="eval_manifest_v1.json")
     ap.add_argument("--workdir", default="eval_data")
+    ap.add_argument("--n-per-lang", type=int, default=30)
+    ap.add_argument(
+        "--download-fleurs",
+        action="store_true",
+        help="curl FLEURS parquets first (needs working HF access)",
+    )
+    ap.add_argument(
+        "--no-fleurs",
+        action="store_true",
+        help="skip FLEURS even if present (offline fallback only)",
+    )
     args = ap.parse_args()
-    build_lean_manifest(args.out, args.workdir)
-    print(f"Wrote {args.out}")
+    if args.download_fleurs:
+        download_fleurs(args.workdir)
+    build_lean_manifest(
+        args.out,
+        workdir=args.workdir,
+        n_per_lang=args.n_per_lang,
+        use_fleurs=not args.no_fleurs,
+    )
 
 
 if __name__ == "__main__":
