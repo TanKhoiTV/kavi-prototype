@@ -7,7 +7,7 @@ import json
 from dataclasses import asdict
 from pathlib import Path
 
-from .registry import build_candidate
+from .registry import build_candidate, default_candidate_id_for_stage
 from .schema import RunManifest, StageResult
 from .scorer import score_item
 from .smoke_sample import build_smoke_manifest
@@ -30,16 +30,17 @@ def run_manifest(
 ) -> list[dict]:
     records: list[dict] = []
     for item in manifest.items:
-        if candidate_filter and item.candidate_id != candidate_filter:
+        cid = item.candidate_id or default_candidate_id_for_stage(item.stage)
+        if candidate_filter and cid != candidate_filter:
             continue
         try:
             candidate = build_candidate(item)
             if hasattr(candidate, "out_dir"):
                 candidate.out_dir = str(out_dir / "outputs")
             result = candidate.run(item)
-        except Exception as exc:  # noqa: BLE001
+        except (RuntimeError, ValueError, OSError, KeyError, ImportError) as exc:
             result = StageResult(
-                candidate_id=item.candidate_id,
+                candidate_id=cid or "unknown",
                 item_id=item.id,
                 stage=item.stage,
                 error=f"{type(exc).__name__}: {exc}",

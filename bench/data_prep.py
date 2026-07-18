@@ -183,27 +183,43 @@ def download_fleurs(
             print(f"  incomplete (rc={rc}); resuming")
 
 
-def _load_fleurs(path: str, n: int, sample_rate: int):
+def _load_fleurs(path: str, n: int, sample_rate: int, seed: int = 42):
     """Return list of (id, transcript, audio_tensor) from a FLEURS parquet.
 
     FLEURS stores the `audio` column as encoded bytes (WAV); decode via
-    torchaudio and resample/downmix to `sample_rate`.
+    soundfile and resample/downmix to `sample_rate`. Reads only the needed
+    columns, and random-samples `n` utterances with a fixed seed so the lean
+    set is reproducible and not biased by file order.
     """
     import io
+    import random
 
     import pyarrow.parquet as pq
     import torch
     import torchaudio
 
     try:
-        table = pq.read_table(path, columns=["id", "transcription", "audio"]).slice(
-            0, n
+        pf = pq.ParquetFile(path)
+        # Cheap pass: ids + transcripts only (no audio bytes) for sampling.
+        meta = pf.read_row_groups([0], columns=["id", "transcription"]).to_pylist()
+        idxs = (
+            list(range(len(meta)))
+            if len(meta) <= n
+            else random.Random(seed).sample(range(len(meta)), n)
         )
+        # Audio pass: read only the audio column for the needed row group, then
+        # keep just the sampled rows. (Parquet is read at row-group granularity,
+        # so for a single-row-group file the audio column is still materialized
+        # once -- true peak-memory reduction would need smaller row groups.)
+        audio_rows = pf.read_row_groups([0], columns=["id", "audio"]).to_pylist()
+        audio_by_id = {str(r["id"]): (r.get("audio") or {}) for r in audio_rows}
     except Exception as exc:  # noqa: BLE001
         raise ValueError(f"cannot read FLEURS parquet {path}: {exc}") from exc
     out = []
-    for r in table.to_pylist():
-        a = r.get("audio") or {}
+    for i in idxs:
+        r = meta[i]
+        uid = str(r.get("id"))
+        a = r.get("audio") or audio_by_id.get(uid) or {}
         arr = a.get("array")
         if arr is None:
             blob = a.get("bytes")
@@ -218,7 +234,7 @@ def _load_fleurs(path: str, n: int, sample_rate: int):
             audio = audio.mean(0, keepdim=True)
         if sr != sample_rate:
             audio = torchaudio.functional.resample(audio, sr, sample_rate)
-        out.append((str(r.get("id")), (r.get("transcription") or "").strip(), audio))
+        out.append((uid, (r.get("transcription") or "").strip(), audio))
     return out
 
 
@@ -245,7 +261,6 @@ def _emit_asr_items(items, mixed_dir, lang, idx, uid, transcript, audio, sample_
                         stage="ASR",
                         language=lang,
                         direction="",
-                        candidate_id="whisper-small-faster-whisper-cpu",
                         audio_ref=str(wav),
                         transcript_ref=transcript,
                         snr=None,
@@ -263,7 +278,6 @@ def _emit_asr_items(items, mixed_dir, lang, idx, uid, transcript, audio, sample_
                     stage="ASR",
                     language=lang,
                     direction="",
-                    candidate_id="whisper-small-faster-whisper-cpu",
                     audio_ref=str(wav),
                     transcript_ref=transcript,
                     snr=snr,
@@ -303,7 +317,6 @@ def build_lean_manifest(
                         stage="MT",
                         language="vi",
                         direction="vi->en",
-                        candidate_id="opus-mt-vi-en-ct2-cpu",
                         input_text=transcript,
                         reference_text=en_tr,
                     )
@@ -329,7 +342,6 @@ def build_lean_manifest(
                 stage="MT",
                 language="vi",
                 direction="vi->en",
-                candidate_id="opus-mt-vi-en-ct2-cpu",
                 input_text=vi_text,
                 reference_text=en_text,
             )
@@ -340,7 +352,6 @@ def build_lean_manifest(
                 stage="TTS",
                 language="en",
                 direction="",
-                candidate_id="piper-en-lessac-cpu",
                 input_text=en_text,
             )
         )

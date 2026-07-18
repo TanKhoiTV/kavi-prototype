@@ -16,12 +16,22 @@ REGISTRY: dict[str, RegistryEntry] = {
 }
 
 
+def default_candidate_id_for_stage(stage: str) -> str | None:
+    """Return the registered candidate id for `stage` (first match), or None."""
+    for cid, (cls, _, _) in REGISTRY.items():
+        if getattr(cls, "stage", None) == stage:
+            return cid
+    return None
+
+
 def build_candidate(item: EvalItem):
-    if item.candidate_id not in REGISTRY:
+    cid = item.candidate_id or default_candidate_id_for_stage(item.stage)
+    if cid is None or cid not in REGISTRY:
         raise KeyError(
-            f"unknown candidate_id {item.candidate_id!r}; known: {sorted(REGISTRY)}"
+            f"no candidate for item {item.id!r} (stage={item.stage!r}, "
+            f"candidate_id={item.candidate_id!r}); known: {sorted(REGISTRY)}"
         )
-    cls, default_model, default_cfg = REGISTRY[item.candidate_id]
+    cls, default_model, default_cfg = REGISTRY[cid]
     model_path = item.model_path if item.model_path is not None else default_model
     config = {**default_cfg, **(item.config or {})}
     return cls(model_path=model_path, config=config)
