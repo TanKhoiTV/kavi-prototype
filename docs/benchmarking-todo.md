@@ -171,36 +171,47 @@ RIRS_NOISES = public-safe.
 
 ### Phase 0 — Setup
 
-- [ ] Branch + deps: add `datasets`, `torchaudio`, `evaluate`, `comet` to the
-      dev environment (uv-managed).
-- [ ] Agree `eval_manifest_v1.json` schema (stage, candidate_id, model_path,
-      config, audio_ref, transcript_ref, snr, noise_type).
+- [x] Branch + deps: `datasets` + `torchaudio` added; `evaluate` not used (jiwer/sacrebleu
+      used directly); `comet` deferred to v1 (Phase 7).
+- [x] Agree `eval_manifest_v1.json` schema (stage, candidate_id, model_path,
+      config, audio_ref, transcript_ref, snr, noise_type) — implemented in `bench/schema.py`.
 
 ### Phase 1 — Data prep (host)
 
-- [ ] Download lean eval set: VIVOS test slice, Common Voice-en/LibriSpeech,
-      bespoke VI↔EN gold set (factory/logistics vocab).
-- [ ] Download noise bank: MUSAN, RIRS_NOISES, DEMAND; stage NOISEX-92 eval-only.
-- [ ] Generate noisy variants via `torchaudio.add_noise` + `fftconvolve` +
-      `resample` across the §4 SNR sweep × ≥2 noise types.
-- [ ] Emit versioned `eval_manifest_v1.json` (clean + noisy, byte-identical).
+- [x] Download lean eval set: `build_lean_manifest` emits an **offline fallback**
+      (authored VI↔EN factory/logistics gold set as MT + TTS) and uses FLEURS
+      parquets **when present** (real VI/EN ASR + VI→EN MT via shared IDs). Actual
+      FLEURS parquet download is blocked in some environments by large-file
+      download limits (PR #28 `download_fleurs` has resume support).
+- [x] Noise bank: synthetic steady/impulsive noise via `torchaudio.add_noise`
+      (default); **real-noise hook added** — `_load_real_noise` + `real_noise_dir`
+      swaps in MUSAN/RIRS_NOISES clips (PR #36). Assets not yet fetched.
+- [x] Generate noisy variants via `torchaudio.add_noise` + `resample` across the
+      §4 SNR sweep × ≥2 noise types (`_synth_noise` / `_mix`).
+- [x] Emit versioned `eval_manifest_v1.json` (clean + noisy, byte-identical).
 
 ### Phase 2 — Host harness (CPU-default, runs today)
 
-- [ ] Implement adapter interfaces (`ASRCandidate` / `MTCandidate` /
-      `TTSCandidate`).
-- [ ] Implement CPU candidates: whisper.cpp-int8 (ASR), CTranslate2-int8-OpusMT
-      (MT), Piper-CPU (TTS, EN leg + `vais1000` VI voice).
-- [ ] Implement off-device scorer: WER/CER (`evaluate`), BLEU (`evaluate`),
-      COMET (`Unbabel/wmt22-comet-da`), RTF/turnaround/RAM from runner logs.
-- [ ] Run manifest fan-out; emit comparison table.
+- [x] Implement adapter interfaces (`ASRCandidate` / `MTCandidate` /
+      `TTSCandidate`) in `bench/adapters.py` + `bench/registry.py`.
+- [x] Implement CPU candidates: **faster-whisper Small int8 (ASR, CPU)** — the v0
+      ASR is **faster-whisper**, not whisper.cpp (whisper.cpp / QNN-Whisper remain
+      later candidates); CTranslate2-int8-OpusMT (MT, **vi→en only** — en→vi weights
+      not in repo); Piper-CPU (TTS, **EN leg only** — `vais1000` VI voice not in repo).
+- [x] Implement off-device scorer: WER/CER (jiwer), BLEU (sacrebleu), RTF;
+      COMET deferred to v1 (Phase 7). `bench/scorer.py`.
+- [x] Run manifest fan-out; emit comparison table (`bench/run.py`).
 
 ### Phase 3 — First CPU numbers
 
-- [ ] Run v0 slice (30–50 utts: clean / +5 dB / 0 dB, both langs + directions).
-- [ ] Report WER / BLEU / RTF / turnaround / peak RAM for CPU candidates.
+- [x] Run v0 slice (offline smoke: MT vi→en + TTS EN; ASR decodes real VI/EN audio
+      when FLEURS is present, graceful otherwise). First CPU numbers obtained (MT
+      BLEU ~76, TTS RTF 0.06–0.22, ASR gracefully degrades offline).
+- [x] Report WER / BLEU / RTF / turnaround / peak RAM — **partial**: MT BLEU +
+      TTS RTF obtained; ASR WER pending FLEURS; turnaround / peak-RAM need the
+      on-device runner (Phase 4).
 - [ ] Wire RTranslator pseudo-row (manual APK run; published latency/RAM flagged
-      author-reported).
+      author-reported) — Phase 5.
 
 ### Phase 4 — On-device runner (QNN)  ⚠️ blocked on Qualcomm QAIRT EULA
 
@@ -250,8 +261,8 @@ checklist.
 | --- | --- | --- |
 | **Qualcomm QAIRT runtime EULA** | escalate (detailed instructions pending) | Phase 4 (on-device QNN) |
 | **Piper engine GPL split** | deferred — MIT-era `rhasspy/piper` + subprocess is default option | TTS candidate finalization |
-| **InfoRe donation terms** | verify before relying | vietTTS VI voice |
-| **VI→EN ST corpus** | FLEURS ID-alignment vs bespoke gold (or both) | EN→VI eval coverage |
+| **InfoRe donation terms** | **RESOLVED — AVOID** (no published terms, 401-gated; taints downstream voices) · `25hours_single` also **AVOID** (license unknown, InfoRe-derived) — PR #35 | vietTTS VI voice dropped |
+| **VI→EN ST corpus** | **RESOLVED** — FLEURS ID-alignment (when parquets present) + bespoke factory/logistics gold set (offline fallback) | EN→VI eval coverage |
 | **RTranslator 3.0 imminent** | snapshot version/date when tested | fair comparison |
 
 ---

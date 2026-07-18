@@ -464,6 +464,14 @@ registered candidate per stage with zero harness changes.
 
 ## 8. Lean eval set & v0 minimal
 
+> **Implementation status (2026-07-18):** the v0 host-side harness described in
+> §6 is **implemented** in `bench/` (PR #28, #36). It runs today on CPU-default
+> candidates — **faster-whisper** Small int8 (ASR), CTranslate2 Opus-MT vi→en int8
+> (MT), Piper EN (TTS) — with an off-device scorer (jiwer WER/CER, sacrebleu BLEU;
+> COMET/MOS deferred to v1). The on-device QNN runner (Phase 4) is still blocked on
+> the Qualcomm QAIRT EULA. The initial v0 ASR candidate is **faster-whisper**, not
+> whisper.cpp (whisper.cpp / QNN-Whisper remain later candidates).
+
 **Lean eval set:** ~40–60 utterances per direction (VI ASR, EN ASR, VI→EN, EN→VI)
 from VIVOS (clean anchor) + a hand-verified VSS/Common Voice-vi slice (conversational)
 
@@ -477,9 +485,10 @@ VSS/PhoST/FLEURS only after narrowing to 1–2 finalists per stage.
 
 1. ~30–50 utterance slice — clean + one moderate (+5 dB) + one hard (0 dB) condition,
    both languages, both directions.
-2. **Two candidates per stage** to start: whisper.cpp-int8 vs Whisper-Small-Quantized-QNN (the only confirmed EN+VI
-   pair; see §4 for the broader ASR landscape); CTranslate2-int8-OpusMT vs ORT+QNN-OpusMT (once a vi↔en compile works);
-   Piper-CPU vs Piper-QNN if/when compiled.
+2. **Two candidates per stage** to start: faster-whisper-int8 vs Whisper-Small-Quantized-QNN (the only confirmed EN+VI
+   pair; see §4 for the broader ASR landscape — the v0 harness implements **faster-whisper Small int8 (CPU)** as the
+   initial ASR candidate; whisper.cpp / QNN-Whisper remain later candidates); CTranslate2-int8-OpusMT vs ORT+QNN-OpusMT
+   (once a vi↔en compile works); Piper-CPU vs Piper-QNN if/when compiled.
 3. **Automated metrics only:** RTF, turnaround, WER, BLEU, RAM. Defer COMET + human
    MOS to v1 (slower to stand up; not needed to answer "does QNN beat CPU here").
 4. **Single device, single run per config** during exploration; add averaging only
@@ -530,7 +539,9 @@ slice is marginal, that's a cheap, legitimate signal to reconsider effort alloca
 
 ## 9. Open questions / deferred decisions (→ ADR-004)
 
-- **Final dataset set** — VSS (MIT) and PhoST (research-only) licenses now resolved; confirm **InfoRe** donation terms before relying.
+- **Final dataset set** — VSS (MIT), PhoST (research-only), and **InfoRe** licenses now resolved: VSS/PhoST as
+  noted; **InfoRe confirmed AVOID** (no published terms, 401-gated) and `25hours_single` also **AVOID** (license
+  unknown, InfoRe-derived) — see `docs/decisions/license-situation.md` + PR #35.
 - **VI→EN ST corpus** — adopt FLEURS ID-alignment, the bespoke gold set, or both?
 - **RTranslator snapshot** — which version/commit tested + dated in writeup; APK-eval
   task owner & timeline.

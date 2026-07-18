@@ -66,7 +66,7 @@ records what is **settled** and what stays **open** until the v0 harness
 
 | # | Open parameter | Closes when |
 | --- | --- | --- |
-| 1 | **Final ASR / MT / TTS models** | v0 harness WER / BLEU / COMET / RTF / peak-RAM numbers on the clean CPU-default stack |
+| 1 | **Final ASR / MT / TTS models** | v0 harness WER / BLEU / RTF / peak-RAM on the CPU-default stack. **Initial slate already chosen in `bench/`:** faster-whisper Small int8 (ASR), CTranslate2 Opus-MT vi→en int8 (MT), Piper EN (TTS). Closes when on-device QNN numbers exist (Phase 4, blocked on QAIRT EULA). |
 | 2 | **Piper engine GPL split** | resolved as MIT-era subprocess (default option) or alternative; GPL build stays deferred |
 | 3 | **QAIRT runtime EULA** (Qualcomm) | Qualcomm confirms commercial bundling terms for compiled models + QNN runtime libs |
 | 4 | **Pre-ASR denoising gate** | v0 harness Wiener/RNNoise toggle result (benchmarking-plan §8) |
@@ -74,10 +74,13 @@ records what is **settled** and what stays **open** until the v0 harness
 ## Decision (deferred)
 
 **No architecture / tech-stack decision is recorded yet.** Once parameters
+
 # 1–#4 close, ADR-004 will be promoted from *Draft* to *Accepted* with the
+
 concrete model + runtime matrix. Until then, development proceeds on the
-**license-clean CPU-default stack** (Whisper / Opus-MT / MIT-era Piper or
-MeloTTS) so the harness can run.
+**license-clean CPU-default stack** (faster-whisper / Opus-MT / MIT-era Piper or
+MeloTTS) so the harness can run. The v0 host-side harness is implemented in
+`bench/` (PR #28/#36) and has already chosen this initial candidate slate.
 
 ## Consequences
 

@@ -30,6 +30,24 @@ uv sync            # install dependencies
 uv run ruff check .   # lint
 ```
 
+## Benchmark harness (v0)
+
+The `bench/` package is a pluggable, off-device benchmark harness for the
+ASR → MT → TTS candidate stack. It runs today on CPU-default, license-clean
+candidates:
+
+```bash
+make bench-data   # build the lean eval set -> eval_manifest_v1.json (offline fallback until FLEURS parquets download)
+make bench        # run the harness (offline smoke: Opus-MT vi->en + Piper EN TTS)
+make test         # run the pytest suite (manifest round-trip, scorer, FLEURS id-merge)
+```
+
+ASR items need real VI/EN speech (FLEURS parquets); until those download, the
+harness scores the MT + TTS legs offline and ASR degrades gracefully. Real-noise
+clips (MUSAN/RIRS_NOISES) can be swapped in via `build_lean_manifest(real_noise_dir=...)`.
+The on-device QNN runner (Phase 4) is blocked on the Qualcomm QAIRT EULA. See
+`docs/benchmarking-plan.md` and `docs/benchmarking-todo.md`.
+
 > Public contest documentation (contest-info, registration checklist, Luma
 > answers, pitch deck) lives in the parent repo `aivoice-2026/docs/`.
 
