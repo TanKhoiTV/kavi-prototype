@@ -69,8 +69,8 @@ Two nuances:
 | TTS | Coqui XTTS v2 | CPML + Coqui shut down | non-commercial + no licensor |
 | Voice | Piper `vivos` (VI) | inherits VIVOS CC-BY-NC-SA | do not ship |
 | Data | PhoST | research/educational ONLY, no redistribution (VinAI terms) | was VI→EN corpus candidate in plan; now avoid for commercial |
-| Voice | Piper `25hours_single` (VI) | unclear / no license grant (re-uploader self-tagged only; InfoRe gave none) | AVOID until verified from the voice's own MODEL_CARD |
-| Data | InfoRe (vietTTS corpus) | no formal license; informal donation | AVOID — no commercial grant; taints any voice trained on it |
+| Voice | Piper `25hours_single` (VI) | **License: Unknown** — voice MODEL_CARD (verified 2026-07-18); trained on "InfoRe Technology 1" (InfoRe-derived) | AVOID — no license grant; do not ship |
+| Data | InfoRe (vietTTS corpus) | no formal license; canonical `VINAI/InfoRe` is **gated** (HF HTTP 401, no published terms — verified 2026-07-18) | AVOID — no commercial grant; taints any voice trained on it |
 
 ### Open — policy forks (fork #1 requires a decision; fork #2 resolved)
 
@@ -93,8 +93,8 @@ Two nuances:
 
 | # | Item | Status |
 | --- | --- | --- |
-| 3 | Piper VI voice licenses: `vais1000`, `25hours_single`, `vivos` | RESOLVED — `vais1000` = **CC BY 4.0** (ADOPT, attribution to VAIS/IEEE DataPort); `vivos` = CC BY-NC-SA (**AVOID**, confirmed); `25hours_single` = **unclear / no license grant** (only re-uploader self-tags; InfoRe gave none) → **AVOID until verified** from the voice's own MODEL_CARD. |
-| 4 | InfoRe donation / usage terms (vietTTS VI reference) | RESOLVED — **AVOID**. An informal donation with **no formal license, no commercial grant, no indemnification**; taints any voice trained on it (incl. `25hours_single`, `vivos`, reference vietTTS). Treat research-only. |
+| 3 | Piper VI voice licenses: `vais1000`, `25hours_single`, `vivos` | RESOLVED — `vais1000` = **CC BY 4.0** (ADOPT, attribution to VAIS/IEEE DataPort); `vivos` = CC BY-NC-SA (**AVOID**, confirmed); `25hours_single` = **License: Unknown** (voice MODEL_CARD, verified 2026-07-18; trained on InfoRe-derived data) → **AVOID** (no grant). |
+| 4 | InfoRe donation / usage terms (vietTTS VI reference) | RESOLVED — **AVOID**. Informal donation with **no formal license, no commercial grant, no indemnification**; canonical `VINAI/InfoRe` is **gated** (HF HTTP 401, no published terms — verified 2026-07-18), only derivative community sets are public. Taints any voice trained on it (incl. `25hours_single`, `vivos`, reference vietTTS). Treat research-only. |
 | 5 | VietSuperSpeech dataset license | RESOLVED — **MIT** (commercial-safe). Quality caveat: labels are Zipformer pseudo-labeled, not gold. |
 | 6 | PhoST dataset license | RESOLVED — **research/educational ONLY, no redistribution** (VinAI terms). → AVOID for commercial; was a VI→EN corpus candidate in the plan. |
 | 7 | QAIRT / Qualcomm AI Hub commercial terms | PARTIAL — `qai_hub_models` pip package = **BSD-3** (ADOPT). AI Hub compile service is **free today but revocable at Qualcomm's sole discretion** (QUIC can quote/charge). QAIRT **runtime redistribution (PKLA)** is **login-gated / not publicly verified** → **escalate to Qualcomm** before shipping. Conditional adopt. |
