@@ -1,0 +1,9 @@
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    # Keep the version comment next to each pinned SHA in sync on updates.
+    reviewers:
+      - "TanKhoiTV"
