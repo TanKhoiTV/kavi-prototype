@@ -1,0 +1,5 @@
+{
+  "venvPath": ".",
+  "venv": ".venv",
+  "exclude": ["archive", "bench-results", ".venv"]
+}
