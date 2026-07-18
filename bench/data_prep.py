@@ -262,7 +262,7 @@ def _emit_asr_items(items, mixed_dir, lang, idx, uid, transcript, audio, sample_
                         language=lang,
                         direction="",
                         audio_ref=str(wav),
-                        transcript_ref=transcript,
+                        reference_text=transcript,
                         snr=None,
                         noise_type=kind,
                     )
@@ -279,7 +279,7 @@ def _emit_asr_items(items, mixed_dir, lang, idx, uid, transcript, audio, sample_
                     language=lang,
                     direction="",
                     audio_ref=str(wav),
-                    transcript_ref=transcript,
+                    reference_text=transcript,
                     snr=snr,
                     noise_type=kind,
                 )
