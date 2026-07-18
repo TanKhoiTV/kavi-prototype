@@ -1,0 +1,56 @@
+"""Off-device scorer: WER/CER (jiwer), BLEU (sacrebleu), RTF; COMET deferred to v1.
+
+Scoring stays off the device (host-side). COMET and human MOS are Phase 7 (v1);
+the v0 harness intentionally gates on RTF/turnaround/WER/BLEU/RAM only.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+
+from .schema import EvalItem, StageResult
+
+
+@dataclass
+class Metrics:
+    wer: float | None = None
+    cer: float | None = None
+    bleu: float | None = None
+    rtf: float | None = None
+    notes: list[str] = field(default_factory=list)
+
+
+def score_item(
+    item: EvalItem, result: StageResult, audio_duration_s: float | None = None
+) -> Metrics:
+    metrics = Metrics()
+    if result.error:
+        metrics.notes.append(f"error: {result.error}")
+        return metrics
+
+    if item.stage in ("ASR", "MT"):
+        ref = item.resolve_reference()
+        if not ref:
+            metrics.notes.append("no reference text -> skipped WER/BLEU")
+            return metrics
+        hyp = result.output_text or ""
+        try:
+            import jiwer
+
+            metrics.wer = jiwer.wer(ref, hyp)
+            metrics.cer = jiwer.cer(ref, hyp)
+        except Exception as exc:  # noqa: BLE001
+            metrics.notes.append(f"wer/cer failed: {exc}")
+        if item.stage == "MT":
+            try:
+                import sacrebleu
+
+                metrics.bleu = sacrebleu.corpus_bleu([hyp], [[ref]]).score
+            except Exception as exc:  # noqa: BLE001
+                metrics.notes.append(f"bleu failed: {exc}")
+    elif item.stage == "TTS":
+        metrics.notes.append("TTS MOS deferred to v1 (DNSMOS / human panel)")
+
+    if audio_duration_s and result.latency_s:
+        metrics.rtf = result.latency_s / audio_duration_s
+    return metrics
