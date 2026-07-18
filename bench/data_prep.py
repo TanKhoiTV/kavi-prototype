@@ -25,6 +25,8 @@ from __future__ import annotations
 import random
 from pathlib import Path
 
+import soundfile as sf
+
 from .schema import EvalItem, RunManifest
 
 SNR_LEVELS = [None, 15.0, 10.0, 5.0, 0.0]  # clean + mild/moderate/hard/severe
@@ -122,14 +124,17 @@ def _mix(clean, noise, snr_db: float):
 
 def mix_noise(clean_wav: str, noise_wav: str, snr_db: float, out_path: str) -> None:
     """Mix `noise_wav` into `clean_wav` at `snr_db` dB and write to `out_path`."""
+    import torch
     import torchaudio
 
-    clean, sr = torchaudio.load(clean_wav)
-    noise, nsr = torchaudio.load(noise_wav)
+    clean, sr = sf.read(clean_wav, dtype="float32", always_2d=True)
+    clean = torch.from_numpy(clean).transpose(0, 1)
+    noise, nsr = sf.read(noise_wav, dtype="float32", always_2d=True)
+    noise = torch.from_numpy(noise).transpose(0, 1)
     if nsr != sr:
         noise = torchaudio.functional.resample(noise, nsr, sr)
     mixed = _mix(clean, noise, snr_db)
-    torchaudio.save(out_path, mixed, sr)
+    sf.write(out_path, mixed.transpose(0, 1).numpy(), sr)
 
 
 def download_fleurs(
@@ -179,28 +184,52 @@ def download_fleurs(
 
 
 def _load_fleurs(path: str, n: int, sample_rate: int):
-    """Return list of (id, transcript, audio_tensor) from a FLEURS parquet."""
+    """Return list of (id, transcript, audio_tensor) from a FLEURS parquet.
+
+    FLEURS stores the `audio` column as encoded bytes (WAV); decode via
+    torchaudio and resample/downmix to `sample_rate`.
+    """
+    import io
+
     import pyarrow.parquet as pq
     import torch
     import torchaudio
 
     try:
-        table = pq.read_table(path).slice(0, n)
+        table = pq.read_table(path, columns=["id", "transcription", "audio"]).slice(
+            0, n
+        )
     except Exception as exc:  # noqa: BLE001
         raise ValueError(f"cannot read FLEURS parquet {path}: {exc}") from exc
-    rows = table.select(["id", "transcription", "audio"]).to_pylist()
     out = []
-    for r in rows:
+    for r in table.to_pylist():
         a = r.get("audio") or {}
         arr = a.get("array")
         if arr is None:
-            continue
-        audio = torch.tensor(arr).float().unsqueeze(0)
-        sr = a.get("sampling_rate") or sample_rate
+            blob = a.get("bytes")
+            if blob is None:
+                continue
+            data, sr = sf.read(io.BytesIO(blob), dtype="float32", always_2d=True)
+            audio = torch.from_numpy(data).transpose(0, 1)
+        else:
+            audio = torch.tensor(arr).float().unsqueeze(0)
+            sr = a.get("sampling_rate") or sample_rate
+        if audio.shape[0] > 1:  # downmix to mono
+            audio = audio.mean(0, keepdim=True)
         if sr != sample_rate:
             audio = torchaudio.functional.resample(audio, sr, sample_rate)
         out.append((str(r.get("id")), (r.get("transcription") or "").strip(), audio))
     return out
+
+
+def _load_fleurs_ids_texts(path: str) -> dict[str, str]:
+    """Full id->transcription map (no audio decode) for VI->EN MT pairing."""
+    import pyarrow.parquet as pq
+
+    table = pq.read_table(path, columns=["id", "transcription"])
+    return {
+        str(r["id"]): (r.get("transcription") or "").strip() for r in table.to_pylist()
+    }
 
 
 def build_lean_manifest(
@@ -210,7 +239,6 @@ def build_lean_manifest(
     sample_rate: int = 16000,
     use_fleurs: bool = True,
 ) -> None:
-    import torchaudio
 
     wd = Path(workdir)
     mixed_dir = wd / "mixed"
@@ -221,14 +249,13 @@ def build_lean_manifest(
     en_path = wd / "raw" / "fleurs_en_us_test.parquet"
     if use_fleurs and vi_path.exists() and en_path.exists():
         vi = _load_fleurs(str(vi_path), n_per_lang, sample_rate)
-        en = _load_fleurs(str(en_path), n_per_lang, sample_rate)
-        en_by_id = {i: t for i, t, _ in en}
+        en_text_by_id = _load_fleurs_ids_texts(str(en_path))
         for idx, (uid, transcript, audio) in enumerate(vi):
             for snr in SNR_LEVELS:
                 for kind in NOISE_TYPES:
                     if snr is None:
                         wav = mixed_dir / f"vi_{uid}_{kind}_clean.wav"
-                        torchaudio.save(str(wav), audio, sample_rate)
+                        sf.write(str(wav), audio.transpose(0, 1).numpy(), sample_rate)
                         items.append(
                             EvalItem(
                                 id=f"vi-asr-{uid}-{kind}-clean",
@@ -248,7 +275,7 @@ def build_lean_manifest(
                     )
                     mixed = _mix(audio, noise, snr)
                     wav = mixed_dir / f"vi_{uid}_{kind}_{snr:g}.wav"
-                    torchaudio.save(str(wav), mixed, sample_rate)
+                    sf.write(str(wav), mixed.transpose(0, 1).numpy(), sample_rate)
                     items.append(
                         EvalItem(
                             id=f"vi-asr-{uid}-{kind}-{snr:g}",
@@ -262,7 +289,7 @@ def build_lean_manifest(
                             noise_type=kind,
                         )
                     )
-            en_tr = en_by_id.get(uid)
+            en_tr = en_text_by_id.get(uid)
             if en_tr:
                 items.append(
                     EvalItem(
