@@ -3,7 +3,7 @@
 
 PY ?= uv run python
 
-.PHONY: install check fmt bench bench-data
+.PHONY: install check fmt test bench bench-data
 
 install: ## Install dependencies
 	uv sync
@@ -15,6 +15,9 @@ check: ## Lint with ruff
 fmt: ## Format with ruff
 	uv run ruff format .
 	uv run ruff check --fix .
+
+test: ## Run the test suite (pytest)
+	uv run pytest
 
 bench: ## Run the benchmark harness (offline smoke by default)
 	uv run python -m bench.run --smoke --out bench-results

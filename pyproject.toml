@@ -35,5 +35,13 @@ ignore = ["E501"]
 [tool.ruff.format]
 quote-style = "double"
 
+[tool.pytest.ini_options]
+pythonpath = ["."]
+
 [dependency-groups]
-dev = ["pre-commit>=4.6.0", "ruff>=0.15.18", "datasets"]
+dev = [
+    "pre-commit>=4.6.0",
+    "ruff>=0.15.18",
+    "datasets",
+    "pytest>=9.1.1",
+]
