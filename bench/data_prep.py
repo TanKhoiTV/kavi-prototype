@@ -108,6 +108,37 @@ def _synth_noise(kind: str, length: int, sample_rate: int, seed: int):
     return noise
 
 
+def _load_real_noise(dir_path: str, sample_rate: int) -> dict[str, list]:
+    """Load real noise clips from `dir_path/{steady,impulsive}/*.wav`.
+
+    Returns NOISE_TYPES -> list[Tensor] (mono, at sample_rate). Used by
+    build_lean_manifest when a real noise bank is supplied, replacing the
+    synthetic `_synth_noise`. Requires real assets (e.g. MUSAN/RIRS_NOISES
+    from openslr); those are NOT fetched automatically -- acquisition is
+    blocked in some environments by large-file download limits, so the
+    synthetic fallback remains the v0 default.
+    """
+    import torch
+    import torchaudio
+
+    out: dict[str, list] = {kind: [] for kind in NOISE_TYPES}
+    base = Path(dir_path)
+    for kind in NOISE_TYPES:
+        d = base / kind
+        if not d.is_dir():
+            continue
+        for wav in sorted(d.glob("*.wav")):
+            try:
+                data, sr = sf.read(str(wav), dtype="float32", always_2d=True)
+            except Exception:
+                continue
+            t = torch.from_numpy(data).mean(0, keepdim=True)
+            if sr != sample_rate:
+                t = torchaudio.functional.resample(t, sr, sample_rate)
+            out[kind].append(t)
+    return out
+
+
 def _mix(clean, noise, snr_db: float):
     import torch
     import torchaudio
@@ -263,8 +294,16 @@ def _load_fleurs_ids_texts(path: str) -> dict[str, str]:
     }
 
 
-def _emit_asr_items(items, mixed_dir, lang, idx, uid, transcript, audio, sample_rate):
-    """Emit the SNR-sweep ASR items for one utterance (clean + noisy)."""
+def _emit_asr_items(
+    items, mixed_dir, lang, idx, uid, transcript, audio, sample_rate, real_noise=None
+):
+    """Emit the SNR-sweep ASR items for one utterance (clean + noisy).
+
+    `real_noise`, when provided, maps NOISE_TYPES -> list[Tensor] of real
+    clips (already at `sample_rate`); those replace the synthetic
+    `_synth_noise` generator for the sweep. This is the documented swap point
+    for MUSAN/RIRS_NOISES once those assets are available.
+    """
     # Clean reference condition: identical regardless of noise type, so emit once.
     clean_wav = mixed_dir / f"{lang}_{uid}_clean.wav"
     sf.write(str(clean_wav), audio.transpose(0, 1).numpy(), sample_rate)
@@ -281,10 +320,14 @@ def _emit_asr_items(items, mixed_dir, lang, idx, uid, transcript, audio, sample_
         )
     )
     for kind in NOISE_TYPES:
+        clips = (real_noise or {}).get(kind)
         for snr in SNR_LEVELS:
             if snr is None:
                 continue
-            noise = _synth_noise(kind, audio.shape[-1], sample_rate, seed=idx + 1)
+            if clips:
+                noise = clips[idx % len(clips)]
+            else:
+                noise = _synth_noise(kind, audio.shape[-1], sample_rate, seed=idx + 1)
             mixed = _mix(audio, noise, snr)
             wav = mixed_dir / f"{lang}_{uid}_{kind}_{snr:g}.wav"
             sf.write(str(wav), mixed.transpose(0, 1).numpy(), sample_rate)
@@ -308,12 +351,16 @@ def build_lean_manifest(
     n_per_lang: int = 30,
     sample_rate: int = 16000,
     use_fleurs: bool = True,
+    real_noise_dir: str | None = None,
 ) -> None:
 
     wd = Path(workdir)
     mixed_dir = wd / "mixed"
     mixed_dir.mkdir(parents=True, exist_ok=True)
     items: list[EvalItem] = []
+    real_noise = (
+        _load_real_noise(real_noise_dir, sample_rate) if real_noise_dir else None
+    )
 
     vi_path = wd / "raw" / "fleurs_vi_vn_test.parquet"
     en_path = wd / "raw" / "fleurs_en_us_test.parquet"
@@ -323,7 +370,15 @@ def build_lean_manifest(
         en_text_by_id = _load_fleurs_ids_texts(str(en_path))
         for idx, (uid, transcript, audio) in enumerate(vi):
             _emit_asr_items(
-                items, mixed_dir, "vi", idx, uid, transcript, audio, sample_rate
+                items,
+                mixed_dir,
+                "vi",
+                idx,
+                uid,
+                transcript,
+                audio,
+                sample_rate,
+                real_noise=real_noise,
             )
             en_tr = en_text_by_id.get(uid)
             if en_tr:
@@ -339,7 +394,15 @@ def build_lean_manifest(
                 )
         for idx, (uid, transcript, audio) in enumerate(en_audio):
             _emit_asr_items(
-                items, mixed_dir, "en", idx, uid, transcript, audio, sample_rate
+                items,
+                mixed_dir,
+                "en",
+                idx,
+                uid,
+                transcript,
+                audio,
+                sample_rate,
+                real_noise=real_noise,
             )
         print(
             f"FLEURS: added {len(vi)} VI + {len(en_audio)} EN ASR speakers "
@@ -403,6 +466,10 @@ def main() -> None:
         action="store_true",
         help="skip FLEURS even if present (offline fallback only)",
     )
+    ap.add_argument(
+        "--noise-dir",
+        help="dir with {steady,impulsive}/*.wav real noise clips (else synthetic)",
+    )
     args = ap.parse_args()
     if args.download_fleurs:
         langs = tuple(args.lang) if args.lang else ("vi_vn", "en_us")
@@ -412,6 +479,7 @@ def main() -> None:
         workdir=args.workdir,
         n_per_lang=args.n_per_lang,
         use_fleurs=not args.no_fleurs,
+        real_noise_dir=args.noise_dir,
     )
 
 
