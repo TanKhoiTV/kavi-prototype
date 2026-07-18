@@ -7,6 +7,7 @@ import json
 from dataclasses import asdict
 from pathlib import Path
 
+from .adapters import Candidate
 from .registry import build_candidate, default_candidate_id_for_stage
 from .schema import RunManifest, StageResult
 from .scorer import score_item
@@ -14,7 +15,9 @@ from .smoke_sample import build_smoke_manifest
 
 
 def audio_duration(path: str | None) -> float | None:
-    if not path or not Path(path).exists():
+    if path is None:
+        return None
+    if not Path(path).exists():
         return None
     try:
         import soundfile as sf
@@ -29,18 +32,36 @@ def run_manifest(
     manifest: RunManifest, out_dir: Path, candidate_filter: str | None
 ) -> list[dict]:
     records: list[dict] = []
+    # Cache one candidate instance per cid so model weights load once per run,
+    # not once per item (which would reload e.g. Whisper for every ASR clip).
+    candidates: dict[str, Candidate] = {}
     for item in manifest.items:
-        cid = item.candidate_id or default_candidate_id_for_stage(item.stage)
-        if candidate_filter and cid != candidate_filter:
+        cid = item.candidate_id
+        if cid is None:
+            cid = default_candidate_id_for_stage(item.stage)
+        cid_label = cid
+        if cid_label is None:
+            cid_label = "unknown"
+        if candidate_filter is None:
+            pass
+        elif cid != candidate_filter:
             continue
         try:
-            candidate = build_candidate(item)
-            if hasattr(candidate, "out_dir"):
-                candidate.out_dir = str(out_dir / "outputs")
+            cached = None
+            if cid is not None:
+                cached = candidates.get(cid)
+            if cached is not None:
+                candidate = cached
+            else:
+                candidate = build_candidate(item)
+                if hasattr(candidate, "out_dir"):
+                    candidate.out_dir = str(out_dir / "outputs")
+                if cid is not None:
+                    candidates[cid] = candidate
             result = candidate.run(item)
-        except (RuntimeError, ValueError, OSError, KeyError, ImportError) as exc:
+        except Exception as exc:  # noqa: BLE001 - one bad candidate must not abort the run
             result = StageResult(
-                candidate_id=cid or "unknown",
+                candidate_id=cid_label,
                 item_id=item.id,
                 stage=item.stage,
                 error=f"{type(exc).__name__}: {exc}",
@@ -78,6 +99,13 @@ def print_table(records: list[dict]) -> None:
     rows = []
     for rec in records:
         it, res, met = rec["item"], rec["result"], rec["metrics"]
+        out = res.get("output_audio_path")
+        if out is None:
+            out = res.get("error")
+        if out is None:
+            out = res.get("output_text")
+        if out is None:
+            out = ""
         rows.append(
             [
                 it["id"],
@@ -88,12 +116,7 @@ def print_table(records: list[dict]) -> None:
                 f"{met['wer']:.3f}" if met.get("wer") is not None else "-",
                 f"{met['bleu']:.1f}" if met.get("bleu") is not None else "-",
                 f"{met['rtf']:.2f}" if met.get("rtf") is not None else "-",
-                (
-                    res.get("output_audio_path")
-                    or res.get("error")
-                    or res.get("output_text")
-                    or ""
-                )[:36],
+                out[:36],
             ]
         )
     if not rows:
