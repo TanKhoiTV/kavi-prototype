@@ -1,7 +1,16 @@
 ## [Unreleased]
 
+### Bug Fixes
+
+- Resolve pi-lens false positives via pyrightconfig.json([#26](https://github.com/TanKhoiTV/kavi-prototype/pull/26))
+
+### Features
+
+- Scaffold host-side v0 benchmark harness (Phases 0-3)
+
 ### Miscellaneous
 
+- Update CHANGELOG
 - Update CHANGELOG
 - Update CHANGELOG
 - Update CHANGELOG
@@ -16,5 +25,6 @@
 - Use commit.remote instead of deprecated commit.github([#23](https://github.com/TanKhoiTV/kavi-prototype/pull/23))
 - Bump astral-sh/setup-uv to v8 (Node 24 runtime)([#24](https://github.com/TanKhoiTV/kavi-prototype/pull/24))
 - Pin astral-sh/setup-uv to v8.3.2 (resolvable tag)([#25](https://github.com/TanKhoiTV/kavi-prototype/pull/25))
+- Pin GitHub Action tags to full commit SHAs([#27](https://github.com/TanKhoiTV/kavi-prototype/pull/27))
 [unreleased]: https://github.com/TanKhoiTV/kavi-prototype/compare/v0.1.0...HEAD
 
