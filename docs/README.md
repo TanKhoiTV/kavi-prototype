@@ -14,6 +14,10 @@ new member understands the current state.
 design, metrics, and the v0 minimal. Gates ADR-004.
 - `benchmarking-todo.md` — execution checklist / pitch for the v0 benchmark
 harness (what to build, in what order).
+- `phase-4-qnn-plan.md` — executable spec for the on-device QNN conversion &
+  comparison (Phase 4): env contract, per-model ONNX export, artifact
+  bundling, instrumented runner, and the RTF<1.0 / turnaround<2.0s gates.
+  Precedes the Phase-4 implementation (ADR-003 determination method).
 - `decisions/` — Architecture Decision Records (ADR-001 offline-first,
   ADR-002 target platform, ADR-003 Hexagon runtime, ADR-004 ASR/MT/TTS
   architecture, plus `license-situation.md`). Source of truth for
