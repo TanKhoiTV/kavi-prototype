@@ -142,7 +142,7 @@ Run each SNR against **≥2 noise types** (steady/mechanical vs babble/impulsive
 a single averaged "noisy" number hides the failure mode.
 
 **License hygiene:** VIVOS / viVoice / NOISEX-92 = eval-only, never bundle.
-PhoST = eval-only (research/no-redistribution). VSS = MIT (commercial-safe, but
+PhoST = eval-only (research/no-redistribution) — fine for *internal benchmarking* (no redistribute), but AVOID to ship/redistribute it or build the product on it; also EN→VI only, so moot for Kavi's VI→EN v0 (use FLEURS + bespoke gold set). VSS = MIT (commercial-safe, but
 pseudo-labeled refs). Common Voice / LibriSpeech / FLEURS / LibriTTS / MUSAN /
 RIRS_NOISES = public-safe.
 
