@@ -2,7 +2,7 @@
 
 > **Status:** Planning (precedes and parallels the Phase-4 implementation, job (1))
 > **Companion docs:** `benchmarking-todo.md` §Phase 4, `ADR-003` (Hexagon runtime, *Proposed*), `ADR-004` (architecture, *Draft*).
-> **Tracking:** issue #51.
+> **Tracking:** issue #51, issue #57 (verified-command corrections).
 
 ## 0. Purpose
 
@@ -97,11 +97,16 @@ benchmark below is what decides.
 
 ### 3.3 TTS — Piper (MIT-era `rhasspy/piper`, ONNX)
 
-- **v0 (CPU):** Piper-CPU, **EN leg only** (`vais1000` VI voice not in repo).
-- **For QNN:** Piper is **already ONNX** → short hop through `qnn-onnx-converter`
-  → `.dlc`. Check **Vietnamese** voice coverage (e.g. `vais1000`, CC-BY-4.0) in
-  the QAIRT/AI Hub Piper path.
-- **Output:** `.dlc` + v73 context binary.
+- **v0 (CPU):** Piper-CPU, **EN leg only** (`en_US-lessac-medium`; `vais1000` VI
+  voice not in repo).
+- **For QNN:** Piper is ONNX, but **not a short hop.** `en_US-lessac-medium.onnx`
+  contains `RandomNormalLike` (stochastic decoder sampling), which
+  `qnn-onnx-converter` 2.31.0.250130 **does not support**. Required surgery:
+  replace with deterministic zero-noise (Mul-by-0 of the reference tensor), then
+  pin the data-dependent output length by normalizing the duration-sum to a fixed
+  `T_FIXED` (see §10). See `license-situation.md` for the MIT-era vs GPL engine
+  fork decision.
+- **Output:** `.dlc` + v73 context binary (after the decoder reformulation above).
 
 ---
 
@@ -173,9 +178,121 @@ that finalize **ADR-004** (tech stack).
 
 ---
 
-## 8. Status / tracking
+## 8. Verified conversion command reference (QAIRT 2.31.0.250130)
+
+> Flag forms below were verified against the installed SDK (`qnn-onnx-converter
+> --help`, `qnn-model-lib-generator` source). Use them verbatim — do not substitute
+> variants.
+
+**Quantization (w8a16, `tf`):** `--param_quantizer tf --act_quantizer tf
+--weights_bitwidth 8 --act_bitwidth 16` (all four confirmed present).
+`--float_fallback` is valid and recommended for transformer sensitivity (softmax /
+embedding lookup).
+
+**Converter → `.cpp` + `.dlc` (host: WSL/Linux):**
+
+```
+qnn-onnx-converter \
+  --input_network <model>.onnx \
+  --output_path <model>.cpp \
+  --input_dim <input_name> "<dims>" \   # repeated per input; singular --input_dim
+  --param_quantizer tf --act_quantizer tf \
+  --weights_bitwidth 8 --act_bitwidth 16 \
+  --input_list <model>_input_list.txt \  # format: "data_file input_name" (data path FIRST)
+  --float_fallback
+```
+
+- The converter emits `<model>.cpp`, `<model>.dlc`, `<model>_net.json`, and a
+  **QNN_CPU-oriented** `.bin`. That `.bin` is **not** the target HTP v73 artifact.
+- **No `--output_dim` flag exists** in 2.31 — output dims are inferred from the
+  ONNX graph + `input_list`. For data-dependent outputs (Piper TTS), pin the
+  length **inside the ONNX graph** (§10), not via a converter flag.
+
+**Model lib + HTP v73 context binary (build host: Windows, NDK r26c + MSVC/clang):**
+
+```
+qnn-model-lib-generator -c <model>.cpp -t aarch64-android -n <model> -o <model>_libs/
+qnn-context-binary-generator \
+  --model <model>_libs/aarch64-android/lib<model>.so \
+  --backend %QAIRT_SDK_ROOT%\lib\aarch64-android\libQnnHtp.so \
+  --htp_arch v73 --binary_file <model>_v73.bin --output_dir <model>_ctx/
+```
+
+- `qnn-model-lib-generator` takes `-c <cpp> -t <targets>` only. **`-n <name>` is
+  required** — without it the `.so` is named `libqnn_model.so` (SDK default), and
+  every downstream `--model` path breaks. The `aarch64-android/` subdir is
+  auto-appended inside `-o`.
+- `--backend` needs the **full path** to `libQnnHtp.so` (on Windows
+  `%QAIRT_SDK_ROOT%\lib\aarch64-android\libQnnHtp.so`); a bare `libQnnHtp.so`
+  will not resolve.
+- `--htp_arch v73` is accepted **only** with `--model <compiled .so>` (passing a
+  `.dlc` directly errors with "Unused Arguments").
+
+**First validation target = Whisper encoder** (static `[1,80,3000]`, no decoder
+loop — lowest risk). Convert on WSL, build + generate the context binary on
+Windows, run on-device via `qnn-net-run --backend libQnnHtp.so --input_list
+input_features:<real_fleurs_mel>.raw`. Save the FP32 `whisper.audio.log_mel_spectrogram`
+reference on WSL (`np.save`) so the on-device HTP output can be diffed (max abs
+diff should be small, ~int16 step). Confirm profiling shows `BackendType=HTP` for
+attention/conv layers, not `CPU`.
+
+## 9. Calibration data (real FLEURS, primary)
+
+FLEURS parquets are reliably downloadable in our environment — **use real data;
+do not compromise the benchmark with synthetic tensors.**
+
+- **ASR (Whisper):** generate mel spectrograms with `whisper.audio.log_mel_spectrogram`
+  (Slaney filterbank + log clamp) — **not** generic `librosa` defaults, or the
+  `tf` quantizer ranges won't match on-device preprocessing.
+- **MT (Opus-MT):** real VI/EN token sequences from FLEURS text (not random int32
+  ranges). Build VI→EN pairs by aligning FLEURS `vi_vn` and `en_us` rows on the
+  shared sentence **`id`**.
+- **TTS (Piper):** real espeak-ng phonemizations of representative English
+  sentences (factory-domain phrase list), not random phoneme IDs.
+- **Split discipline:** calibration draws from FLEURS **train**; `eval_manifest_v1.json`
+  scoring draws from FLEURS **test** (same distribution, no overlap). Teacher-force
+  reference transcripts into decoder calibration (not the model's own greedy output).
+- **VIVOS** (`AILAB-VNUHCM/vivos`, CC BY-NC-SA) may be used for **VI acoustic
+  diversity in calibration only** — it is eval/redistribution-restricted and must
+  **never** appear in the shipped `eval_manifest_v1.json`.
+- Synthetic `calibration_gen.py` (uniform/Gaussian tensors) stays in the repo
+  **only as a last-resort fallback** if the FLEURS download fails again.
+
+> **Harness note:** `eval_manifest_v1.json` is currently the 24-item fallback (12
+> Opus-MT MT + 12 Piper TTS); ASR + real VI→EN MT items are deferred until FLEURS
+> is fetched. Populating it with real FLEURS **test** items is a `data_prep` code
+> change, not covered by this doc.
+
+## 10. Pre-execution checklist / known pitfalls
+
+1. **Piper is NOT a short hop.** `en_US-lessac-medium.onnx` contains
+   `RandomNormalLike` (unsupported by `qnn-onnx-converter` 2.31.0.250130) →
+   deterministic zero-noise (Mul-by-0 of the reference tensor), then fix the
+   data-dependent output length (next item). §3.3's old "already ONNX → short hop"
+   wording is retired.
+2. **Piper output length is data-dependent** (duration predictor → length regulator
+   → `sum(durations) × hop_length`). Pin it by **normalizing the duration-sum to a
+   fixed `T_FIXED`** (insert a `Div` rescale node preserving phoneme ratios) — do
+   **not** rely on `onnx-simplifier` with `input_data` alone (it bakes in one
+   traced example's timing = misalignment bug). `T_FIXED` is a design constant
+   (e.g. 400 latent frames ≈ 4.6 s @ 22050 Hz / hop 256); trim trailing silence
+   **outside** the QNN graph.
+3. **`onnx-graphsurgeon` is not in the `qairt-converters` venv** — `pip install
+   onnx-graphsurgeon` before the Piper surgery. The exact `DURATION_OUTPUT_NAME` /
+   expand-node names need a **manual Netron inspection** of the patched ONNX first.
+4. **WSL validation must `np.save('ref_encoder_out.npy', out[0])`** — the on-device
+   diff step reads this FP32 reference; the converter snippet alone doesn't save it.
+5. **`qnn-model-lib-generator` flags:** `-n <name>` required (default `.so` =
+   `libqnn_model.so`); full `--backend` path; `--htp_arch v73` only with a compiled
+   `.so` (see §8).
+6. **SDK version lock:** keep `2.31.0.250130` (= device `qnn-2.31` / HTP v73). Do
+   not upgrade.
+7. **VIVOS CC BY-NC-SA** → calibration only, never in the shipped eval manifest (§9).
+
+## 11. Status / tracking
 
 - **Precedes** job (1) (the actual conversion). Implementation tracks this spec.
 - **Related:** `benchmarking-todo.md` §Phase 4 (terse checklist), `ADR-003`
   (determination method → this plan), `ADR-004` open params #1–4.
-- **Issues:** #51 (this doc), #52 (ADR-003 tightening).
+- **Issues:** #51 (this doc), #52 (ADR-003 tightening), #57 (verified-command
+  corrections + pitfalls folded in).
