@@ -56,13 +56,43 @@ deferred to future per-stage ADRs (see Open Questions).
 - **De-risk sequencing:** stand up a **CPU-only baseline first** (ORT XNNPACK, or
   the current Piper / CT2 stack lightly re-quantized) to prove RTF < 1.0 /
   turnaround < 2.0 s; *then* layer QAIRT / QNN as an optimization pass. This avoids
-  a toolchain snag blocking the whole submission.
+  a toolchain snag blocking the whole submission. **Done** — the v0 harness runs
+  on CPU (faster-whisper / CTranslate2 Opus-MT / Piper-CPU), Phase 2–3 of
+  `benchmarking-todo.md`.
 - **Benchmark on real 8 Gen 2 (v73)** — emulators do not exercise the NPU
   (ADR-002): for each stage × candidate runtime {QAIRT / QNN, ORT-CPU}, measure RTF,
-  end-to-end turnaround (EOS → SA < 2.0 s), and MOS / accuracy regression vs the CPU
+  end-to-end turnaround (EOS → SA < 2.0 s), and accuracy regression vs the CPU
   baseline.
 - **Pick per stage.** If QNN conversion misses the budget or regresses accuracy,
   fall back to CPU. This ADR is **amended / superseded** once numbers are in.
+
+### Executable plan (pinned spec)
+
+The detailed, step-by-step spec lives in `docs/phase-4-qnn-plan.md`. In brief:
+
+1. **Convert** each v0 candidate to a QAIRT / QNN artifact (host build-time only):
+   - **ASR** — *evaluate* re-sourcing Whisper Small to ONNX (fixed-shape decoder,
+     KV-cache / padded decode; no dynamic shapes). `faster-whisper`/ggml and
+     CTranslate2 are **not** QNN-convertible.
+   - **MT** — re-export Opus-MT (Helsinki-NLP PyTorch) → ONNX → `.dlc` (w8a16);
+     the current CTranslate2 build is not QNN-convertible.
+   - **TTS** — Piper is already ONNX → short hop to `.dlc`.
+   - Toolchain: QAIRT SDK `2.31.0.250130` (**must match** device `qnn-2.31` /
+     **HTP v73**), `qnn-onnx-converter` → `.dlc`, `qnn-context-binary-generator
+     --htp_arch v73` → HTP v73 context binary. No dynamic shapes.
+2. **Bundle** the host-independent `.dlc` + context binary + `libQnn*.so` into
+   `kavi-android` `jniLibs/arm64-v8a` (committed, so every commit builds).
+3. **Run** the on-device instrumented runner (Android instrumented test / service)
+   against the **same versioned `eval_manifest_v1.json`** as the host scorer —
+   logging per-utterance RTF, turnaround (EOS→SA), peak RSS, with a **zero-network**
+   assertion.
+4. **Score** off-device via `bench/scorer.py` (WER/CER, BLEU; COMET/MOS deferred).
+5. **Decide** per stage: adopt QNN **iff** it meets the hard gates (**RTF < 1.0**,
+   **turnaround < 2.0 s**, **zero network**) **and** beats the CPU baseline on RTF /
+   turnaround without accuracy regression; else keep CPU for that stage.
+
+This comparison **closes this ADR** (→ *Accepted*) and feeds ADR-004's tech-stack
+picks. **Status remains *Proposed* until the on-device numbers exist.**
 
 ## Alternatives Considered
 
