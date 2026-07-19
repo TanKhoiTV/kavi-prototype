@@ -20,6 +20,7 @@
 - Sync harness docs with the implemented v0 benchmark harness
 - **benchmarking-todo:** Add progress & to-do snapshot at top([#43](https://github.com/TanKhoiTV/kavi-prototype/pull/43))
 - **license:** Resolve QAIRT runtime gate — ADOPT (clean)([#45](https://github.com/TanKhoiTV/kavi-prototype/pull/45))
+- **license:** Record PKLA (signed 2026-07-19) findings([#47](https://github.com/TanKhoiTV/kavi-prototype/pull/47))
 
 ### Features
 
@@ -29,6 +30,7 @@
 
 ### Miscellaneous
 
+- Update CHANGELOG
 - Update CHANGELOG
 - Update CHANGELOG
 - Update CHANGELOG
