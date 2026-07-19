@@ -2,11 +2,12 @@
 
 **Status:** Proposed — clean/avoid resolved; **Piper engine GPL split (fork #1)
 deferred** (MIT-era Piper is the clean option; GPL build not decided); **QAIRT
-runtime redistribution EULA (escalate to Qualcomm) still open**; **Hy-MT
+runtime ADOPT (clean) — gate resolved** (AI Stack License §1(iv) + §1(v); runtime
+preinstalled on the 8 Gen 2, HTP v73, qnn-2.31); **Hy-MT
 ADOPT** (Vietnam contest, no blocked-region launch; 100M MAU = sky-high
 ceiling). All dataset/voice licenses closed via Claude lookup (see #3 / #4 / #7).
 This record **gates ADR-004 (architecture / tech-stack)**.
-**Date:** 2026-07-15
+**Date:** 2026-07-15 (QAIRT gate resolved 2026-07-19)
 **Author:** Project lead
 
 ---
@@ -97,8 +98,42 @@ Two nuances:
 | 4 | InfoRe donation / usage terms (vietTTS VI reference) | RESOLVED — **AVOID**. Informal donation with **no formal license, no commercial grant, no indemnification**; canonical `VINAI/InfoRe` is **gated** (HF HTTP 401, no published terms — verified 2026-07-18), only derivative community sets are public. Taints any voice trained on it (incl. `25hours_single`, `vivos`, reference vietTTS). Treat research-only. |
 | 5 | VietSuperSpeech dataset license | RESOLVED — **MIT** (commercial-safe). Quality caveat: labels are Zipformer pseudo-labeled, not gold. |
 | 6 | PhoST dataset license | RESOLVED — **research/educational ONLY, no redistribution** (VinAI terms). → AVOID for commercial; was a VI→EN corpus candidate in the plan. |
-| 7 | QAIRT / Qualcomm AI Hub commercial terms | PARTIAL — `qai_hub_models` pip package = **BSD-3** (ADOPT). AI Hub compile service is **free today but revocable at Qualcomm's sole discretion** (QUIC can quote/charge). QAIRT **runtime redistribution (PKLA)** is **login-gated / not publicly verified** → **escalate to Qualcomm** before shipping. Conditional adopt. |
+| 7 | QAIRT / Qualcomm AI Hub commercial terms | **RESOLVED — ADOPT (clean)**. `qai_hub_models` pip = **BSD-3**. AI Hub compile is free today but revocable (build-time only; runtime stays offline). QAIRT **runtime** is governed by the **AI Stack License (QTI)** §1(iv) (royalty-free object-code redistribution within the app) + §1(v) (benchmarking); preinstalled + version-matched on the 8 Gen 2 (qnn-2.31 / HTP v73). **No escalation required.** See "Resolved — QAIRT runtime redistribution (2026-07-19)". |
 | 8 | Whisper exact license | RESOLVED — **MIT** (plan's 'Apache-2.0' note was wrong). |
+
+### Resolved — QAIRT runtime redistribution (2026-07-19)
+
+The "escalate to Qualcomm" blocker is **closed**. The operative license is the
+**AI Stack License (QTI)** shipped in the SDK install (`LICENSE.pdf`):
+
++ **§1(iv)** grants a royalty-free, non-exclusive license to **distribute and
+  sublicense the Software (the QNN runtime) in object code, as incorporated in
+  Your software application** — i.e. we may bundle `libQnn*.so` in the Kavi APK.
+  Standalone redistribution is not permitted (we don't do that).
++ **§1(v)** explicitly permits **benchmarking** — covers the whole harness.
++ **Export (§10(f))**: Vietnam is not embargoed/restricted; Kavi is not a
+  military/supercomputer/semiconductor end-use. **Export-clear.**
++ **Use-case (§2(d)/(e))**: Kavi (assistive speech translation) is not an
+  unacceptable- or high-risk application. **Clear.**
++ **Third-party (§10(h), `QNN_NOTICE.txt`)**: stack is permissive (Apache-2.0,
+  MIT, BSD, Boost, zlib, LLVM-exception, Unlicense) + **MPL-2.0**; the only
+  copyleft is **Eigen LGPL-2.1**, confined to the **host build tools** (header
+  lib used by the converters), **not** the on-device runtime. No GPL anywhere.
+
+**Device verification (Meizu 21 Note, 2026-07-19):** the runtime is
+**preinstalled** on the target — `/system/lib64/libQnnHtp.so`,
+`libQnnHtpV73.so`, and a full `/system/lib64/qnn/qnn-2.31/` tree (Cpu, Dsp, Gpu,
+HTP v73, Ir, Lpai, ModelDlc, System). `qnn-2.31` matches our locally-installed
+QAIRT **2.31.0.250130**, and `libQnnHtpV73.so` confirms **HTP v73** (ADR-002).
+Because `libQnn*.so` is **not** listed in `/vendor/etc/public.libraries.txt` or
+`/system/etc/public.libraries.txt`, a third-party app cannot `dlopen` the
+device runtime directly (linker-namespace/SELinux) — so we **bundle** the runtime
+`.so` in the APK, which §1(iv) permits. `libadsprpc.so`/`libcdsprpc.so` (FastRPC
+transport to the DSP) **are** public, so the HTP path is reachable.
+
+**Verdict:** QAIRT → **ADOPT (clean)**. No Qualcomm escalation required. The
+runtime is both preinstalled (version-matched) and freely redistributable in
+object code within the app.
 
 ## Consequences
 
@@ -121,8 +156,8 @@ Two nuances:
 ADR-004 (architecture / tech-stack) records the licensed-clean candidate set
 but **defers the final tech-stack pick** until the v0 benchmark harness runs.
 Remaining gates: **Piper engine GPL split** (deferred — MIT-era is the clean
-option), the **QAIRT runtime redistribution EULA** (escalate to Qualcomm), and
-harness confirmation that the CPU-default stack is license-clean. Lookups #3–#8
+option), and harness confirmation that the CPU-default stack is license-clean.
+The **QAIRT runtime gate is RESOLVED** (ADOPT, clean — see above). Lookups #3–#8
 are closed or advanced. Candidate shortlist in `docs/benchmarking-plan.md` §4
 stands, with the avoid-list already dropped.
 

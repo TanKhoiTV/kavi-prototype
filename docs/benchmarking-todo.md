@@ -18,7 +18,7 @@
 >   TTS), and the off-device scorer (WER/CER via jiwer, BLEU via sacrebleu; COMET/MOS
 >   deferred to v1) are implemented. First CPU numbers obtained (MT BLEU ~76, TTS RTF
 >   0.06–0.22). Doc drift from this work resolved by PR #43 (issues #37–#42).
-> - **To-do (Phase 4–7):** on-device QNN runner (blocked on the Qualcomm QAIRT EULA);
+> - **To-do (Phase 4–7):** on-device QNN runner (QAIRT gate **resolved** — runtime ADOPT, clean; ready when FLEURS assets + QNN compile land);
 >   fetch real FLEURS / MUSAN / RIRS_NOISES assets (large-file download currently
 >   limited); RTranslator baseline row (Phase 5); pre-ASR denoising gate (Phase 6);
 >   COMET + human MOS depth (Phase 7); then finalize ADR-004 once on-device numbers
@@ -37,7 +37,7 @@ being **100% offline**.
 
 ## 1. Platform & method
 
-- **Device:** Snapdragon 8 Gen 2 (Hexagon HTP v73), Android 16. GPU/CPU fallback.
+- **Device (verified 2026-07-19):** Meizu 21 Note — Snapdragon 8 Gen 2 (SM8550 / `kalama`, Hexagon **HTP v73**), **Android 16 (API 36)**, ~15 GB RAM, 8× Cortex, Adreno 740. GPU/CPU fallback. QNN runtime preinstalled (`/system/lib64/qnn/qnn-2.31`, HTP v73); app **bundles** `libQnn*.so` (not in `public.libraries.txt`).
 - **Split architecture (two halves):**
   - **On-device runner** — Android instrumented test / thin service reads a run
     manifest, executes candidates, logs latency / RTF / peak RSS, dumps outputs.
@@ -227,7 +227,7 @@ RIRS_NOISES = public-safe.
 - [ ] Wire RTranslator pseudo-row (manual APK run; published latency/RAM flagged
       author-reported) — Phase 5.
 
-### Phase 4 — On-device runner (QNN)  ⚠️ blocked on Qualcomm QAIRT EULA
+### Phase 4 — On-device runner (QNN)
 
 - [ ] Compile Whisper-Small-Quantized-QNN `.dlc`, ORT+QNN-OpusMT, Piper-QNN.
 - [ ] Android instrumented runner: read manifest, run candidates, log latency/
@@ -273,7 +273,7 @@ checklist.
 
 | Blocker | Status | Unblocks |
 | --- | --- | --- |
-| **Qualcomm QAIRT runtime EULA** | escalate (detailed instructions pending) | Phase 4 (on-device QNN) |
+| **Qualcomm QAIRT runtime EULA** | **RESOLVED — ADOPT (clean)** (AI Stack License §1(iv)/(v); runtime preinstalled on 8 Gen 2, qnn-2.31 / HTP v73; bundle `.so` in APK permitted) · no escalation | Phase 4 (on-device QNN) |
 | **Piper engine GPL split** | deferred — MIT-era `rhasspy/piper` + subprocess is default option | TTS candidate finalization |
 | **InfoRe donation terms** | **RESOLVED — AVOID** (no published terms, 401-gated; taints downstream voices) · `25hours_single` also **AVOID** (license unknown, InfoRe-derived) — PR #35 | vietTTS VI voice dropped |
 | **VI→EN ST corpus** | **RESOLVED** — FLEURS ID-alignment (when parquets present) + bespoke factory/logistics gold set (offline fallback) | EN→VI eval coverage |
