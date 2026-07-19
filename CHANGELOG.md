@@ -19,6 +19,7 @@
 - Verify InfoRe + 25hours_single licenses (stay avoid)([#35](https://github.com/TanKhoiTV/kavi-prototype/pull/35))
 - Sync harness docs with the implemented v0 benchmark harness
 - **benchmarking-todo:** Add progress & to-do snapshot at top([#43](https://github.com/TanKhoiTV/kavi-prototype/pull/43))
+- **license:** Resolve QAIRT runtime gate — ADOPT (clean)([#45](https://github.com/TanKhoiTV/kavi-prototype/pull/45))
 
 ### Features
 
@@ -28,6 +29,7 @@
 
 ### Miscellaneous
 
+- Update CHANGELOG
 - Update CHANGELOG
 - Update CHANGELOG
 - Update CHANGELOG
