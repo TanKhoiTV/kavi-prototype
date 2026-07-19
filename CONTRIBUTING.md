@@ -65,10 +65,19 @@ stabilizes.
 ## Local setup
 
 ```bash
-uv sync        # install dependencies
-make check     # lint
-make test      # run the test suite (pytest)
+uv sync            # install dependencies (Python 3.12+, uv)
+make check         # lint + format check (ruff)
+make fmt           # auto-fix formatting
+make test          # run the test suite (pytest)
+make bench-data    # build the eval manifest (CPU-only; FLEURS assets optional)
+make bench         # run the v0 benchmark harness (CPU-default candidates)
 ```
+
+The v0 harness runs **CPU-only** today (faster-whisper / CTranslate2 Opus-MT /
+Piper-CPU). On-device QNN candidates land in Phase-4 (see
+`docs/phase-4-qnn-plan.md`). `make bench-data` works offline with a built-in
+fallback eval set; fetching real FLEURS parquets is optional and only needed once
+the large-file download path is available in your environment.
 
 ## Tooling & standards
 
@@ -87,6 +96,36 @@ make test      # run the test suite (pytest)
   `git cliff -o CHANGELOG.md` after installing `git-cliff`.
 - **CI**: `.github/workflows/ci.yml` runs `make check` on PRs/pushes to `main`.
 - **License**: MIT (see `LICENSE`).
+
+## Development environments (OS notes)
+
+The core toolchain is **OS-agnostic**: Python + `uv` (cross-platform), `ruff`, and
+Gradle all run identically on Windows, Linux, and macOS. The only OS-specific
+pieces are the **QAIRT conversion toolchain** (Phase-4) and, in the Android repo,
+the **Android SDK/NDK install**.
+
+**You do not need a hybrid Windows + WSL2 machine — a single OS is enough:**
+
+- **Windows-only** — install Python + `uv`, and (for Phase-4) the Windows QAIRT SDK
+  (its converters run natively as `.exe`). No WSL required for the Python harness.
+- **Linux-only** — same, with the Linux QAIRT SDK (`.qik` installed via `qpm-cli`);
+  conversion runs natively.
+- **macOS-only** — Python + `uv` work fine. The QAIRT *conversion* toolchain is
+  Linux/Windows-only, so run conversion in a Linux VM/container or CI and build the
+  app from the committed `.dlc` / context binaries; the harness and app build
+  themselves run on macOS.
+
+**Our setup (reference, not a requirement):** the assistant builds the Android app
+on **Windows** and runs QAIRT conversion in **WSL2** — only because this box's WSL
+environment cannot launch the Windows `.exe` converters. A human Windows developer
+runs conversion natively on Windows; the split is an environment quirk, not a
+project requirement.
+
+**QAIRT conversion toolchain (Phase-4):** host build-time only, needed solely when
+producing `.dlc` / HTP v73 context binaries. See `docs/phase-4-qnn-plan.md` §1 for
+the exact env contract (`QAIRT_SDK_ROOT`, `ANDROID_NDK_ROOT`, `qairt-env.sh`,
+`qairt-converters` venv). The Android-side SDK/NDK install is documented in
+[`kavi-android/CONTRIBUTING.md`](android/CONTRIBUTING.md).
 
 ## Note on `archive/`
 
