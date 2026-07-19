@@ -21,6 +21,7 @@
 - **benchmarking-todo:** Add progress & to-do snapshot at top([#43](https://github.com/TanKhoiTV/kavi-prototype/pull/43))
 - **license:** Resolve QAIRT runtime gate — ADOPT (clean)([#45](https://github.com/TanKhoiTV/kavi-prototype/pull/45))
 - **license:** Record PKLA (signed 2026-07-19) findings([#47](https://github.com/TanKhoiTV/kavi-prototype/pull/47))
+- Fix PKLA expansion and clarify PhoST benchmarking vs redistribution([#50](https://github.com/TanKhoiTV/kavi-prototype/pull/50))
 
 ### Features
 
@@ -46,6 +47,7 @@
 - Add kavi-android submodule (prototype/android)
 - Pin kavi-android to runtime-bundled commit
 - Pin kavi-android to README consistency fix
+- Update CHANGELOG
 
 ### Refactoring
 
