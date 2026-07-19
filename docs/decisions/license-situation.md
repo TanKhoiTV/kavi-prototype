@@ -70,7 +70,7 @@ Two nuances:
 | TTS | MMS-TTS-vie | CC-BY-NC-4.0 | non-commercial |
 | TTS | Coqui XTTS v2 | CPML + Coqui shut down | non-commercial + no licensor |
 | Voice | Piper `vivos` (VI) | inherits VIVOS CC-BY-NC-SA | do not ship |
-| Data | PhoST | research/educational ONLY, no redistribution (VinAI terms) | was VI→EN corpus candidate in plan; now avoid for commercial |
+| Data | PhoST | **research or educational purposes ONLY**; no distribution (VinAI terms) | **AVOID** to ship/redistribute or build the product on it. *Internal benchmarking* (eval-only, no redistribute) is lower-risk — but the "research/educational only" purpose clause is the catch: a **commercial contest** may fall outside it. Also **EN→VI only**, so it does not serve Kavi's **VI→EN** v0 benchmark (use FLEURS CC BY-4.0 + bespoke gold set). Cite INTERSPEECH 2022 if published. |
 | Voice | Piper `25hours_single` (VI) | **License: Unknown** — voice MODEL_CARD (verified 2026-07-18); trained on "InfoRe Technology 1" (InfoRe-derived) | AVOID — no license grant; do not ship |
 | Data | InfoRe (vietTTS corpus) | no formal license; canonical `VINAI/InfoRe` is **gated** (HF HTTP 401, no published terms — verified 2026-07-18) | AVOID — no commercial grant; taints any voice trained on it |
 
@@ -98,7 +98,7 @@ Two nuances:
 | 3 | Piper VI voice licenses: `vais1000`, `25hours_single`, `vivos` | RESOLVED — `vais1000` = **CC BY 4.0** (ADOPT, attribution to VAIS/IEEE DataPort); `vivos` = CC BY-NC-SA (**AVOID**, confirmed); `25hours_single` = **License: Unknown** (voice MODEL_CARD, verified 2026-07-18; trained on InfoRe-derived data) → **AVOID** (no grant). |
 | 4 | InfoRe donation / usage terms (vietTTS VI reference) | RESOLVED — **AVOID**. Informal donation with **no formal license, no commercial grant, no indemnification**; canonical `VINAI/InfoRe` is **gated** (HF HTTP 401, no published terms — verified 2026-07-18), only derivative community sets are public. Taints any voice trained on it (incl. `25hours_single`, `vivos`, reference vietTTS). Treat research-only. |
 | 5 | VietSuperSpeech dataset license | RESOLVED — **MIT** (commercial-safe). Quality caveat: labels are Zipformer pseudo-labeled, not gold. |
-| 6 | PhoST dataset license | RESOLVED — **research/educational ONLY, no redistribution** (VinAI terms). → AVOID for commercial; was a VI→EN corpus candidate in the plan. |
+| 6 | PhoST dataset license | RESOLVED (lookup complete) — VinAI terms: **research or educational purposes ONLY**, **no distribution** (original or modified), cite INTERSPEECH 2022 if published. **AVOID** to ship/redistribute the dataset or build the product on it. *Internal benchmarking* (evaluate models without redistributing) is lower-risk — but the "research/educational only" purpose clause is the catch: a **commercial contest** may sit outside it. PhoST is **EN→VI only**, so it does **not** serve Kavi's **VI→EN** v0 benchmark; FLEURS (CC BY-4.0) + a bespoke gold set are the v0 corpora. Moot for v0. |
 | 7 | QAIRT / Qualcomm AI Hub commercial terms | **RESOLVED — ADOPT (clean)**. `qai_hub_models` pip = **BSD-3**. AI Hub compile is free today but revocable (build-time only; runtime stays offline). QAIRT **runtime** is governed by the **AI Stack License (QTI)** §1(iv) (royalty-free object-code redistribution within the app) + §1(v) (benchmarking); preinstalled + version-matched on the 8 Gen 2 (qnn-2.31 / HTP v73). **No escalation required.** See "Resolved — QAIRT runtime redistribution (2026-07-19)". |
 | 8 | Whisper exact license | RESOLVED — **MIT** (plan's 'Apache-2.0' note was wrong). |
 | 9 | PKLA (portal master agreement, signed 2026-07-19) vs AI Stack License | RESOLVED — PKLA does **not** reopen the QAIRT ADOPT (clean) gate; §2.1(b) confirms object-code bundling, conditional fee sections (§2.3(a)/§2.5/§2.6) don't apply to the royalty-free AI Stack kit, §3.6/§3.10 satisfied. See "PKLA (portal master agreement, signed 2026-07-19)". Tracking #46. |
@@ -139,7 +139,7 @@ object code within the app.
 
 ### PKLA (portal master agreement, signed 2026-07-19) — confirms the gate
 
-The PKLA (Product License Key Agreement) was signed when installing the Linux
+The PKLA (Product Kit License Agreement) was signed when installing the Linux
 QAIRT 2.31.0.250130 SDK via QPM. It is the **portal master agreement** that sits
 above the AI Stack License (`LICENSE.pdf`) shipped in the SDK. It does **not**
 reopen the ADOPT (clean) gate — it affirms the bundling right and adds only
