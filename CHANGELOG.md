@@ -42,6 +42,10 @@
 - Update CHANGELOG
 - Update CHANGELOG
 - Update CHANGELOG
+- Update CHANGELOG
+- Add kavi-android submodule (prototype/android)
+- Pin kavi-android to runtime-bundled commit
+- Pin kavi-android to README consistency fix
 
 ### Refactoring
 
@@ -52,6 +56,10 @@
 
 - Add bench harness tests + pytest config
 
+### Build
+
+- Bump kavi-android to AGP 8.10.0 / Gradle 8.11.1 (API 36)
+
 ### Ci
 
 - Guard changelog footer for repos without tags([#20](https://github.com/TanKhoiTV/kavi-prototype/pull/20))
@@ -61,5 +69,6 @@
 - Bump astral-sh/setup-uv to v8 (Node 24 runtime)([#24](https://github.com/TanKhoiTV/kavi-prototype/pull/24))
 - Pin astral-sh/setup-uv to v8.3.2 (resolvable tag)([#25](https://github.com/TanKhoiTV/kavi-prototype/pull/25))
 - Pin GitHub Action tags to full commit SHAs([#27](https://github.com/TanKhoiTV/kavi-prototype/pull/27))
+- Stop recursing into the private kavi-android submodule
 [unreleased]: https://github.com/TanKhoiTV/kavi-prototype/compare/v0.1.0...HEAD
 
