@@ -25,6 +25,7 @@
 - Add Phase-4 QNN conversion & comparison plan (#51)([#53](https://github.com/TanKhoiTV/kavi-prototype/pull/53))
 - **adr-003:** Turn determination method into executable plan (#52)([#54](https://github.com/TanKhoiTV/kavi-prototype/pull/54))
 - Expand CONTRIBUTING with OS-agnostic dev setup + OS notes (#55)
+- **phase-4:** Fold verified QNN command reference + pitfalls (#57)([#58](https://github.com/TanKhoiTV/kavi-prototype/pull/58))
 
 ### Features
 
@@ -54,6 +55,7 @@
 - Update CHANGELOG
 - Update CHANGELOG
 - Bump kavi-android submodule to CONTRIBUTING (#1)([#56](https://github.com/TanKhoiTV/kavi-prototype/pull/56))
+- Update CHANGELOG
 
 ### Refactoring
 
