@@ -24,6 +24,7 @@
 - Fix PKLA expansion and clarify PhoST benchmarking vs redistribution([#50](https://github.com/TanKhoiTV/kavi-prototype/pull/50))
 - Add Phase-4 QNN conversion & comparison plan (#51)([#53](https://github.com/TanKhoiTV/kavi-prototype/pull/53))
 - **adr-003:** Turn determination method into executable plan (#52)([#54](https://github.com/TanKhoiTV/kavi-prototype/pull/54))
+- Expand CONTRIBUTING with OS-agnostic dev setup + OS notes (#55)
 
 ### Features
 
@@ -51,6 +52,8 @@
 - Pin kavi-android to README consistency fix
 - Update CHANGELOG
 - Update CHANGELOG
+- Update CHANGELOG
+- Bump kavi-android submodule to CONTRIBUTING (#1)([#56](https://github.com/TanKhoiTV/kavi-prototype/pull/56))
 
 ### Refactoring
 
