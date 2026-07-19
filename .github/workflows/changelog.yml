@@ -15,7 +15,9 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
-          submodules: recursive
+          # Don't recurse into the private kavi-android submodule; the runner
+          # token can't access it and git-cliff only needs the repo history.
+          submodules: false
           fetch-depth: 0
       - name: Set up Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
