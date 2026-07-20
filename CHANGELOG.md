@@ -55,6 +55,7 @@
 - Normalize dev dependency array to uv canonical single-line form([#68](https://github.com/TanKhoiTV/kavi-prototype/pull/68))
 - Move AGENTS.md into .pi/
 - Add handoff prompt to .pi/prompts([#69](https://github.com/TanKhoiTV/kavi-prototype/pull/69))
+- Untrack .pi agent config directory([#71](https://github.com/TanKhoiTV/kavi-prototype/pull/71))
 
 ### Refactoring
 
