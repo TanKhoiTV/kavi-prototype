@@ -44,6 +44,8 @@
 - Skip git-cliff changelog-bot commits([#62](https://github.com/TanKhoiTV/kavi-prototype/pull/62))
 - Clarify Makefile targets and drop unused PY var([#63](https://github.com/TanKhoiTV/kavi-prototype/pull/63))
 - Move eval_manifest_v1.json into eval_data/([#64](https://github.com/TanKhoiTV/kavi-prototype/pull/64))
+- Ignore *cache/ directories
+- Exclude caches and dot-dirs from pyright([#66](https://github.com/TanKhoiTV/kavi-prototype/pull/66))
 
 ### Refactoring
 
