@@ -21,7 +21,7 @@ Classify each as **DECIDED**, **DEFERRED**, or **OPEN**:
 (a) Kavi runs fully offline · (b) target device is Snapdragon 8 Gen 2 · (c) the
 NPU runtime is QAIRT/QNN · (d) the exact ASR model · (e) Hy-MT is commercially
 usable · (f) Piper's distribution model (subprocess vs bundled) · (g) the Qualcomm
-runtime EULA for shipping `.dlc` models.
+runtime EULA for shipping QNN model artifacts (model `.so` + context binary).
 
 **Q3 — Short answer (benchmark method).** *Source: ADR-004, benchmarking-plan §8.*
 Why do we stand up a benchmark harness **before** finalizing the ASR/MT/TTS stack?
