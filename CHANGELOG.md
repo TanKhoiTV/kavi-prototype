@@ -42,6 +42,7 @@
 - Bump kavi-android submodule to CONTRIBUTING (#1)([#56](https://github.com/TanKhoiTV/kavi-prototype/pull/56))
 - Skip git-cliff changelog-bot commits([#62](https://github.com/TanKhoiTV/kavi-prototype/pull/62))
 - Clarify Makefile targets and drop unused PY var([#63](https://github.com/TanKhoiTV/kavi-prototype/pull/63))
+- Move eval_manifest_v1.json into eval_data/([#64](https://github.com/TanKhoiTV/kavi-prototype/pull/64))
 
 ### Refactoring
 
