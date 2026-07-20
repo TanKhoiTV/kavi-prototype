@@ -48,6 +48,7 @@
 - Ignore *cache/ directories
 - Exclude caches and dot-dirs from pyright([#66](https://github.com/TanKhoiTV/kavi-prototype/pull/66))
 - Declare pyarrow, ctranslate2, and numpy as direct deps
+- Normalize dev dependency array to uv canonical single-line form([#68](https://github.com/TanKhoiTV/kavi-prototype/pull/68))
 
 ### Refactoring
 
