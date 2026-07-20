@@ -41,6 +41,7 @@
 - Pin kavi-android to README consistency fix
 - Bump kavi-android submodule to CONTRIBUTING (#1)([#56](https://github.com/TanKhoiTV/kavi-prototype/pull/56))
 - Skip git-cliff changelog-bot commits([#62](https://github.com/TanKhoiTV/kavi-prototype/pull/62))
+- Clarify Makefile targets and drop unused PY var([#63](https://github.com/TanKhoiTV/kavi-prototype/pull/63))
 
 ### Refactoring
 
