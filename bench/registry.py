@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from .candidates.opusmt_mt import OpusMTMTCandidate
 from .candidates.piper_tts import PiperTTSCandidate
+from .candidates.rtranslator import RTranslatorCandidate
 from .candidates.whisper_asr import WhisperASRCandidate
 from .schema import EvalItem
 
@@ -13,6 +14,7 @@ REGISTRY: dict[str, RegistryEntry] = {
     WhisperASRCandidate.id: (WhisperASRCandidate, None, {}),
     OpusMTMTCandidate.id: (OpusMTMTCandidate, None, {}),
     PiperTTSCandidate.id: (PiperTTSCandidate, None, {}),
+    RTranslatorCandidate.id: (RTranslatorCandidate, None, {}),
 }
 
 
