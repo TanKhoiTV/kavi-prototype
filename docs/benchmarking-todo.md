@@ -53,7 +53,7 @@ being **100% offline**.
   inputs**.
 - **Sequencing (de-risks Qualcomm dependency):** build the **host-side CPU-default
   harness first** (runs today, no Qualcomm access). Add the **on-device QNN path**
-  only after the QAIRT runtime EULA is confirmed (see §8).
+  now that the QAIRT gate is resolved (see §8).
 
 ---
 
@@ -195,8 +195,7 @@ RIRS_NOISES = public-safe.
 - [x] Download lean eval set: `build_lean_manifest` emits an **offline fallback**
       (authored VI↔EN factory/logistics gold set as MT + TTS) and uses FLEURS
       parquets **when present** (real VI/EN ASR + VI→EN MT via shared IDs). Actual
-      FLEURS parquet download is blocked in some environments by large-file
-      download limits (PR #28 `download_fleurs` has resume support).
+      FLEURS parquets are available via `download_fleurs` (PR #28, with resume support).
 - [x] Noise bank: synthetic steady/impulsive noise via `torchaudio.add_noise`
       (default); **real-noise hook added** — `_load_real_noise` + `real_noise_dir`
       swaps in MUSAN/RIRS_NOISES clips (PR #36). Assets not yet fetched.

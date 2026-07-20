@@ -61,8 +61,7 @@ kavi-prototype/               (PRIVATE submodule — the real repo)
     choices are NOT made yet** — they wait for benchmark numbers. The doc the
     whole benchmarking effort feeds.
 11. **`docs/decisions/license-situation.md`** → most candidates are license-clean;
-    this gate is *why* we can pick safely. Two open items: the **Qualcomm QAIRT
-    EULA** and the **Piper GPL split**.
+    this gate is *why* we can pick safely. One open item: the **Piper GPL split**.
 12. **`docs/benchmarking-plan.md`** → we **benchmark before choosing** — datasets,
     the ASR/MT/TTS candidate landscape, the pluggable harness design, the lean v0.
 13. **`docs/benchmarking-todo.md`** → the **execution checklist** (phases 0–7,
@@ -243,7 +242,7 @@ shortlist; the harness is what turns it into a decision.
 4. **The v0 harness is built** (`bench/`) — build the eval set and run it:
 
    ```bash
-   make bench-data   # -> eval_data/eval_manifest_v1.json (offline fallback until FLEURS downloads)
+   make bench-data   # -> eval_data/eval_manifest_v1.json
    make bench        # run the harness (offline smoke: Opus-MT vi->en + Piper EN TTS)
    make test         # run the pytest suite
    ```
