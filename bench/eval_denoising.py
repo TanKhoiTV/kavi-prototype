@@ -164,8 +164,7 @@ def run_denoising_eval(
 
     # ---- Evaluate ---------------------------------------------------------
     total_combos = sum(
-        len(items) * len(DENOISERS)
-        for (_snr, _noise, _lang), items in grouped.items()
+        len(items) * len(DENOISERS) for (_snr, _noise, _lang), items in grouped.items()
     )
     processed = 0
     start_wall = time.time()
