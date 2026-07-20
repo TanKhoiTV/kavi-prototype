@@ -115,7 +115,7 @@ def _load_real_noise(dir_path: str, sample_rate: int) -> dict[str, list]:
     build_lean_manifest when a real noise bank is supplied, replacing the
     synthetic `_synth_noise`. Requires real assets (e.g. MUSAN/RIRS_NOISES
     from openslr); those are NOT fetched automatically -- acquisition is
-    blocked in some environments by large-file download limits, so the
+    large-file downloads in some CI environments, so the
     synthetic fallback remains the v0 default.
     """
     import torch

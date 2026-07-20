@@ -59,16 +59,16 @@ records what is **settled** and what stays **open** until the v0 harness
 
 - Per ADR-003, **CPU / XNNPACK int8 is the license-clean baseline** and can ship
   today.
-- The **NPU / QAIRT path is gated** on the Qualcomm runtime-redistribution EULA
-  (escalate to Qualcomm — see open parameters).
+- The **NPU / QAIRT path is now unblocked** — the Qualcomm runtime gate is
+  resolved (ADOPT, clean; see `license-situation.md`).
 
 ## Open parameters (closed by the v0 harness + remaining lookups)
 
 | # | Open parameter | Closes when |
 | --- | --- | --- |
-| 1 | **Final ASR / MT / TTS models** | v0 harness WER / BLEU / RTF / peak-RAM on the CPU-default stack. **Initial slate already chosen in `bench/`:** faster-whisper Small int8 (ASR), CTranslate2 Opus-MT vi→en int8 (MT), Piper EN (TTS). Closes when on-device QNN numbers exist (Phase 4, blocked on QAIRT EULA). |
+| 1 | **Final ASR / MT / TTS models** | v0 harness WER / BLEU / RTF / peak-RAM on the CPU-default stack. **Initial slate already chosen in `bench/`:** faster-whisper Small int8 (ASR), CTranslate2 Opus-MT vi→en int8 (MT), Piper EN (TTS). Closes when on-device QNN numbers exist (Phase 4, QAIRT gate resolved). |
 | 2 | **Piper engine GPL split** | resolved as MIT-era subprocess (default option) or alternative; GPL build stays deferred |
-| 3 | **QAIRT runtime EULA** (Qualcomm) | Qualcomm confirms commercial bundling terms for compiled models + QNN runtime libs |
+| 3 | **QAIRT runtime EULA** (Qualcomm) | **RESOLVED — ADOPT (clean)** (see `license-situation.md`) |
 | 4 | **Pre-ASR denoising gate** | v0 harness Wiener/RNNoise toggle result (benchmarking-plan §8) |
 
 ## Decision (deferred)
@@ -95,8 +95,8 @@ MeloTTS) so the harness can run. The v0 host-side harness is implemented in
 
 - The final model pick may still shift after harness numbers (e.g., if a
   license-clean model misses the RTranslator quality bar).
-- **Qualcomm QAIRT EULA (#3) is the one external unknown** with lead time; if it
-  resolves against us, the NPU path falls back to CPU (ADR-003).
+- **Qualcomm QAIRT EULA (#3) is resolved** (ADOPT, clean). The NPU path is
+  unblocked; CPU fallback (ADR-003) remains available.
 
 ## References
 
