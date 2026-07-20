@@ -36,28 +36,11 @@
 
 ### Miscellaneous
 
-- Update CHANGELOG
-- Update CHANGELOG
-- Update CHANGELOG
-- Update CHANGELOG
-- Update CHANGELOG
-- Update CHANGELOG
-- Update CHANGELOG
-- Update CHANGELOG
-- Update CHANGELOG
-- Update CHANGELOG
-- Update CHANGELOG
-- Update CHANGELOG
-- Update CHANGELOG
 - Add kavi-android submodule (prototype/android)
 - Pin kavi-android to runtime-bundled commit
 - Pin kavi-android to README consistency fix
-- Update CHANGELOG
-- Update CHANGELOG
-- Update CHANGELOG
 - Bump kavi-android submodule to CONTRIBUTING (#1)([#56](https://github.com/TanKhoiTV/kavi-prototype/pull/56))
-- Update CHANGELOG
-- Update CHANGELOG
+- Skip git-cliff changelog-bot commits([#62](https://github.com/TanKhoiTV/kavi-prototype/pull/62))
 
 ### Refactoring
 
