@@ -33,6 +33,7 @@
 - Update agent guidance in .pi/AGENTS.md
 - Mirror parent contest-info.md and specifications.md
 - Add handoff notes to .pi/HANDOFF.md([#70](https://github.com/TanKhoiTV/kavi-prototype/pull/70))
+- Update stale blocker references (QAIRT EULA resolved, FLEURS available)([#72](https://github.com/TanKhoiTV/kavi-prototype/pull/72))
 
 ### Features
 
