@@ -53,6 +53,7 @@ commit_parsers = [
     { message = "^style", group = "Styling" },
     { message = "^test", group = "Testing" },
     { message = "^chore\\(release\\)", skip = true },
+    { message = "^chore: update CHANGELOG", skip = true },
     { message = "^chore", group = "Miscellaneous" },
 ]
 filter_commits = false
