@@ -31,3 +31,6 @@ logs/
 bench-results/
 eval_data/
 eval_manifest_v1.json
+
+# Caches of all types
+*cache/
