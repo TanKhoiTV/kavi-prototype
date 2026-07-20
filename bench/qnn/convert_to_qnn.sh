@@ -48,11 +48,14 @@ VERBOSE=false
 
 # ── helpers ──────────────────────────────────────────────────────────────────
 
-die() { echo "[ERROR] $*" >&2; exit 1; }
+die() {
+	echo "[ERROR] $*" >&2
+	exit 1
+}
 info() { echo "[INFO] $*"; }
 
 usage() {
-    cat <<'USAGE'
+	cat <<'USAGE'
 Usage: convert_to_qnn.sh [OPTIONS]
 
 Required:
@@ -87,7 +90,7 @@ Examples:
       --input-list calibration_input_list.txt \
       --output-dir out/ --name whisper_encoder
 USAGE
-    exit 0
+	exit 0
 }
 
 # ── parse arguments ──────────────────────────────────────────────────────────
@@ -97,20 +100,50 @@ INPUT_NAMES=()
 INPUT_DIMS=()
 
 while [[ $# -gt 0 ]]; do
-    case "$1" in
-        --onnx) ONNX="$2"; shift 2 ;;
-        --input-name) INPUT_NAMES+=("$2"); shift 2 ;;
-        --input-dims) INPUT_DIMS+=("$2"); shift 2 ;;
-        --input-list) INPUT_LIST="$2"; shift 2 ;;
-        --output-dir) OUTPUT_DIR="$2"; shift 2 ;;
-        --name) NAME="$2"; shift 2 ;;
-        --no-quantize) QUANTIZE=false; shift ;;
-        --skip-lib) SKIP_LIB=true; shift ;;
-        --skip-ctx) SKIP_CTX=true; shift ;;
-        --verbose) VERBOSE=true; shift ;;
-        --help|-h) usage ;;
-        *) die "Unknown option: $1 (use --help)" ;;
-    esac
+	case "$1" in
+	--onnx)
+		ONNX="$2"
+		shift 2
+		;;
+	--input-name)
+		INPUT_NAMES+=("$2")
+		shift 2
+		;;
+	--input-dims)
+		INPUT_DIMS+=("$2")
+		shift 2
+		;;
+	--input-list)
+		INPUT_LIST="$2"
+		shift 2
+		;;
+	--output-dir)
+		OUTPUT_DIR="$2"
+		shift 2
+		;;
+	--name)
+		NAME="$2"
+		shift 2
+		;;
+	--no-quantize)
+		QUANTIZE=false
+		shift
+		;;
+	--skip-lib)
+		SKIP_LIB=true
+		shift
+		;;
+	--skip-ctx)
+		SKIP_CTX=true
+		shift
+		;;
+	--verbose)
+		VERBOSE=true
+		shift
+		;;
+	--help | -h) usage ;;
+	*) die "Unknown option: $1 (use --help)" ;;
+	esac
 done
 
 # Validate required arguments
@@ -122,7 +155,7 @@ done
 
 # If NAME is not set explicitly, derive from ONNX basename
 if [[ "$NAME" == "." ]]; then
-    NAME=$(basename "$ONNX" .onnx)
+	NAME=$(basename "$ONNX" .onnx)
 fi
 
 # Ensure output directory exists
@@ -136,11 +169,11 @@ MODEL_LIB_GEN="$QAIRT_SDK_ROOT/bin/x86_64-linux-clang/qnn-model-lib-generator"
 CTX_BIN_GEN="$QAIRT_SDK_ROOT/bin/x86_64-linux-clang/qnn-context-binary-generator"
 
 for tool in "$CONVERTER" "$MODEL_LIB_GEN" "$CTX_BIN_GEN"; do
-    [[ -x "$tool" ]] || die "Tool not found or not executable: $tool (check QAIRT_SDK_ROOT)"
+	[[ -x "$tool" ]] || die "Tool not found or not executable: $tool (check QAIRT_SDK_ROOT)"
 done
 
 if [[ -n "${ANDROID_NDK_ROOT:-}" ]]; then
-    ANDROID_NDK_ROOT="$(cd "$ANDROID_NDK_ROOT" && pwd)"
+	ANDROID_NDK_ROOT="$(cd "$ANDROID_NDK_ROOT" && pwd)"
 fi
 
 info "=== QAIRT Conversion Pipeline ==="
@@ -159,31 +192,31 @@ info "Step 1: qnn-onnx-converter → $CPP_OUT.cpp"
 
 INPUT_DIM_FLAGS=()
 for i in "${!INPUT_NAMES[@]}"; do
-    INPUT_DIM_FLAGS+=(--input_dim "${INPUT_NAMES[$i]}" "${INPUT_DIMS[$i]}")
+	INPUT_DIM_FLAGS+=(--input_dim "${INPUT_NAMES[$i]}" "${INPUT_DIMS[$i]}")
 done
 
 QUANT_FLAGS=()
 if $QUANTIZE; then
-    QUANT_FLAGS=(
-        --param_quantizer tf
-        --act_quantizer tf
-        --weights_bitwidth 8
-        --act_bitwidth 16
-    )
-    if [[ -n "$INPUT_LIST" ]]; then
-        QUANT_FLAGS+=(--input_list "$INPUT_LIST")
-    else
-        info "  WARNING: No --input-list provided; quantizer will use fallback ranges."
-        info "  For best accuracy, supply real calibration data via --input-list"
-    fi
+	QUANT_FLAGS=(
+		--param_quantizer tf
+		--act_quantizer tf
+		--weights_bitwidth 8
+		--act_bitwidth 16
+	)
+	if [[ -n "$INPUT_LIST" ]]; then
+		QUANT_FLAGS+=(--input_list "$INPUT_LIST")
+	else
+		info "  WARNING: No --input-list provided; quantizer will use fallback ranges."
+		info "  For best accuracy, supply real calibration data via --input-list"
+	fi
 fi
 
 set -x
 "$CONVERTER" \
-    --input_network "$ONNX" \
-    --output_path "$CPP_OUT" \
-    "${INPUT_DIM_FLAGS[@]}" \
-    "${QUANT_FLAGS[@]}"
+	--input_network "$ONNX" \
+	--output_path "$CPP_OUT" \
+	"${INPUT_DIM_FLAGS[@]}" \
+	"${QUANT_FLAGS[@]}"
 { set +x; } 2>/dev/null
 
 # Verify outputs
@@ -198,64 +231,64 @@ info ""
 # ── Step 2: .cpp → model library (.so) ──────────────────────────────────────
 
 if $SKIP_LIB; then
-    info "Step 2: SKIPPED (--skip-lib)"
+	info "Step 2: SKIPPED (--skip-lib)"
 else
-    LIB_OUT="$OUTPUT_DIR/${NAME}_libs"
-    info "Step 2: qnn-model-lib-generator → $LIB_OUT/aarch64-android/lib${NAME}.so"
+	LIB_OUT="$OUTPUT_DIR/${NAME}_libs"
+	info "Step 2: qnn-model-lib-generator → $LIB_OUT/aarch64-android/lib${NAME}.so"
 
-    if [[ -z "${ANDROID_NDK_ROOT:-}" ]]; then
-        info "  WARNING: ANDROID_NDK_ROOT not set; attempting build with system toolchain."
-        info "  Set ANDROID_NDK_ROOT=path/to/ndk-r26c for correct aarch64-android build."
-    fi
+	if [[ -z "${ANDROID_NDK_ROOT:-}" ]]; then
+		info "  WARNING: ANDROID_NDK_ROOT not set; attempting build with system toolchain."
+		info "  Set ANDROID_NDK_ROOT=path/to/ndk-r26c for correct aarch64-android build."
+	fi
 
-    set -x
-    "$MODEL_LIB_GEN" \
-        -c "$CPP_FILE" \
-        -t aarch64-android \
-        -n "$NAME" \
-        -o "$LIB_OUT"
-    { set +x; } 2>/dev/null
+	set -x
+	"$MODEL_LIB_GEN" \
+		-c "$CPP_FILE" \
+		-t aarch64-android \
+		-n "$NAME" \
+		-o "$LIB_OUT"
+	{ set +x; } 2>/dev/null
 
-    LIB_SO="$LIB_OUT/aarch64-android/lib${NAME}.so"
-    [[ -f "$LIB_SO" ]] || die "Step 2 failed: $LIB_SO not generated"
-    info "  ✓ $LIB_SO"
-    info ""
+	LIB_SO="$LIB_OUT/aarch64-android/lib${NAME}.so"
+	[[ -f "$LIB_SO" ]] || die "Step 2 failed: $LIB_SO not generated"
+	info "  ✓ $LIB_SO"
+	info ""
 fi
 
 # ── Step 3: model lib → HTP v73 context binary ──────────────────────────────
 
 if $SKIP_CTX; then
-    info "Step 3: SKIPPED (--skip-ctx)"
+	info "Step 3: SKIPPED (--skip-ctx)"
 else
-    CTX_OUT="$OUTPUT_DIR/${NAME}_ctx"
-    mkdir -p "$CTX_OUT"
+	CTX_OUT="$OUTPUT_DIR/${NAME}_ctx"
+	mkdir -p "$CTX_OUT"
 
-    # Use the generated .so from step 2, or accept an external one
-    if [[ -f "$LIB_SO" ]]; then
-        MODEL_SO="$LIB_SO"
-    else
-        die "No model .so available for context binary generation (run step 2 or provide one)"
-    fi
+	# Use the generated .so from step 2, or accept an external one
+	if [[ -f "$LIB_SO" ]]; then
+		MODEL_SO="$LIB_SO"
+	else
+		die "No model .so available for context binary generation (run step 2 or provide one)"
+	fi
 
-    HTP_BACKEND="$QAIRT_SDK_ROOT/lib/aarch64-android/libQnnHtp.so"
-    [[ -f "$HTP_BACKEND" ]] || die "HTP backend not found: $HTP_BACKEND"
+	HTP_BACKEND="$QAIRT_SDK_ROOT/lib/aarch64-android/libQnnHtp.so"
+	[[ -f "$HTP_BACKEND" ]] || die "HTP backend not found: $HTP_BACKEND"
 
-    CTX_BIN="$CTX_OUT/${NAME}_v73.bin"
+	CTX_BIN="$CTX_OUT/${NAME}_v73.bin"
 
-    info "Step 3: qnn-context-binary-generator → $CTX_BIN"
+	info "Step 3: qnn-context-binary-generator → $CTX_BIN"
 
-    set -x
-    "$CTX_BIN_GEN" \
-        --model "$MODEL_SO" \
-        --backend "$HTP_BACKEND" \
-        --htp_arch v73 \
-        --binary_file "$CTX_BIN" \
-        --output_dir "$CTX_OUT"
-    { set +x; } 2>/dev/null
+	set -x
+	"$CTX_BIN_GEN" \
+		--model "$MODEL_SO" \
+		--backend "$HTP_BACKEND" \
+		--htp_arch v73 \
+		--binary_file "$CTX_BIN" \
+		--output_dir "$CTX_OUT"
+	{ set +x; } 2>/dev/null
 
-    [[ -f "$CTX_BIN" ]] || die "Step 3 failed: $CTX_BIN not generated"
-    info "  ✓ $CTX_BIN"
-    info ""
+	[[ -f "$CTX_BIN" ]] || die "Step 3 failed: $CTX_BIN not generated"
+	info "  ✓ $CTX_BIN"
+	info ""
 fi
 
 # ── summary ──────────────────────────────────────────────────────────────────
@@ -266,10 +299,10 @@ info ""
 info "Generated files:"
 ls -lh "$OUTPUT_DIR"/"$NAME"* 2>/dev/null || true
 if [[ -d "${LIB_OUT:-}" ]]; then
-    ls -lh "$LIB_OUT"/aarch64-android/ 2>/dev/null || true
+	ls -lh "$LIB_OUT"/aarch64-android/ 2>/dev/null || true
 fi
 if [[ -d "${CTX_OUT:-}" ]]; then
-    ls -lh "$CTX_OUT"/ 2>/dev/null || true
+	ls -lh "$CTX_OUT"/ 2>/dev/null || true
 fi
 info ""
 info "On-device verification:"

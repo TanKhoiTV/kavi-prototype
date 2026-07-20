@@ -254,11 +254,12 @@ checklist.
 
 ### Phase 6 — Pre-ASR denoising gate
 
-- [ ] Add denoising toggle (raw vs Wiener `prop_decrease=0.5` vs RNNoise
+- [x] Add denoising toggle (raw vs Wiener `prop_decrease=0.5` vs RNNoise
       `stationary=False`) as a fixed factor in v0 slice (mixing per §4, not the
       archived custom RMS mix).
-- [ ] Trigger binary gate: denoiser beats raw-noisy WER → tune `prop_decrease`;
-      else VAD-only pipeline.
+- [x] Trigger binary gate: denoiser beats raw-noisy WER → tune `prop_decrease`;
+      else VAD-only pipeline. **Result: ADOPT Wiener** (noisy WER 49.82% vs raw
+      51.23%). See `docs/denoising-gate-results.md`.
 
 ### Phase 7 — v1 (quality depth)
 
