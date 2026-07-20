@@ -189,7 +189,7 @@ under `archive/` for reference.
 | `docs/` | Internal docs (this file's siblings). |
 | `docs/decisions/` | The ADRs (001–004) + `license-situation.md`. Source of truth for architecture + licensing. |
 | `docs/benchmarking-plan.md` | The plan to *measure* models before picking them (gates ADR-004). **Read this next.** |
-| `AGENTS.md`, `CONTRIBUTING.md`, `README.md` | Project / agent guidance, how we work, quickstart. |
+| `.pi/AGENTS.md`, `CONTRIBUTING.md`, `README.md` | Project / agent guidance, how we work, quickstart. |
 | `Makefile`, `pyproject.toml`, `LICENSE` | Build / run, deps (uv), MIT license. |
 | `.github/` | CI (lint + changelog) and PR / issue templates. |
 
