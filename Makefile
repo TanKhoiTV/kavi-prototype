@@ -15,7 +15,7 @@
 #     results to bench-results/. This matches the project's offline /
 #     on-device-at-runtime requirement (see AGENTS.md).
 #   - bench-data NEEDS NETWORK: it is the one-time Phase 1 step that builds
-#     the eval manifest (eval_manifest_v1.json). Run it once, then `bench`
+#     the eval manifest (eval_data/eval_manifest_v1.json). Run it once, then `bench`
 #     runs fully offline.
 
 .PHONY: install check fmt test bench bench-data

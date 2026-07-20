@@ -243,7 +243,7 @@ shortlist; the harness is what turns it into a decision.
 4. **The v0 harness is built** (`bench/`) — build the eval set and run it:
 
    ```bash
-   make bench-data   # -> eval_manifest_v1.json (offline fallback until FLEURS downloads)
+   make bench-data   # -> eval_data/eval_manifest_v1.json (offline fallback until FLEURS downloads)
    make bench        # run the harness (offline smoke: Opus-MT vi->en + Piper EN TTS)
    make test         # run the pytest suite
    ```

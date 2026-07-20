@@ -37,7 +37,7 @@ ASR → MT → TTS candidate stack. It runs today on CPU-default, license-clean
 candidates:
 
 ```bash
-make bench-data   # build the lean eval set -> eval_manifest_v1.json (offline fallback until FLEURS parquets download)
+make bench-data   # build the lean eval set -> eval_data/eval_manifest_v1.json (offline fallback until FLEURS parquets download)
 make bench        # run the harness (offline smoke: Opus-MT vi->en + Piper EN TTS)
 make test         # run the pytest suite (manifest round-trip, scorer, FLEURS id-merge)
 ```
