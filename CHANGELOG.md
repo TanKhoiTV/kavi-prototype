@@ -32,6 +32,7 @@
 - Point AGENTS.md reference at .pi/AGENTS.md
 - Update agent guidance in .pi/AGENTS.md
 - Mirror parent contest-info.md and specifications.md
+- Add handoff notes to .pi/HANDOFF.md([#70](https://github.com/TanKhoiTV/kavi-prototype/pull/70))
 
 ### Features
 
