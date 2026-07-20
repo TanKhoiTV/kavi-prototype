@@ -7,5 +7,5 @@ byte-identical inputs.
 
 See docs/benchmarking-plan.md (S6 harness design) and docs/benchmarking-todo.md
 (Phases 0-3). This package is the host-side, CPU-default scaffold (Phase 0-3);
-the on-device QNN runner is Phase 4 (blocked on the Qualcomm QAIRT EULA).
+the on-device QNN runner is Phase 4 (QAIRT gate resolved).
 """

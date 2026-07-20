@@ -468,8 +468,8 @@ registered candidate per stage with zero harness changes.
 > §6 is **implemented** in `bench/` (PR #28, #36). It runs today on CPU-default
 > candidates — **faster-whisper** Small int8 (ASR), CTranslate2 Opus-MT vi→en int8
 > (MT), Piper EN (TTS) — with an off-device scorer (jiwer WER/CER, sacrebleu BLEU;
-> COMET/MOS deferred to v1). The on-device QNN runner (Phase 4) is still blocked on
-> the Qualcomm QAIRT EULA. The initial v0 ASR candidate is **faster-whisper**, not
+> COMET/MOS deferred to v1). The on-device QNN runner (Phase 4) is ready to begin
+> now that the QAIRT gate is resolved. The initial v0 ASR candidate is **faster-whisper**, not
 > whisper.cpp (whisper.cpp / QNN-Whisper remain later candidates).
 
 **Lean eval set:** ~40–60 utterances per direction (VI ASR, EN ASR, VI→EN, EN→VI)

@@ -258,7 +258,7 @@ attention/conv layers, not `CPU`.
 
 ## 9. Calibration data (real FLEURS, primary)
 
-FLEURS parquets are reliably downloadable in our environment — **use real data;
+FLEURS parquets are available — **use real data;
 do not compromise the benchmark with synthetic tensors.**
 
 - **ASR (Whisper):** generate mel spectrograms with `whisper.audio.log_mel_spectrogram`
@@ -276,7 +276,7 @@ do not compromise the benchmark with synthetic tensors.**
   diversity in calibration only** — it is eval/redistribution-restricted and must
   **never** appear in the shipped `eval_manifest_v1.json`.
 - Synthetic `calibration_gen.py` (uniform/Gaussian tensors) stays in the repo
-  **only as a last-resort fallback** if the FLEURS download fails again.
+  retained for offline/CI use only (FLEURS parquets are now available).
 
 > **Harness note:** `eval_manifest_v1.json` is currently the 24-item fallback (12
 > Opus-MT MT + 12 Piper TTS); ASR + real VI→EN MT items are deferred until FLEURS
