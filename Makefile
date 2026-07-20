@@ -38,4 +38,4 @@ bench: ## Offline harness run (--smoke by default; writes bench-results/)
 	uv run python -m bench.run --smoke --out bench-results
 
 bench-data: ## Phase 1: build eval manifest (NEEDS NETWORK, one-time)
-	uv run python -m bench.data_prep --out eval_manifest_v1.json
+	uv run python -m bench.data_prep --out eval_data/eval_manifest_v1.json

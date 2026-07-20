@@ -448,7 +448,7 @@ def main() -> None:
     import argparse
 
     ap = argparse.ArgumentParser(description="Kavi bench data prep (Phase 1)")
-    ap.add_argument("--out", default="eval_manifest_v1.json")
+    ap.add_argument("--out", default="eval_data/eval_manifest_v1.json")
     ap.add_argument("--workdir", default="eval_data")
     ap.add_argument("--n-per-lang", type=int, default=30)
     ap.add_argument(
