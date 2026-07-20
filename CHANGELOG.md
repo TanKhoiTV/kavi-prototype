@@ -29,6 +29,9 @@
 - **phase-4:** Correct .dlc claims and elaborate conversion plan([#61](https://github.com/TanKhoiTV/kavi-prototype/pull/61))
 - Point eval_manifest_v1.json references at eval_data/([#65](https://github.com/TanKhoiTV/kavi-prototype/pull/65))
 - Pin Python 3.12 and document sync prereqs([#67](https://github.com/TanKhoiTV/kavi-prototype/pull/67))
+- Point AGENTS.md reference at .pi/AGENTS.md
+- Update agent guidance in .pi/AGENTS.md
+- Mirror parent contest-info.md and specifications.md
 
 ### Features
 
@@ -49,6 +52,8 @@
 - Exclude caches and dot-dirs from pyright([#66](https://github.com/TanKhoiTV/kavi-prototype/pull/66))
 - Declare pyarrow, ctranslate2, and numpy as direct deps
 - Normalize dev dependency array to uv canonical single-line form([#68](https://github.com/TanKhoiTV/kavi-prototype/pull/68))
+- Move AGENTS.md into .pi/
+- Add handoff prompt to .pi/prompts([#69](https://github.com/TanKhoiTV/kavi-prototype/pull/69))
 
 ### Refactoring
 
