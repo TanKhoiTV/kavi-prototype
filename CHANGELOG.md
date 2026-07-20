@@ -28,6 +28,7 @@
 - **phase-4:** Fold verified QNN command reference + pitfalls (#57)([#58](https://github.com/TanKhoiTV/kavi-prototype/pull/58))
 - **phase-4:** Correct .dlc claims and elaborate conversion plan([#61](https://github.com/TanKhoiTV/kavi-prototype/pull/61))
 - Point eval_manifest_v1.json references at eval_data/([#65](https://github.com/TanKhoiTV/kavi-prototype/pull/65))
+- Pin Python 3.12 and document sync prereqs([#67](https://github.com/TanKhoiTV/kavi-prototype/pull/67))
 
 ### Features
 
@@ -46,6 +47,7 @@
 - Move eval_manifest_v1.json into eval_data/([#64](https://github.com/TanKhoiTV/kavi-prototype/pull/64))
 - Ignore *cache/ directories
 - Exclude caches and dot-dirs from pyright([#66](https://github.com/TanKhoiTV/kavi-prototype/pull/66))
+- Declare pyarrow, ctranslate2, and numpy as direct deps
 
 ### Refactoring
 
