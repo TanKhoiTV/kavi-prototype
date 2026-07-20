@@ -2,7 +2,7 @@
 
 > **Status:** Planning (precedes and parallels the Phase-4 implementation, job (1))
 > **Companion docs:** `benchmarking-todo.md` §Phase 4, `ADR-003` (Hexagon runtime, *Proposed*), `ADR-004` (architecture, *Draft*).
-> **Tracking:** issue #51, issue #57 (verified-command corrections).
+> **Tracking:** issue #51, issue #57 (verified-command corrections), issue #59 (converter output / `.dlc` corrections).
 
 ## 0. Purpose
 
@@ -24,7 +24,7 @@ greenfield build.
 ## 1. Environment contract (host, build-time only)
 
 All conversion happens **off-device** on a Linux x86_64 host. The artifacts
-(`.dlc`, HTP v73 context binary, `libQnn*.so`) are **host-independent** — byte
+(model `.so` library, HTP v73 context binary, `libQnn*.so` runtime) are **host-independent** — byte
 identical regardless of the developer's OS — and are committed so every commit
 builds.
 
@@ -34,7 +34,7 @@ builds.
 | **ANDROID_NDK_ROOT** | NDK r26c (`26.1.10909125`) | Matches `archive/`/`sdk.yaml` pin. |
 | **Env helper** | `qairt-env.sh` | `source`s `bin/envsetup.sh` (sets `QNN_SDK_ROOT`, `SNPE_ROOT`) and exports `LD_LIBRARY_PATH` (venv `libpython3.10` + `$QAIRT_SDK_ROOT/lib/x86_64-linux-clang`). |
 | **Converter venv** | Python 3.10 (`qairt-converters`) | `onnx 1.16.1`, `onnxruntime 1.17.1`, `numpy<2`, `onnx-simplifier`, `scipy`, `lxml`, `absl-py`, `pandas`. |
-| **Converters** | `qnn-onnx-converter`, `qnn-context-binary-generator` | Under `$QAIRT_SDK_ROOT/bin/x86_64-linux-clang`. |
+| **Converters** | `qnn-onnx-converter`, `qnn-model-lib-generator`, `qnn-context-binary-generator` | Under `$QAIRT_SDK_ROOT/bin/x86_64-linux-clang`. |
 | **Device** | Meizu 21 Note — SD 8 Gen 2 (`kalama`), **Android 16 (API 36)**, **HTP v73**, `qnn-2.31` | Runtime **preinstalled**; app **bundles** `libQnn*.so`. |
 
 **Offline guarantee:** the SDK is build-time only; the on-device runtime is
@@ -44,11 +44,14 @@ preinstalled firmware + the bundled `.so`. No network at app runtime.
 
 ## 2. Conversion pipeline (per model)
 
-```
+```text
 sourceable model (PyTorch / TFLite / ONNX)
         │
         ▼
-  qnn-onnx-converter        →  <model>.dlc        (w8a16 quant: int8 wts / int16 acts)
+  qnn-onnx-converter        →  <model>.cpp        (graph; w8a16 quant: int8 wts / int16 acts)
+        │                                   (+ <model>_net.json, QNN_CPU .bin)
+        ▼
+  qnn-model-lib-generator -c <model>.cpp  →  model library (.so)
         │
         ▼
   qnn-context-binary-generator --htp_arch v73   →  HTP v73 context binary
@@ -60,8 +63,12 @@ sourceable model (PyTorch / TFLite / ONNX)
 - **No dynamic shapes:** batch / sequence length must be **fixed** (padding +
   masking). This is the main engineering cost for the autoregressive ASR / MT
   decoders.
-- **Artifact choice:** prefer **DLC** over a context binary for forward-compat
-  across QAIRT SDK versions; generate the v73 context binary for the NPU path.
+- **Artifact choice:** `qnn-onnx-converter` emits `<model>.cpp` (graph source) +
+  `<model>_net.json` + a QNN_CPU `.bin` — **not** a `.dlc`. The on-device NPU
+  artifact is the **HTP v73 context binary** (plus the model `.so` library), built
+  on Windows via `qnn-model-lib-generator` + `qnn-context-binary-generator`. (A
+  `.dlc` is a separate SNPE-era format loaded via `libQnnModelDlc.so --dlc_path`
+  and is **not** produced by `qnn-onnx-converter`.)
 
 ---
 
@@ -82,18 +89,18 @@ benchmark below is what decides.
 - **Hard part:** the autoregressive decoder needs **fixed-sequence handling** —
   KV-cache / padded decoding, because **no dynamic shapes** are allowed. This is
   the riskiest conversion; budget time for it.
-- **Output:** `.dlc` + v73 context binary.
+- **Output:** encoder `.cpp` (graph) → Windows builds model `.so` + HTP v73 context binary.
 
 ### 3.2 MT — Opus-MT vi↔en (Helsinki-NLP, PyTorch, Apache-2.0)
 
 - **v0 (CPU):** `CTranslate2`-int8 Opus-MT, **vi→en only** (en→vi weights not in
   repo). CTranslate2 is **not** QNN-convertible.
 - **For QNN:** re-export from the **original Helsinki-NLP PyTorch** model → ONNX
-  → `qnn-onnx-converter` → `.dlc` (w8a16). No AI Hub prebuilt exists for Opus-MT;
+  → `qnn-onnx-converter` → `<model>.cpp` (w8a16). No AI Hub prebuilt exists for Opus-MT;
   the en-es recipe is a template.
 - **Scope:** export **vi→en** (v0 need) and **en→vi** if the bidirectional eval
   set requires it.
-- **Output:** `.dlc` + v73 context binary.
+- **Output:** `<model>.cpp` (graph) → HTP v73 context binary (Windows).
 
 ### 3.3 TTS — Piper (MIT-era `rhasspy/piper`, ONNX)
 
@@ -106,18 +113,18 @@ benchmark below is what decides.
   pin the data-dependent output length by normalizing the duration-sum to a fixed
   `T_FIXED` (see §10). See `license-situation.md` for the MIT-era vs GPL engine
   fork decision.
-- **Output:** `.dlc` + v73 context binary (after the decoder reformulation above).
+- **Output:** `<model>.cpp` (graph) → HTP v73 context binary (Windows).
 
 ---
 
 ## 4. Artifact layout & bundling
 
-- **Host-independent outputs** (`.dlc`, v73 context binary, `libQnn*.so`) are
+- **Host-independent outputs** (model `.so` library, v73 context binary, `libQnn*.so` runtime) are
   **committed** so every commit builds — no developer needs the SDK to build.
 - **Location in `kavi-android`:**
   - `app/src/main/jniLibs/arm64-v8a/` — `libQnn*.so` (39 `.so` already bundled)
-    plus the compiled model `.so`/`.dlc` loaders.
-  - `app/src/main/assets/` — model `.dlc` + HTP v73 context binaries (read at
+    plus the compiled model `.so` library.
+  - `app/src/main/assets/` — model `.so` library + HTP v73 context binaries (read at
     runtime, kept out of `jniLibs` binary load path if preferred).
 - **License:** AI Stack License §1(iv) permits distributing the runtime in object
   code within the app; `public.libraries.txt` does **not** list `libQnn*.so`, so
@@ -166,6 +173,15 @@ that finalize **ADR-004** (tech stack).
 
 - **CPU-first already done** (Phase 2–3): the baseline exists, so a QNN toolchain
   snag cannot block the submission.
+- **Conversion order (lowest-risk first):** (1) **Whisper-Small encoder** —
+  static `[1,80,3000]`, no decoder loop, and Qualcomm already ships a
+  Whisper-Small-Quantized-QNN re-source proving the path; (2) **Opus-MT vi→en** —
+  same autoregressive decoder pattern, no sampling op; (3) **Piper
+  en_US-lessac-medium** last — heaviest, because its `RandomNormalLike`
+  stochastic-decoder nodes must be reformulated deterministically (§3.3 / §10) before
+  conversion. The WSL host runs `qnn-onnx-converter` → `<model>.cpp`; the model
+  `.so` + HTP v73 context binary are built on Windows (clang++ / NDK / MSVC), per
+  the §1 env split.
 - **Risks:**
   - ASR decoder **fixed-shape reformulation** (KV-cache / padded decode) — the
     heaviest lift.
@@ -186,12 +202,13 @@ that finalize **ADR-004** (tech stack).
 
 **Quantization (w8a16, `tf`):** `--param_quantizer tf --act_quantizer tf
 --weights_bitwidth 8 --act_bitwidth 16` (all four confirmed present).
-`--float_fallback` is valid and recommended for transformer sensitivity (softmax /
-embedding lookup).
+`--float_fallback` is **mutually exclusive** with `--input_list` in 2.31.0.250130
+(the SDK rejects the combination). Omit it and supply a real `--input_list` (e.g. the
+FLEURS mel) for calibration.
 
-**Converter → `.cpp` + `.dlc` (host: WSL/Linux):**
+**Converter → `.cpp` (+ `.net.json` + QNN_CPU `.bin`) (host: WSL/Linux):**
 
-```
+```bash
 qnn-onnx-converter \
   --input_network <model>.onnx \
   --output_path <model>.cpp \
@@ -199,18 +216,20 @@ qnn-onnx-converter \
   --param_quantizer tf --act_quantizer tf \
   --weights_bitwidth 8 --act_bitwidth 16 \
   --input_list <model>_input_list.txt \  # format: "data_file input_name" (data path FIRST)
-  --float_fallback
 ```
 
-- The converter emits `<model>.cpp`, `<model>.dlc`, `<model>_net.json`, and a
-  **QNN_CPU-oriented** `.bin`. That `.bin` is **not** the target HTP v73 artifact.
+- The converter emits `<model>.cpp` (graph source), `<model>_net.json` (network
+  descriptor), and a **QNN_CPU-oriented** `.bin` (context binary — 89 MB for the
+  Whisper encoder; calibration artifact, **not** the HTP v73 target). It does
+  **not** emit a `.dlc`; the `.dlc` is a separate SNPE-era format (loaded via
+  `libQnnModelDlc.so --dlc_path`) and is **not** produced by `qnn-onnx-converter`.
 - **No `--output_dim` flag exists** in 2.31 — output dims are inferred from the
   ONNX graph + `input_list`. For data-dependent outputs (Piper TTS), pin the
   length **inside the ONNX graph** (§10), not via a converter flag.
 
 **Model lib + HTP v73 context binary (build host: Windows, NDK r26c + MSVC/clang):**
 
-```
+```bash
 qnn-model-lib-generator -c <model>.cpp -t aarch64-android -n <model> -o <model>_libs/
 qnn-context-binary-generator \
   --model <model>_libs/aarch64-android/lib<model>.so \
@@ -230,8 +249,9 @@ qnn-context-binary-generator \
 
 **First validation target = Whisper encoder** (static `[1,80,3000]`, no decoder
 loop — lowest risk). Convert on WSL, build + generate the context binary on
-Windows, run on-device via `qnn-net-run --backend libQnnHtp.so --input_list
-input_features:<real_fleurs_mel>.raw`. Save the FP32 `whisper.audio.log_mel_spectrogram`
+Windows (build model `.so` + HTP v73 context binary there), run on-device via
+`qnn-net-run --model <model>_libs/aarch64-android/lib<model>.so --backend libQnnHtp.so
+--binary_file <model>_v73.bin --input_list input_features:<real_fleurs_mel>.raw`. Save the FP32 `whisper.audio.log_mel_spectrogram`
 reference on WSL (`np.save`) so the on-device HTP output can be diffed (max abs
 diff should be small, ~int16 step). Confirm profiling shows `BackendType=HTP` for
 attention/conv layers, not `CPU`.
