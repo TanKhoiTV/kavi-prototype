@@ -1605,10 +1605,13 @@ name = "prototype"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
+    { name = "ctranslate2" },
     { name = "faster-whisper" },
     { name = "jiwer" },
     { name = "noisereduce" },
+    { name = "numpy" },
     { name = "piper-tts" },
+    { name = "pyarrow" },
     { name = "sacrebleu" },
     { name = "sentencepiece" },
     { name = "silero-vad" },
@@ -1630,10 +1633,13 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "ctranslate2" },
     { name = "faster-whisper" },
     { name = "jiwer", specifier = ">=4.0.0" },
     { name = "noisereduce", specifier = ">=3.0" },
+    { name = "numpy" },
     { name = "piper-tts", specifier = ">=1.4.2" },
+    { name = "pyarrow" },
     { name = "sacrebleu", specifier = ">=2.6.0" },
     { name = "sentencepiece", specifier = ">=0.2.1" },
     { name = "silero-vad", specifier = ">=5.1.0" },
