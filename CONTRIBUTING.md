@@ -64,8 +64,17 @@ stabilizes.
 
 ## Local setup
 
+**Prerequisites**
+
+- **Python 3.12** — pinned via `.python-version`; `uv` selects it automatically.
+  If it is not already installed, run `uv python install 3.12` first.
+- **Network access for the first `uv sync`** — packages install from PyPI, and
+  `torch` / `torchaudio` fetch their **CPU-only** wheels from the PyTorch CPU
+  index (`https://download.pytorch.org/whl/cpu`, set in `pyproject.toml` under
+  `[tool.uv] extra-index-url`). Allow outbound HTTPS to both hosts.
+
 ```bash
-uv sync            # install dependencies (Python 3.12+, uv)
+uv sync            # install dependencies (Python 3.12, uv)
 make check         # lint + format check (ruff)
 make fmt           # auto-fix formatting
 make test          # run the test suite (pytest)
