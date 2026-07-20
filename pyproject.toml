@@ -42,9 +42,4 @@ quote-style = "double"
 pythonpath = ["."]
 
 [dependency-groups]
-dev = [
-    "pre-commit>=4.6.0",
-    "ruff>=0.15.18",
-    "datasets",
-    "pytest>=9.1.1",
-]
+dev = ["pre-commit>=4.6.0", "ruff>=0.15.18", "datasets", "pytest>=9.1.1"]
