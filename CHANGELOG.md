@@ -27,6 +27,7 @@
 - Expand CONTRIBUTING with OS-agnostic dev setup + OS notes (#55)
 - **phase-4:** Fold verified QNN command reference + pitfalls (#57)([#58](https://github.com/TanKhoiTV/kavi-prototype/pull/58))
 - **phase-4:** Correct .dlc claims and elaborate conversion plan([#61](https://github.com/TanKhoiTV/kavi-prototype/pull/61))
+- Point eval_manifest_v1.json references at eval_data/([#65](https://github.com/TanKhoiTV/kavi-prototype/pull/65))
 
 ### Features
 
