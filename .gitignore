@@ -34,3 +34,6 @@ eval_manifest_v1.json
 
 # Caches of all types
 *cache/
+
+# Pi coding agent configurations
+.pi/
