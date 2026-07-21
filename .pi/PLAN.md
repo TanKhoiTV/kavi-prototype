@@ -1,6 +1,6 @@
 # PLAN.md — Kavi Benchmark Harness: Phases 4–7
 
-> **Last updated:** 2026-07-20
+> **Last updated:** 2026-07-20 (updated after Batch 1 execution)
 > **Cross-references:** `docs/benchmarking-todo.md` (§7 phased TODO),
 > `docs/phase-4-qnn-plan.md` (executable QNN spec), `docs/benchmarking-plan.md`
 > (datasets + candidates), `.pi/HANDOFF.md` (session continuity),
@@ -25,7 +25,7 @@
 - **APK**: `eval_data/rtranslator/RTranslator_2.1.5.apk` (SHA-256 verified)
 - **FLEURS parquets**: Available in `eval_data/raw/` (vi_vn + en_us test splits)
 - **Registry**: 4 candidates registered (WhisperASR, OpusMT, Piper, RTranslator)
-- **Deps gap**: `optimum`, `datasets`, `onnx-graphsurgeon` NOT in `pyproject.toml`
+- **Deps gap**: `optimum[onnx]`, `datasets`, `onnx-graphsurgeon`, `unbabel-comet` added to `pyproject.toml` (commit `6c5601d`)
 
 ---
 
@@ -42,8 +42,8 @@
 | Android app scaffold | `android/app/` (build.gradle.kts, MainActivity.kt) | ✅ Buildable skeleton |
 | QNN runtime .so | `android/app/src/main/jniLibs/arm64-v8a/` (39 files) | ✅ Bundled |
 | Model assets | `android/app/src/main/assets/` | ❌ Empty |
-| `qairt-env.sh` | `scripts/qairt-env.sh` | ❌ Not created |
-| Whisper ONNX export | — | ❌ Not started |
+| `qairt-env.sh` | `scripts/qairt-env.sh` (136 lines) | ✅ Created (commit `6c5601d`) |
+| Whisper ONNX export | `bench/qnn/export_whisper_onnx.py` (460 lines) | ✅ Created (commit `edb72c0`) |
 | Piper ONNX surgery | — | ❌ Not started |
 | Calibration input lists | — | ❌ Not started |
 | Android instrumented test | `android/app/src/androidTest/` | ❌ Not started |
@@ -55,9 +55,9 @@
 | Blocker | Severity | Mitigation |
 |---------|----------|------------|
 | **QAIRT SDK 2.31.0.250130 not installed** | **Hard** — blocks all conversion | Download from Qualcomm (requires account); SDK version MUST match device `qnn-2.31` / HTP v73 |
-| **`optimum` not in pyproject.toml** | Soft — blocks ONNX export scripts | `uv pip install transformers optimum[onnx] datasets` |
-| **`onnx-graphsurgeon` not in pyproject.toml** | Soft — blocks Piper surgery | `uv pip install onnx-graphsurgeon` |
-| **Whisper ONNX export not written** | Medium — no Whisper→QNN path | Write `bench/qnn/export_whisper_onnx.py` (analogous to Opus-MT script) |
+| ~~**`optimum` not in pyproject.toml**~~ | ~~Soft~~ | **RESOLVED** — added in commit `6c5601d` |
+| ~~**`onnx-graphsurgeon` not in pyproject.toml**~~ | ~~Soft~~ | **RESOLVED** — added in commit `6c5601d` |
+| ~~**Whisper ONNX export not written**~~ | ~~Medium~~ | **RESOLVED** — created in commit `edb72c0` |
 | **Piper `RandomNormalLike` surgery not implemented** | Medium — no TTS→QNN path | Write `bench/qnn/patch_piper_onnx.py` per plan §3.3/§10 |
 | **Windows build host for context binaries** | Hard — `qnn-context-binary-generator` needs Windows or WSL | Plan §1 documents hybrid WSL/Linux + Windows workflow |
 | **No instrumented test code** | Hard — no on-device runner | Write `android/app/src/androidTest/` per plan §5 |
@@ -69,15 +69,15 @@
 | Task | Owner | Effort | Files |
 |------|-------|--------|-------|
 | Install QAIRT SDK 2.31.0.250130 on Ubuntu 22.04 host | Manual | 30 min | External |
-| Create `scripts/qairt-env.sh` per `models/qnn/README.md` spec | Worker | 15 min | `scripts/qairt-env.sh` |
-| Add `optimum[onnx]`, `datasets`, `onnx-graphsurgeon` to pyproject.toml | Worker | 10 min | `pyproject.toml` |
+| ~~Create `scripts/qairt-env.sh`~~ | ~~Worker~~ | ✅ Done | commit `6c5601d` |
+| ~~Add `optimum[onnx]`, `datasets`, `onnx-graphsurgeon` to pyproject.toml~~ | ~~Worker~~ | ✅ Done | commit `6c5601d` |
 | Verify `qnn-onnx-converter --help` runs in converter venv | Manual | 5 min | — |
 
 #### 1.3.2 Model export scripts (lowest risk first)
 
 | Task | Owner | Effort | Files | Blocked by |
 |------|-------|--------|-------|------------|
-| Write Whisper Small ONNX export script | Worker | 2 hrs | `bench/qnn/export_whisper_onnx.py` | `optimum` dep |
+| ~~Write Whisper Small ONNX export script~~ | ~~Worker~~ | ✅ Done | commit `edb72c0` |
 | Export Opus-MT vi→en ONNX | Worker | 1 hr | `models/qnn/opus-mt-vi-en/` | `optimum` dep, QAIRT SDK |
 | Export Whisper Small ONNX | Worker | 1 hr | `models/qnn/whisper-small/` | Whisper export script |
 | Generate calibration input lists from FLEURS | Worker | 2 hrs | `models/qnn/*_input_list.txt` | FLEURS parquets (available) |
@@ -134,8 +134,9 @@
 | Scoring adapter | `bench/candidates/rtranslator.py` (168 lines) | ✅ Written |
 | CLI scorer | `bench/score_rtranslator.py` (253 lines) | ✅ Written |
 | APK | `eval_data/rtranslator/RTranslator_2.1.5.apk` | ✅ Downloaded, SHA-256 verified |
-| Output directory | `eval_data/rtranslator/outputs/` | ❌ Empty (no on-device run) |
-| Device state metadata | `eval_data/rtranslator/device-state.json` | ❌ Not created |
+| Output directory | `eval_data/rtranslator/outputs/{vi-en,en-vi}/` | ✅ Created |
+| Device state template | `eval_data/rtranslator/device-state-template.json` | ✅ Created |
+| Test manifest (10-item) | `eval_data/rtranslator/test-manifest-10.json` | ✅ Created |
 | On-device test execution | — | ❌ Not started |
 | Latency measurement | — | ❌ Not started |
 
@@ -153,8 +154,8 @@
 
 | Task | Owner | Effort | Files | Blocked by |
 |------|-------|--------|-------|------------|
-| Create `eval_data/rtranslator/outputs/` directory structure | Worker | 10 min | `eval_data/rtranslator/outputs/{vi-en,en-vi}/` | — |
-| Create sample `device-state.json` template | Worker | 15 min | `eval_data/rtranslator/device-state-template.json` | — |
+| ~~Create `eval_data/rtranslator/outputs/` directory structure~~ | ~~Worker~~ | ✅ Done | |
+| ~~Create sample `device-state.json` template~~ | ~~Worker~~ | ✅ Done | |
 | Run RTranslator on device (10-utterance subset) | Manual | 1 hr | `eval_data/rtranslator/outputs/` | Physical device |
 | Run full lean eval set on device | Manual | 4–6 hrs | `eval_data/rtranslator/outputs/` | Physical device, subset run |
 | Score RTranslator outputs | Worker | 30 min | `bench-results/rtranslator/` | On-device run complete |
@@ -211,11 +212,11 @@ Same as Phase 4 — RTranslator is the **anchor** Kavi must not be worse than:
 | `faster-whisper` | Phase 2 (CPU ASR) | ✅ Yes |
 | `ctranslate2` | Phase 2 (CPU MT) | ✅ Yes |
 | `transformers` | Phase 4 (ONNX export) | ✅ Yes |
-| `optimum[onnx]` | Phase 4 (ONNX export) | ❌ **Missing** |
-| `datasets` | Phase 4 (FLEURS calibration) | ❌ **Missing** |
-| `onnx-graphsurgeon` | Phase 4 (Piper surgery) | ❌ **Missing** |
+| `optimum[onnx]` | Phase 4 (ONNX export) | ✅ **Added** (`>=1.20.0`) |
+| `datasets` | Phase 4 (FLEURS calibration) | ✅ **Added** (`>=2.19.0`) |
+| `onnx-graphsurgeon` | Phase 4 (Piper surgery) | ✅ **Added** (`>=0.5.0`) |
 | `sentencepiece` | Phase 4 (Opus-MT tokenizers) | ✅ Yes (`>=0.2.1`) |
-| `comet` | Phase 7 (COMET scoring) | ❌ **Missing** |
+| `unbabel-comet` | Phase 7 (COMET scoring) | ✅ **Added** (`>=2.2.0`) |
 | `noisereduce` | Phase 6 (denoising) | ✅ Yes (`>=3.0`) |
 | `jiwer` | Phase 2 (WER/CER) | ✅ Yes (`>=4.0.0`) |
 | `sacrebleu` | Phase 2 (BLEU) | ✅ Yes (`>=2.6.0`) |
@@ -330,13 +331,85 @@ uv run python -m bench.qnn.export_opusmt_onnx --model Helsinki-NLP/opus-mt-vi-en
 
 ---
 
-## 7. Next actions (immediate)
+## 7. Next actions — completed Batch 1
 
-1. **Add missing deps**: `uv pip install optimum[onnx] datasets onnx-graphsurgeon` + update pyproject.toml
-2. **Create `scripts/qairt-env.sh`** per README spec
-3. **Write Whisper ONNX export script** (`bench/qnn/export_whisper_onnx.py`)
-4. **Create sample RTranslator output directory** for scorer unit testing
-5. **Run RTranslator on device** (10-utterance subset first, then full)
+| # | Action | Commit |
+|---|--------|--------|
+| 1 | Add missing deps (`optimum[onnx]`, `datasets`, `onnx-graphsurgeon`, `unbabel-comet`) | `6c5601d` |
+| 2 | Create `scripts/qairt-env.sh` | `6c5601d` |
+| 3 | Write Whisper ONNX export script (`bench/qnn/export_whisper_onnx.py`) | `edb72c0` |
+| 4 | Create RTranslator output directory + templates + 10-item test manifest | untracked |
+| 5 | Run RTranslator on device | 🟡 Awaiting physical device |
+
+---
+
+## 9. Batch 2 — next executable tasks (post-Batch 1)
+
+### 9.1 Piper ONNX surgery script (`bench/qnn/patch_piper_onnx.py`)
+
+**Why:** Piper TTS (`voices/en_US-lessac-medium.onnx`) contains `RandomNormalLike` nodes
+unsupported by `qnn-onnx-converter` 2.31.0.250130. This script patches them out so
+the model can be converted to QNN.
+
+**Blocked by:** `onnx-graphsurgeon` (✅ installed). Requires manual Netron inspection
+of the ONNX to identify exact node names.
+
+**Spec:** See `docs/phase-4-qnn-plan.md` §3.3 + §10 items 1–2.
+
+### 9.2 Run ONNX exports (Opus-MT + Whisper)
+
+**Why:** Generate the actual `.onnx` files that feed into QAIRT conversion.
+
+**Blocked by:** `optimum` (✅ installed). Requires HuggingFace model download (network).
+
+**Commands:**
+```bash
+uv run python -m bench.qnn.export_opusmt_onnx --model Helsinki-NLP/opus-mt-vi-en --output models/qnn/opus-mt-vi-en/
+uv run python -m bench.qnn.export_whisper_onnx --output models/qnn/whisper-small/ --verify
+```
+
+### 9.3 Generate calibration input lists from FLEURS
+
+**Why:** QAIRT `qnn-onnx-converter` needs `--input_list` files for INT8 calibration.
+These must be real data (FLEURS mel spectrograms / token sequences), not synthetic.
+
+**Blocked by:** FLEURS parquets (✅ available in `eval_data/raw/`).
+
+**Output:** `models/qnn/whisper_input_list.txt`, `models/qnn/opusmt_input_list.txt`.
+
+### 9.4 Android QNN model loader + manifest reader (Kotlin)
+
+**Why:** The instrumented test runner needs to load QNN context binaries and read
+`eval_manifest_v1.json` on-device.
+
+**Blocked by:** Nothing (independent Kotlin code).
+
+**Files:**
+- `android/app/src/main/java/com/kavi/app/qnn/QnnModelLoader.kt`
+- `android/app/src/main/java/com/kavi/app/runner/ManifestReader.kt`
+- `android/app/src/main/java/com/kavi/app/runner/NetworkMonitor.kt`
+
+### 9.5 Host-side QNN candidate adapters + registry
+
+**Why:** Stub adapters that will later call the on-device QNN models via ADB/bridge.
+For now, these are placeholders that define the interface.
+
+**Blocked by:** Nothing (interface-only, no actual QNN calls yet).
+
+**Files:**
+- `bench/candidates/qnn_whisper_asr.py`
+- `bench/candidates/qnn_opusmt_mt.py`
+- `bench/candidates/qnn_piper_tts.py`
+- Update `bench/registry.py` with QNN entries
+
+### 9.6 COMET scoring integration (Phase 7 prep)
+
+**Why:** `unbabel-comet` is now installed; wire it into `bench/scorer.py` for
+both-direction COMET scoring.
+
+**Blocked by:** Nothing (can run on CPU).
+
+**Spec:** See §3.2 task list above.
 
 ---
 
