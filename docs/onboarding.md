@@ -159,7 +159,7 @@ QAIRT). **NNAPI is explicitly avoided** (deprecated in Android 15; we target
 | **ONNX** | Open Neural Network Exchange | A common, tool-agnostic model format. The lingua franca for conversion. |
 | **ORT** | ONNX Runtime | The inference engine; talks to NPU / CPU / GPU via "Execution Providers". |
 | **EP (Execution Provider)** | ORT's backend plugin | e.g. QNN EP (NPU), OpenCL EP (GPU), XNNPACK (CPU int8). |
-| **DLC** | Deep Learning Container | Qualcomm's compiled model file. Preferred over raw context binaries (forward-compatible). |
+| **HTP v73 context binary** | Qualcomm's compiled model format | The output of `qnn-context-binary-generator --htp_arch v73`. Device-specific; not portable across SDK versions or hardware targets. |
 | **AI Hub** | Qualcomm's model catalog + device farm | Free, build-time only; gives pre-optimized models and remote test devices. |
 | **AIMET** | AI Model Efficiency Toolkit | Qualcomm tool for quantization, run on a PC (x86_64). |
 | **int8 / w8a16** | 8-bit integer weights / 8-bit weights + 16-bit activations | The low-precision formats the NPU needs; w8a16 protects accuracy. |

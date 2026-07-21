@@ -121,7 +121,7 @@ the **Android SDK/NDK install**.
   conversion runs natively.
 - **macOS-only** — Python + `uv` work fine. The QAIRT *conversion* toolchain is
   Linux/Windows-only, so run conversion in a Linux VM/container or CI and build the
-  app from the committed `.dlc` / context binaries; the harness and app build
+  app from the committed context binaries; the harness and app build
   themselves run on macOS.
 
 **Our setup (reference, not a requirement):** the assistant builds the Android app
@@ -131,9 +131,9 @@ runs conversion natively on Windows; the split is an environment quirk, not a
 project requirement.
 
 **QAIRT conversion toolchain (Phase-4):** host build-time only, needed solely when
-producing `.dlc` / HTP v73 context binaries. See `docs/phase-4-qnn-plan.md` §1 for
+producing HTP v73 context binaries. See `docs/phase-4-qnn-plan.md` §1 for
 the exact env contract (`QAIRT_SDK_ROOT`, `ANDROID_NDK_ROOT`, `qairt-env.sh`,
-`qairt-converters` venv). The Android-side SDK/NDK install is documented in
+`.venv-qairt` venv). The Android-side SDK/NDK install is documented in
 [`kavi-android/CONTRIBUTING.md`](android/CONTRIBUTING.md).
 
 ## Note on `archive/`

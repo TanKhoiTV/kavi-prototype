@@ -53,43 +53,39 @@ the expected artifact format.
   Linux x86_64 binaries.
 - **SDK version:** 2.31.0.250130 — **must match** the device `qnn-2.31` / HTP v73
   runtime. Do NOT upgrade.
-- **Python:** 3.10 in a dedicated venv (`qairt-converters`)
+- **Python:** 3.10 (auto-managed by `scripts/qairt-env.sh`)
 - **NDK:** Android NDK r26c (26.1.10909125)
 
-### Installation
+### Installation (recommended)
 
 1. Download QAIRT SDK 2.31.0.250130 from Qualcomm's portal:
    <https://account.qualcomm.com/> (requires free Qualcomm ID)
 
-2. Extract to e.g. `/opt/qairt/2.31.0.250130`:
+2. Extract to `~/Qualcomm/AIStack/QAIRT/`:
 
    ```bash
-   mkdir -p /opt/qairt
-   tar xzf qairt-sdk-2.31.0.250130.tar.gz -C /opt/qairt/
-   export QAIRT_SDK_ROOT=/opt/qairt/2.31.0.250130
+   mkdir -p ~/Qualcomm/AIStack/QAIRT/
+   tar xzf qairt-sdk-2.31.0.250130.tar.gz -C ~/Qualcomm/AIStack/QAIRT/
    ```
 
-3. Create the Python converter venv:
+3. Source the environment helper (auto-creates `.venv-qairt/` on first run):
 
    ```bash
-   python3.10 -m venv /opt/qairt/converters-venv
-   source /opt/qairt/converters-venv/bin/activate
-   pip install onnx==1.16.1 onnxruntime==1.17.1 'numpy<2' \
-       onnx-simplifier scipy lxml absl-py pandas
+   source scripts/qairt-env.sh
    ```
 
-4. Source the environment helper:
+   This sets `QAIRT_SDK_ROOT`, activates the converter venv, configures
+   `LD_LIBRARY_PATH` and `PYTHONPATH`, and verifies all converter binaries.
 
-   ```bash
-   source $QAIRT_SDK_ROOT/bin/envsetup.sh
-   export LD_LIBRARY_PATH=$QAIRT_SDK_ROOT/lib/x86_64-linux-clang:${LD_LIBRARY_PATH:-}
-   ```
+### Installation (manual)
 
-5. Set ANDROID_NDK_ROOT:
+If you prefer manual setup:
 
-   ```bash
-   export ANDROID_NDK_ROOT=/opt/android-ndk-r26c
-   ```
+1. Set SDK path: `export QAIRT_SDK_ROOT=/path/to/2.31.0.250130`
+2. Create venv: `uv venv --python 3.10 .venv-qairt`
+3. Install deps: `uv pip install --python .venv-qairt onnx==1.16.1 onnxruntime==1.17.1 'numpy<2' onnx-simplifier scipy lxml absl-py pandas pyyaml`
+4. Source envsetup: `source $QAIRT_SDK_ROOT/bin/envsetup.sh`
+5. Set ANDROID_NDK_ROOT: `export ANDROID_NDK_ROOT=/path/to/android-ndk-r26c`
 
 ## Conversion pipeline
 
