@@ -47,6 +47,7 @@
 - **qnn:** Add Phase 4 QNN conversion pipeline setup
 - Add Phase 4 QNN setup, Phase 5 RTranslator prep, Phase 6 denoising gate
 - **qnn:** Add Whisper Small ONNX export script with fixed-shape encoder
+- **qnn:** Add Piper surgery script, calibration lists, and QNN adapter stubs
 
 ### Miscellaneous
 
