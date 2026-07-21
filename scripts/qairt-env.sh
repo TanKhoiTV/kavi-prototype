@@ -21,7 +21,7 @@
 set -euo pipefail
 
 # ---- Defaults ----
-: "${QAIRT_SDK_ROOT:=/opt/qairt/2.31.0.250130}"
+: "${QAIRT_SDK_ROOT:=/home/dmin/Qualcomm/AIStack/QAIRT/2.31.0.250130}"
 export QAIRT_SDK_ROOT
 
 # ---- Resolve real paths ----
@@ -33,11 +33,21 @@ QAIRT_SDK_ROOT="$(cd "$QAIRT_SDK_ROOT" 2>/dev/null && pwd)" || {
 # ---- Source SDK envsetup ----
 ENVSETUP="$QAIRT_SDK_ROOT/bin/envsetup.sh"
 if [[ -f "$ENVSETUP" ]]; then
+	# SDK envsetup.sh uses unquoted ${PYTHONPATH} which fails under set -u
+	# Temporarily disable nounset for the source call.
 	# shellcheck source=/dev/null
+	set +u
 	source "$ENVSETUP"
+	set -u
 	echo "[qairt-env] Sourced $ENVSETUP"
 else
 	echo "[qairt-env] WARNING: $ENVSETUP not found — QNN_SDK_ROOT/SNPE_ROOT may not be set" >&2
+fi
+
+# ---- PYTHONPATH (SDK converter packages) ----
+SDK_PYTHON="$QAIRT_SDK_ROOT/lib/python"
+if [[ -d "$SDK_PYTHON" ]]; then
+	export PYTHONPATH="${SDK_PYTHON}${PYTHONPATH:+:$PYTHONPATH}"
 fi
 
 # ---- LD_LIBRARY_PATH ----
@@ -54,7 +64,8 @@ CONVERTER_VENV_LIB=""
 for candidate in \
 	"$QAIRT_SDK_ROOT/../converters-venv/lib/python3.10/lib-dynload" \
 	"$QAIRT_SDK_ROOT/../qairt-converters/lib/python3.10/lib-dynload" \
-	"/opt/qairt/converters-venv/lib/python3.10/lib-dynload"; do
+	"/opt/qairt/converters-venv/lib/python3.10/lib-dynload" \
+	"/home/dmin/venvs/qairt-converters/lib/python3.10/lib-dynload"; do
 	candidate="$(cd "$(dirname "$candidate")" 2>/dev/null && pwd)/$(basename "$candidate")" || continue
 	if [[ -d "$candidate" ]]; then
 		CONVERTER_VENV_LIB="$(cd "$candidate" && pwd)"
