@@ -35,6 +35,7 @@ bench/qnn/smoke/
 # Tooling / environment caches
 .ruff_cache/
 .venv/
+.venv-qairt/
 
 # Runtime logs (legacy logs/ is tracked under archive/)
 logs/
