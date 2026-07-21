@@ -11,7 +11,7 @@ dependencies = [
   "soundfile",
   "torch",
   "torchaudio",
-  "sentencepiece>=0.2.1",
+  "sentencepiece>=0.1.96",
   "jiwer>=4.0.0",
   "sacrebleu>=2.6.0",
   "piper-tts>=1.4.2",
@@ -47,3 +47,14 @@ pythonpath = ["."]
 
 [dependency-groups]
 dev = ["pre-commit>=4.6.0", "ruff>=0.15.18", "datasets", "pytest>=9.1.1"]
+qairt = [
+  "onnx==1.16.1",
+  "onnxruntime==1.17.1",
+  "numpy<2",
+  "onnx-simplifier",
+  "scipy",
+  "lxml",
+  "absl-py",
+  "pandas",
+  "pyyaml",
+]

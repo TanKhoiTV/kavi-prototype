@@ -8,17 +8,25 @@
 # qnn-context-binary-generator).
 #
 # Usage:
-#   source scripts/qairt-env.sh              # default /opt/qairt/2.31.0.250130
+#   source scripts/qairt-env.sh
 #   QAIRT_SDK_ROOT=/custom/path source scripts/qairt-env.sh
 #
 # This script:
-#   - Sets QAIRT_SDK_ROOT (default /opt/qairt/2.31.0.250130 if unset)
+#   - Sets QAIRT_SDK_ROOT (defaults to ~/Qualcomm/AIStack/QAIRT/2.31.0.250130)
+#   - Creates .venv-qairt/ in the repo if missing (Python 3.10, qairt deps)
 #   - Sources $QAIRT_SDK_ROOT/bin/envsetup.sh (sets QNN_SDK_ROOT, SNPE_ROOT)
-#   - Exports LD_LIBRARY_PATH for the SDK libs and converter venv
+#   - Exports LD_LIBRARY_PATH and PYTHONPATH for SDK + converter venv
 #   - Validates that key converter binaries are reachable
 #   - Prints a verification summary
+#
+# The converter venv MUST be Python 3.10 — the SDK's compiled .so files
+# link against libpython3.10.so.1.0 and are ABI-incompatible with 3.11+.
 
 set -euo pipefail
+
+# ---- Script directory (repo root) ----
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # ---- Defaults ----
 : "${QAIRT_SDK_ROOT:=/home/dmin/Qualcomm/AIStack/QAIRT/2.31.0.250130}"
@@ -29,6 +37,28 @@ QAIRT_SDK_ROOT="$(cd "$QAIRT_SDK_ROOT" 2>/dev/null && pwd)" || {
 	echo "[qairt-env] ERROR: QAIRT_SDK_ROOT does not exist or is not a directory: $QAIRT_SDK_ROOT" >&2
 	return 1 2>/dev/null || exit 1
 }
+
+# ---- Converter venv (Python 3.10, created on first run) ----
+VENV_DIR="${REPO_ROOT}/.venv-qairt"
+if [[ ! -d "$VENV_DIR" ]]; then
+	echo "[qairt-env] Creating converter venv at $VENV_DIR ..."
+	if ! command -v uv &>/dev/null; then
+		echo "[qairt-env] ERROR: uv is not installed. Install with: curl -LsSf https://astral.sh/uv/install.sh | sh" >&2
+		return 1 2>/dev/null || exit 1
+	fi
+	uv venv --python 3.10 "$VENV_DIR"
+	# Use uv pip install (not uv sync) to bypass project's requires-python >=3.12
+	uv pip install --python "$VENV_DIR" \
+		--index-strategy unsafe-best-match \
+		onnx==1.16.1 onnxruntime==1.17.1 "numpy<2" onnx-simplifier \
+		scipy lxml absl-py pandas pyyaml
+	echo "[qairt-env] Converter venv created."
+fi
+
+# Activate the venv
+# shellcheck source=/dev/null
+source "$VENV_DIR/bin/activate"
+echo "[qairt-env] Activated venv: $VENV_DIR (Python $(python3 --version | cut -d' ' -f2))"
 
 # ---- Source SDK envsetup ----
 ENVSETUP="$QAIRT_SDK_ROOT/bin/envsetup.sh"
@@ -57,28 +87,10 @@ if [[ -d "$SDK_LIB" ]]; then
 	export LD_LIBRARY_PATH="${SDK_LIB}${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 fi
 
-# Try to locate the converter venv libpython3.10 directory
-# Common locations: $QAIRT_SDK_ROOT/../converters-venv/lib/python3.10/lib-dynload
-# or directly adjacent
-CONVERTER_VENV_LIB=""
-for candidate in \
-	"$QAIRT_SDK_ROOT/../converters-venv/lib/python3.10/lib-dynload" \
-	"$QAIRT_SDK_ROOT/../qairt-converters/lib/python3.10/lib-dynload" \
-	"/opt/qairt/converters-venv/lib/python3.10/lib-dynload" \
-	"/home/dmin/venvs/qairt-converters/lib/python3.10/lib-dynload"; do
-	candidate="$(cd "$(dirname "$candidate")" 2>/dev/null && pwd)/$(basename "$candidate")" || continue
-	if [[ -d "$candidate" ]]; then
-		CONVERTER_VENV_LIB="$(cd "$candidate" && pwd)"
-		break
-	fi
-done
-
-if [[ -n "$CONVERTER_VENV_LIB" ]]; then
-	export LD_LIBRARY_PATH="${CONVERTER_VENV_LIB}:${LD_LIBRARY_PATH}"
-	echo "[qairt-env] Added converter venv lib to LD_LIBRARY_PATH: $CONVERTER_VENV_LIB"
-else
-	echo "[qairt-env] WARNING: Could not locate converter venv libpython3.10 directory" >&2
-	echo "[qairt-env] Set LD_LIBRARY_PATH manually if qnn-onnx-converter fails with import errors" >&2
+# Add uv-managed Python 3.10 lib (libpython3.10.so.1.0)
+UV_PYTHON_LIB="/home/dmin/.local/share/uv/python/cpython-3.10.20-linux-x86_64-gnu/lib"
+if [[ -d "$UV_PYTHON_LIB" ]]; then
+	export LD_LIBRARY_PATH="${UV_PYTHON_LIB}${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 fi
 
 # ---- Validation ----
@@ -91,6 +103,8 @@ echo " QAIRT_SDK_ROOT : $QAIRT_SDK_ROOT"
 echo " QNN_SDK_ROOT   : ${QNN_SDK_ROOT:-<not set>}"
 echo " SNPE_ROOT      : ${SNPE_ROOT:-<not set>}"
 echo " ANDROID_NDK_ROOT: ${ANDROID_NDK_ROOT:-<not set>}"
+echo " Converter venv : $VENV_DIR"
+echo " Python         : $(python3 --version 2>&1)"
 
 # Check key converters
 converters=(qnn-onnx-converter qnn-model-lib-generator qnn-context-binary-generator)
