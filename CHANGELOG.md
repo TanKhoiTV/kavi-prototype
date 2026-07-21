@@ -12,6 +12,7 @@
 - **bench:** Bound FLEURS audio read to sampled rows (resolve #34)
 - **bench:** Select FLEURS audio by id, not position([#28](https://github.com/TanKhoiTV/kavi-prototype/pull/28))
 - **bench:** Drop no-op candidate_filter pass in run.py
+- Lint cleanup for eval_denoising.py
 
 ### Documentation
 
@@ -34,12 +35,17 @@
 - Mirror parent contest-info.md and specifications.md
 - Add handoff notes to .pi/HANDOFF.md([#70](https://github.com/TanKhoiTV/kavi-prototype/pull/70))
 - Update stale blocker references (QAIRT EULA resolved, FLEURS available)([#72](https://github.com/TanKhoiTV/kavi-prototype/pull/72))
+- Add PLAN.md for Phases 4–7 with cross-checked task breakdown
+- Update PLAN.md — mark Batch 1 done, add Batch 2 task breakdown
 
 ### Features
 
 - Scaffold host-side v0 benchmark harness (Phases 0-3)
 - Build lean eval set + SNR recipe in data_prep (Phase 1)
 - **bench:** Support a real noise bank in data_prep([#36](https://github.com/TanKhoiTV/kavi-prototype/pull/36))
+- **qnn:** Add Phase 4 QNN conversion pipeline setup
+- Add Phase 4 QNN setup, Phase 5 RTranslator prep, Phase 6 denoising gate
+- **qnn:** Add Whisper Small ONNX export script with fixed-shape encoder
 
 ### Miscellaneous
 
@@ -57,6 +63,10 @@
 - Move AGENTS.md into .pi/
 - Add handoff prompt to .pi/prompts([#69](https://github.com/TanKhoiTV/kavi-prototype/pull/69))
 - Untrack .pi agent config directory([#71](https://github.com/TanKhoiTV/kavi-prototype/pull/71))
+- Add Phase 4 deps + qairt-env.sh
+- Consolidate stray paths, fix SDK path, update .gitignore
+- Migrate qairt-converters venv into repo as dependency group
+- Update android submodule (stale .dlc refs removed)
 
 ### Refactoring
 
