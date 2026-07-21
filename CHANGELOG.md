@@ -37,6 +37,7 @@
 - Update stale blocker references (QAIRT EULA resolved, FLEURS available)([#72](https://github.com/TanKhoiTV/kavi-prototype/pull/72))
 - Add PLAN.md for Phases 4–7 with cross-checked task breakdown
 - Update PLAN.md — mark Batch 1 done, add Batch 2 task breakdown
+- Fix stale SDK paths, venv names, and .dlc references
 
 ### Features
 
@@ -67,6 +68,7 @@
 - Consolidate stray paths, fix SDK path, update .gitignore
 - Migrate qairt-converters venv into repo as dependency group
 - Update android submodule (stale .dlc refs removed)
+- Update android submodule (doc fixes)
 
 ### Refactoring
 
