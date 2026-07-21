@@ -21,6 +21,8 @@ models/qnn/*/onnx/
 models/qnn/*_libs/
 models/qnn/*_ctx/
 models/qnn/*_v73.bin
+models/qnn/*_net.json
+models/qnn/*_bin
 models/qnn/piper-en/piper_qnn.onnx
 models/qnn/whisper-small/encoder_model.bin
 models/qnn/whisper-small/input_features.bin

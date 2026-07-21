@@ -33,7 +33,7 @@ builds.
 | **QAIRT SDK** | `2.31.0.250130` (Linux x86_64) at `QAIRT_SDK_ROOT` | **Must match** the device `qnn-2.31` / **HTP v73** runtime. Do **not** upgrade — ABI drift breaks on-device loading. Outside the repo. |
 | **ANDROID_NDK_ROOT** | NDK r26c (`26.1.10909125`) | Matches `archive/`/`sdk.yaml` pin. |
 | **Env helper** | `qairt-env.sh` | `source`s `bin/envsetup.sh` (sets `QNN_SDK_ROOT`, `SNPE_ROOT`) and exports `LD_LIBRARY_PATH` (venv `libpython3.10` + `$QAIRT_SDK_ROOT/lib/x86_64-linux-clang`). |
-| **Converter venv** | Python 3.10 (`qairt-converters`) | `onnx 1.16.1`, `onnxruntime 1.17.1`, `numpy<2`, `onnx-simplifier`, `scipy`, `lxml`, `absl-py`, `pandas`. |
+| **Converter venv** | Python 3.10 (`.venv-qairt/`, auto-created by `scripts/qairt-env.sh`) | `onnx 1.16.1`, `onnxruntime 1.17.1`, `numpy<2`, `onnx-simplifier`, `scipy`, `lxml`, `absl-py`, `pandas`, `pyyaml`. |
 | **Converters** | `qnn-onnx-converter`, `qnn-model-lib-generator`, `qnn-context-binary-generator` | Under `$QAIRT_SDK_ROOT/bin/x86_64-linux-clang`. |
 | **Device** | Meizu 21 Note — SD 8 Gen 2 (`kalama`), **Android 16 (API 36)**, **HTP v73**, `qnn-2.31` | Runtime **preinstalled**; app **bundles** `libQnn*.so`. |
 
@@ -187,7 +187,7 @@ that finalize **ADR-004** (tech stack).
     heaviest lift.
   - **QAIRT version must match** the device (`2.31.0.250130` = `qnn-2.31` / HTP
     v73); do not upgrade the SDK.
-  - Toolchain env verified (`libc++1` installed; `qairt-converters` venv runs
+  - Toolchain env verified (`libc++1` installed; `.venv-qairt` venv runs
     `qnn-onnx-converter`/`qnn-context-binary-generator`).
 - **Deferred:** COMET + human MOS depth (Phase 7); pre-ASR denoising gate (Phase
   6).
@@ -297,8 +297,8 @@ do not compromise the benchmark with synthetic tensors.**
    traced example's timing = misalignment bug). `T_FIXED` is a design constant
    (e.g. 400 latent frames ≈ 4.6 s @ 22050 Hz / hop 256); trim trailing silence
    **outside** the QNN graph.
-3. **`onnx-graphsurgeon` is not in the `qairt-converters` venv** — `pip install
-   onnx-graphsurgeon` before the Piper surgery. The exact `DURATION_OUTPUT_NAME` /
+3. **`onnx-graphsurgeon`** is now in `pyproject.toml` (dependency group `qairt`)
+   and installed automatically by `scripts/qairt-env.sh`. The exact `DURATION_OUTPUT_NAME` /
    expand-node names need a **manual Netron inspection** of the patched ONNX first.
 4. **WSL validation must `np.save('ref_encoder_out.npy', out[0])`** — the on-device
    diff step reads this FP32 reference; the converter snippet alone doesn't save it.
