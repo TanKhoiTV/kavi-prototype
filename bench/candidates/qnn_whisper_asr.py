@@ -1,20 +1,25 @@
-"""QNN Whisper ASR adapter — stub for on-device inference via ADB/bridge.
+"""QNN Whisper ASR adapter — stub for on-device inference.
 
 This adapter is a placeholder for the Phase-4 on-device QNN benchmark runner.
 The actual QNN inference runs on a Snapdragon 8 Gen 2 (HTP v73) via the
-Qualcomm AI Runtime. This host-side stub defines the interface and will
-eventually:
+Qualcomm AI Runtime. This host-side stub defines the interface.
 
-1. Push the context binary + input audio to the device via ADB
-2. Run ``qnn-net-run`` with the Whisper decoder loop (CPU fallback)
-3. Pull the output text back
+Architecture (ADR-005):
+    - Encoder: QNN/NPU (HTP v73 context binary)
+    - Decoder: CPU fallback (on-device, not via ADB bridge)
+
+The Android instrumented test runner (not ADB bridge) handles:
+    1. Load eval_manifest_v1.json via ManifestReader
+    2. For each item: run encoder on NPU, decoder on CPU
+    3. Measure latency/RTF/RAM internally
+    4. Write results JSON
 
 Integration path (when implemented):
     - Pre-requisite model artifacts in ``models/qnn/whisper-small/``:
-      encoder_htp_v73.bin, decoder_htp_v73.bin, input_list.txt
-    - ADB device detected via ``adb devices``
-    - Input audio is pushed to ``/data/local/tmp/kavi/``
-    - Output text is pulled back and returned as ``output_text``
+      encoder_htp_v73.bin (NPU), decoder ONNX (CPU via ORT)
+    - Android app builds with these assets
+    - Instrumented test runs batch and outputs results JSON
+    - Host pulls results via ``adb pull``
 """
 
 from __future__ import annotations
@@ -60,17 +65,18 @@ class QnnWhisperASRCandidate(Candidate):
     def _infer(self, item: EvalItem) -> tuple[str | None, str | None]:
         """Run Whisper ASR via QNN on-device inference.
 
-        TODO: Implement ADB bridge:
-        1. ``adb -s {device_id} shell mkdir -p {data_dir}``
-        2. ``adb -s {device_id} push {input_audio} {data_dir}``
-        3. Convert audio to mel spectrogram via a host-side Whisper preprocessor
-        4. Push mel ``.raw`` to device
-        5. ``adb -s {device_id} shell qnn-net-run --model {ctx_bin} ...``
-        6. Pull output ``last_hidden_state.raw``
-        7. Run decoder loop (autoregressive; likely CPU fallback on device)
-        8. Return transcribed text
+        TODO: Implement via Android instrumented test runner (ADR-006):
+        1. Host pushes manifest + audio to device once
+        2. Android app loads manifest via ManifestReader
+        3. For each item:
+           a. Preprocess audio to mel spectrogram (CPU on device)
+           b. Run encoder on NPU (QNN context binary)
+           c. Run decoder loop on CPU (ORT or custom)
+           d. Measure latency_ns, peak_rss_bytes
+        4. Android app writes results JSON
+        5. Host pulls results via ``adb pull``
 
-        Until the ADB bridge is implemented, this stub raises NotImplementedError
+        Until the Android runner is implemented, this stub raises NotImplementedError
         to make test failures explicit rather than silently producing empty results.
         """
         raise NotImplementedError(

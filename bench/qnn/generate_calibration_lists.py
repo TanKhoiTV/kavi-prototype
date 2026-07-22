@@ -373,17 +373,12 @@ def generate_opusmt_list(
             print(f"  [skip] {item.get('id', '?')}: {exc}", file=sys.stderr)
             continue
 
-    # Fallback: synthetic sequence
+    # Require real calibration data (PR #73 review: random tokens degrade quantization)
     if not list_lines:
-        synth_path = os.path.join(calib_dir, "opusmt_calib_synthetic.bin")
-        rng = np.random.default_rng(42)
-        ids = rng.integers(3, 32000, size=(1, 128)).astype(np.int32)
-        ids[0, -1] = 0  # pad
-        ids.tofile(synth_path)
-        list_lines.append(f"{os.path.relpath(synth_path, out_dir)} input_ids")
-        print(
-            "  [fallback] using synthetic token sequence (no valid MT items)",
-            file=sys.stderr,
+        raise ValueError(
+            "No valid MT items found for calibration. "
+            "Cannot proceed with synthetic tokens as they degrade w8a16 quantization. "
+            "Ensure eval_manifest_v1.json contains MT items or provide FLEURS data."
         )
 
     list_path = os.path.join(out_dir, "opusmt_input_list.txt")
