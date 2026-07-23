@@ -13,6 +13,8 @@
 - **bench:** Select FLEURS audio by id, not position([#28](https://github.com/TanKhoiTV/kavi-prototype/pull/28))
 - **bench:** Drop no-op candidate_filter pass in run.py
 - Lint cleanup for eval_denoising.py
+- **android:** Remove stale .dlc reference in MainActivity.kt
+- **android:** Remove stale .dlc reference in MainActivity.kt([#79](https://github.com/TanKhoiTV/kavi-prototype/pull/79))
 
 ### Documentation
 
