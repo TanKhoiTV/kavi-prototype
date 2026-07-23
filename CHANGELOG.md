@@ -41,6 +41,7 @@
 - Add PLAN.md for Phases 4–7 with cross-checked task breakdown
 - Update PLAN.md — mark Batch 1 done, add Batch 2 task breakdown
 - Fix stale SDK paths, venv names, and .dlc references
+- **adr:** Accept ADR-005, update follow-up status table (#82)([#82](https://github.com/TanKhoiTV/kavi-prototype/pull/82))
 
 ### Features
 
