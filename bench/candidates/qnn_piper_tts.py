@@ -1,27 +1,19 @@
-"""QNN Piper TTS adapter — stub for on-device inference.
+"""Piper TTS adapter — CPU-only stub for on-device inference.
 
-This adapter is a placeholder for the Phase-4 on-device QNN benchmark runner.
-The actual QNN inference runs on a Snapdragon 8 Gen 2 (HTP v73) via the
-Qualcomm AI Runtime. This host-side stub defines the interface and will
-eventually:
-
-1. Load context binary via ``QnnModelLoader`` (bundled in APK assets)
-2. Convert input text to phoneme IDs on host (Piper's espeak-ng)
-3. Run encoder on HTP v73 (NPU offload)
-4. Run deterministic decoder (CPU fallback)
-5. Return output audio path
+ADR-005 Decision 3: Piper stays on CPU. QNN conversion is skipped because
+Piper ONNX has a cyclic graph that QAIRT cannot handle, and the model is
+already fast on CPU (RTF 0.06–0.22 from baseline). TTS is not the pipeline
+bottleneck.
 
 The on-device runner is an Android instrumented test / thin service that
 reads ``eval_manifest_v1.json`` and executes candidates via
 ``com.kavi.app.runner`` (see ``android/app/src/main/java/com/kavi/app/runner/``).
 
 Integration path (when implemented):
-    - Pre-requisite model artifacts in ``models/qnn/piper-en/``:
-      piper_encoder_htp_v73.bin (NPU), piper_decoder (CPU fallback)
-    - Piper ONNX must first be patched via ``bench/qnn/patch_piper_onnx.py``
-      to remove RandomNormalLike and fix output length
-    - Context binary bundled into APK assets
-    - On-device runner loads and executes via ``QnnModelLoader``
+    - Piper ONNX patched via ``bench/qnn/patch_piper_onnx.py``
+      (removes RandomNormalLike, fixes output length)
+    - On-device runner loads patched ONNX via ORT (CPU) in the Android app
+    - Input text is converted to phoneme IDs on host using Piper's espeak-ng
 """
 
 from __future__ import annotations
@@ -31,18 +23,17 @@ from ..schema import EvalItem
 
 
 class QnnPiperTTSCandidate(Candidate):
-    """QNN Piper TTS candidate (HTP v73, w8a16 quantized).
+    """Piper TTS candidate (CPU-only, per ADR-005 Decision 3).
 
     Parameters
     ----------
     model_path : str | None
-        Path to the directory containing the QNN context binary and metadata.
+        Path to the directory containing the patched Piper ONNX and metadata.
         Expected structure::
 
             {model_path}/
-            ├── encoder_htp_v73.bin       # QNN context binary (encoder, NPU)
-            ├── decoder_htp_v73.bin        # QNN context binary (decoder, CPU fallback)
-            └── input_list.txt             # Calibration input list
+            ├── piper_patched.onnx        # Patched Piper ONNX (CPU, no QNN)
+            └── voices/                   # Voice configs for espeak-ng
 
     config : dict | None
         Recognized keys:
@@ -63,14 +54,13 @@ class QnnPiperTTSCandidate(Candidate):
         self.sample_rate = cfg.get("sample_rate", 22050)
 
     def _infer(self, item: EvalItem) -> tuple[str | None, str | None]:
-        """Run Piper TTS via QNN on-device inference.
+        """Run Piper TTS via CPU inference on-device.
 
         TODO: Implement Android instrumented test runner:
-        1. Load context binary via ``QnnModelLoader``
-        2. Convert input text to phoneme IDs (host-side espeak-ng)
-        3. Run encoder on HTP v73 (NPU offload)
-        4. Run deterministic decoder (CPU fallback)
-        5. Save output audio, return path
+        1. Convert input text to phoneme IDs (host-side espeak-ng)
+        2. Load patched Piper ONNX via ORT (CPU)
+        3. Run full Piper pipeline (encoder + decoder, CPU)
+        4. Save output audio, return path
 
         Until the on-device runner is implemented, this stub raises
         NotImplementedError to make test failures explicit rather than
@@ -78,10 +68,9 @@ class QnnPiperTTSCandidate(Candidate):
         """
         raise NotImplementedError(
             f"{self.__class__.__name__} is a stub. "
-            f"On-device QNN inference is not yet implemented.\n"
+            f"On-device CPU inference is not yet implemented.\n"
             f"Model path: {self.model_path}\n"
-            f"Integration path: patch Piper ONNX (remove RandomNormalLike, "
-            f"pin output length), convert to HTP v73 context binary, bundle "
-            f"in APK assets, run via Android instrumented test runner "
+            f"Integration path: patch Piper ONNX via bench/qnn/patch_piper_onnx.py, "
+            f"run via Android instrumented test runner (CPU/ORR) "
             f"(see android/app/src/main/java/com/kavi/app/runner/)."
         )
