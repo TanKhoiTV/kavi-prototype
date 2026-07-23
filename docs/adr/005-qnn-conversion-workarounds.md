@@ -1,7 +1,7 @@
 # ADR-005: QNN Conversion Workarounds
 
 **Date:** 2026-07-22
-**Status:** Proposed
+**Status:** Accepted
 **Deciders:** Kavi team
 **Relates to:** ADR-003 (Hexagon runtime), Phase 4 QNN conversion
 
@@ -149,11 +149,11 @@ This is documented in PR #73 comment from @winterSolstice25.
 
 ## Follow-up actions
 
-| # | Task | Owner | Effort |
-| --- | ------ | ------- | -------- |
-| 1 | Write `patch_whisper_decoder.py` to strip IsNaN | Worker | 2 hrs |
-| 2 | Update QNN adapter stubs for encoder-only architecture | Worker | 1 hr |
-| 3 | Export Opus-MT encoder only (skip decoder) | Worker | 1 hr |
-| 4 | Convert Opus-MT encoder → QNN | Manual | 1 hr |
-| 5 | Build Android runner with CPU decoder fallback | Worker | 4 hrs |
-| 6 | On-device verification | Manual | 4 hrs |
+| # | Task | Owner | Effort | Status |
+| --- | ------ | ------- | -------- | -------- |
+| 1 | Write `patch_whisper_decoder.py` to strip IsNaN | Worker | 2 hrs | ✅ Done (PR #75) |
+| 2 | Update QNN adapter stubs for encoder-only architecture | Worker | 1 hr | ✅ Done (PR #75) |
+| 3 | Export Opus-MT encoder only (skip decoder) | Worker | 1 hr | ✅ Done (PR #75) |
+| 4 | Convert Opus-MT encoder → QNN | Manual | 1 hr | ✅ Done (PR #75, 71 MB `.bin`) |
+| 5 | Build Android runner with CPU decoder fallback | Worker | 4 hrs | Deferred (ADR-006) |
+| 6 | On-device verification | Manual | 4 hrs | Deferred |
