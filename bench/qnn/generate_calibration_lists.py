@@ -313,16 +313,12 @@ def generate_whisper_list(
             print(f"  [skip] {item.get('id', '?')}: {exc}", file=sys.stderr)
             continue
 
-    # Fallback: if no samples were generated, use the existing single-sample file
+    # Fail loudly if no samples were generated (consistent with MT path)
     if not list_lines:
-        existing = os.path.join(out_dir, "whisper-small", "input_features.bin")
-        if os.path.exists(existing):
-            rel = os.path.relpath(existing, out_dir)
-            list_lines.append(f"{rel} input_features")
-            print(
-                "  [fallback] using existing input_features.bin (single sample)",
-                file=sys.stderr,
-            )
+        raise ValueError(
+            "No valid Whisper items found for calibration. "
+            "Cannot proceed with a single sample as it degrades w8a16 quantization."
+        )
 
     list_path = os.path.join(out_dir, "whisper_input_list.txt")
     with open(list_path, "w") as f:
