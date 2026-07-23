@@ -1,22 +1,26 @@
-"""QNN Opus-MT MT adapter — stub for on-device inference via ADB/bridge.
+"""QNN Opus-MT MT adapter — stub for on-device inference.
 
 This adapter is a placeholder for the Phase-4 on-device QNN benchmark runner.
 The actual QNN inference runs on a Snapdragon 8 Gen 2 (HTP v73) via the
 Qualcomm AI Runtime. This host-side stub defines the interface and will
 eventually:
 
-1. Push the context binary + tokenised input to the device via ADB
-2. Run ``qnn-net-run`` for encoder and decoder
-3. Pull the output token sequence back and detokenise on host
+1. Load context binary via ``QnnModelLoader`` (bundled in APK assets)
+2. Encode source text to token IDs on host
+3. Run encoder + autoregressive decoder on HTP v73
+4. Detokenise output on host via target SentencePiece model
+5. Return translated text
+
+The on-device runner is an Android instrumented test / thin service that
+reads ``eval_manifest_v1.json`` and executes candidates via
+``com.kavi.app.runner`` (see ``android/app/src/main/java/com/kavi/app/runner/``).
 
 Integration path (when implemented):
     - Pre-requisite model artifacts in ``models/qnn/opus-mt-vi-en/``:
       encoder_htp_v73.bin, decoder_htp_v73.bin
     - Tokenizers in ``models/opus-mt-vi-en-src/`` (SentencePiece)
-    - ADB device detected via ``adb devices``
-    - Host encodes source text to token IDs, pushes as raw int32
-    - Device runs encoder + autoregressive decoder, returns token IDs
-    - Host detokenises to target text
+    - Context binary bundled into APK assets
+    - On-device runner loads and executes via ``QnnModelLoader``
 """
 
 from __future__ import annotations
@@ -26,23 +30,23 @@ from ..schema import EvalItem
 
 
 class QnnOpusMTMTCandidate(Candidate):
-    """QNN Opus-MT vi<->en candidate (HTP v73, w8a16 quantized).
+    """QNN Opus-MT vi<->en candidate (encoder on HTP v73, decoder on CPU/CT2).
+
+    ADR-005 Decision 2: encoder on NPU, decoder on CPU.
 
     Parameters
     ----------
     model_path : str | None
-        Path to the directory containing the QNN context binaries and metadata.
+        Path to the directory containing the model artifacts.
         Expected structure::
 
             {model_path}/
-            ├── encoder_htp_v73.bin       # QNN context binary (encoder)
-            ├── decoder_htp_v73.bin        # QNN context binary (decoder)
-            └── input_list.txt             # Calibration input list
+            ├── encoder_htp_v73.bin       # QNN context binary (encoder, NPU)
+            ├── decoder_model.onnx        # Opus-MT decoder ONNX (CPU/CT2)
+            └── input_list.txt            # Calibration input list
 
     config : dict | None
         Recognized keys:
-        - ``device_id`` (str, default ``""``): ADB device serial.
-        - ``data_dir`` (str, default ``"/data/local/tmp/kavi/"``): temp dir on device.
         - ``src_spm`` (str): path to source SentencePiece model (defaults to
           ``models/opus-mt-vi-en-src/source.spm``).
         - ``tgt_spm`` (str): path to target SentencePiece model (defaults to
@@ -58,8 +62,6 @@ class QnnOpusMTMTCandidate(Candidate):
     ) -> None:
         self.model_path = model_path
         cfg = config or {}
-        self.device_id = cfg.get("device_id", "")
-        self.data_dir = cfg.get("data_dir", "/data/local/tmp/kavi/")
         self.src_spm_path = cfg.get("src_spm")
         self.tgt_spm_path = cfg.get("tgt_spm")
         self.max_length = cfg.get("max_length", 256)
@@ -67,27 +69,25 @@ class QnnOpusMTMTCandidate(Candidate):
     def _infer(self, item: EvalItem) -> tuple[str | None, str | None]:
         """Run Opus-MT translation via QNN on-device inference.
 
-        TODO: Implement ADB bridge:
-        1. Load SentencePiece tokeniser (source) on host
-        2. Encode source text to token IDs (int32 array)
-        3. ``adb -s {device_id} shell mkdir -p {data_dir}``
-        4. ``adb -s {device_id} push {input_tokens.raw} {data_dir}``
-        5. ``adb -s {device_id} shell qnn-net-run --model {encoder_ctx} ...``
-        6. Pull encoder output, run decoder loop:
-           - For each decode step: push decoder input, run qnn-net-run, pull output
-        7. After EOS or max_length: detokenise on host via target SPM
-        8. Return translated text
+        TODO: Implement Android instrumented test runner:
+        1. Encode source text to token IDs (host-side SentencePiece)
+        2. Load encoder context binary via ``QnnModelLoader`` (NPU)
+        3. Run encoder on HTP v73 via ``QnnModelLoader.run_inference()``
+        4. Load decoder ONNX via ORT/CT2 (CPU)
+        5. Run autoregressive decoder loop (CPU)
+        6. Detokenise output on host via target SPM
+        7. Return translated text
 
-        Until the ADB bridge is implemented, this stub raises NotImplementedError
-        to make test failures explicit rather than silently producing empty results.
+        Until the on-device runner is implemented, this stub raises
+        NotImplementedError to make test failures explicit rather than
+        silently producing empty results.
         """
         raise NotImplementedError(
             f"{self.__class__.__name__} is a stub. "
-            f"On-device QNN inference via ADB is not yet implemented.\n"
+            f"On-device inference is not yet implemented.\n"
             f"Model path: {self.model_path}\n"
-            f"Device: {self.device_id or '(default ADB device)'}\n"
-            f"Data dir: {self.data_dir}\n"
-            f"Integration path: see bench/qnn/export_opusmt_onnx.py for the ONNX "
-            f"export, then use bench/qnn/convert_to_qnn.sh for context binary "
-            f"conversion. Push artifacts to device and run via qnn-net-run."
+            f"Integration path: convert encoder ONNX to HTP v73 context binary, "
+            f"bundle decoder ONNX + encoder .bin in APK assets, run via "
+            f"Android instrumented test runner "
+            f"(see android/app/src/main/java/com/kavi/app/runner/)."
         )
