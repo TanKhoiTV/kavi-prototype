@@ -7,7 +7,6 @@ Each concrete candidate implements `_infer(item)` and declares its `stage` and
 
 from __future__ import annotations
 
-import resource
 import time
 from abc import ABC, abstractmethod
 
@@ -15,10 +14,23 @@ from .schema import EvalItem, StageResult
 
 
 def peak_ram_mb() -> float:
-    # ru_maxrss is the high-water mark of resident memory (KB on Linux).
-    # NOTE: this is the process-wide peak, not a per-candidate delta; a rough
-    # proxy for v0 that we refine (per-process runner) in the on-device Phase 4.
-    return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024.0
+    """Peak RSS in MB (process-wide, not per-candidate delta).
+
+    Cross-platform via ``psutil``: ``peak_wset`` on Windows (peak working set),
+    ``ru_maxrss`` via stdlib ``resource`` on Unix (peak resident set).
+    """
+    import sys
+
+    if sys.platform == "win32":
+        import psutil
+
+        return psutil.Process().memory_info().peak_wset / (1024.0**2)
+
+    import resource
+
+    rss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    divisor = 1024.0**2 if sys.platform == "darwin" else 1024.0
+    return rss / divisor
 
 
 class Candidate(ABC):
