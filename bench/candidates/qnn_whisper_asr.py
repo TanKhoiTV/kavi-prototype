@@ -29,19 +29,20 @@ from ..schema import EvalItem
 
 
 class QnnWhisperASRCandidate(Candidate):
-    """QNN Whisper Small ASR candidate (HTP v73, w8a16 quantized).
+    """QNN Whisper Small ASR candidate (encoder on HTP v73, decoder on CPU).
+
+    ADR-005 Decision 2: encoder on NPU, decoder on CPU.
 
     Parameters
     ----------
     model_path : str | None
-        Path to the directory containing the QNN context binary and metadata.
+        Path to the directory containing the model artifacts.
         Expected structure::
 
             {model_path}/
-            ├── encoder_htp_v73.bin       # QNN context binary (encoder)
-            ├── decoder_htp_v73.bin        # QNN context binary (decoder)
-            ├── encoder_input_list.txt     # Calibration input list
-            └── decoder_input_list.txt     # Calibration input list
+            ├── encoder_htp_v73.bin       # QNN context binary (encoder, NPU)
+            ├── decoder_model.onnx        # Whisper decoder ONNX (CPU/ORT)
+            └── input_list.txt            # Calibration input list
 
     config : dict | None
         Recognized keys:
@@ -62,11 +63,12 @@ class QnnWhisperASRCandidate(Candidate):
         """Run Whisper ASR via QNN on-device inference.
 
         TODO: Implement Android instrumented test runner:
-        1. Load context binary via ``QnnModelLoader``
-        2. Convert audio to mel spectrogram (host-side preprocessor)
+        1. Convert audio to mel spectrogram (host-side preprocessor)
+        2. Load encoder context binary via ``QnnModelLoader`` (NPU)
         3. Run encoder on HTP v73 via ``QnnModelLoader.run_inference()``
-        4. Run decoder loop (autoregressive; likely CPU fallback on device)
-        5. Return transcribed text
+        4. Load decoder ONNX via ORT (CPU)
+        5. Run autoregressive decoder loop (CPU)
+        6. Return transcribed text
 
         Until the on-device runner is implemented, this stub raises
         NotImplementedError to make test failures explicit rather than
@@ -74,9 +76,10 @@ class QnnWhisperASRCandidate(Candidate):
         """
         raise NotImplementedError(
             f"{self.__class__.__name__} is a stub. "
-            f"On-device QNN inference is not yet implemented.\n"
+            f"On-device inference is not yet implemented.\n"
             f"Model path: {self.model_path}\n"
-            f"Integration path: convert ONNX to HTP v73 context binary, "
-            f"bundle in APK assets, run via Android instrumented test runner "
+            f"Integration path: convert encoder ONNX to HTP v73 context binary, "
+            f"bundle decoder ONNX + encoder .bin in APK assets, run via "
+            f"Android instrumented test runner "
             f"(see android/app/src/main/java/com/kavi/app/runner/)."
         )

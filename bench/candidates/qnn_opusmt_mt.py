@@ -30,18 +30,20 @@ from ..schema import EvalItem
 
 
 class QnnOpusMTMTCandidate(Candidate):
-    """QNN Opus-MT vi<->en candidate (HTP v73, w8a16 quantized).
+    """QNN Opus-MT vi<->en candidate (encoder on HTP v73, decoder on CPU/CT2).
+
+    ADR-005 Decision 2: encoder on NPU, decoder on CPU.
 
     Parameters
     ----------
     model_path : str | None
-        Path to the directory containing the QNN context binaries and metadata.
+        Path to the directory containing the model artifacts.
         Expected structure::
 
             {model_path}/
-            ├── encoder_htp_v73.bin       # QNN context binary (encoder)
-            ├── decoder_htp_v73.bin        # QNN context binary (decoder)
-            └── input_list.txt             # Calibration input list
+            ├── encoder_htp_v73.bin       # QNN context binary (encoder, NPU)
+            ├── decoder_model.onnx        # Opus-MT decoder ONNX (CPU/CT2)
+            └── input_list.txt            # Calibration input list
 
     config : dict | None
         Recognized keys:
@@ -68,11 +70,13 @@ class QnnOpusMTMTCandidate(Candidate):
         """Run Opus-MT translation via QNN on-device inference.
 
         TODO: Implement Android instrumented test runner:
-        1. Load context binary via ``QnnModelLoader``
-        2. Encode source text to token IDs (host-side SentencePiece)
-        3. Run encoder + autoregressive decoder on HTP v73
-        4. Detokenise output on host via target SPM
-        5. Return translated text
+        1. Encode source text to token IDs (host-side SentencePiece)
+        2. Load encoder context binary via ``QnnModelLoader`` (NPU)
+        3. Run encoder on HTP v73 via ``QnnModelLoader.run_inference()``
+        4. Load decoder ONNX via ORT/CT2 (CPU)
+        5. Run autoregressive decoder loop (CPU)
+        6. Detokenise output on host via target SPM
+        7. Return translated text
 
         Until the on-device runner is implemented, this stub raises
         NotImplementedError to make test failures explicit rather than
@@ -80,9 +84,10 @@ class QnnOpusMTMTCandidate(Candidate):
         """
         raise NotImplementedError(
             f"{self.__class__.__name__} is a stub. "
-            f"On-device QNN inference is not yet implemented.\n"
+            f"On-device inference is not yet implemented.\n"
             f"Model path: {self.model_path}\n"
-            f"Integration path: convert ONNX to HTP v73 context binary, "
-            f"bundle in APK assets, run via Android instrumented test runner "
+            f"Integration path: convert encoder ONNX to HTP v73 context binary, "
+            f"bundle decoder ONNX + encoder .bin in APK assets, run via "
+            f"Android instrumented test runner "
             f"(see android/app/src/main/java/com/kavi/app/runner/)."
         )
