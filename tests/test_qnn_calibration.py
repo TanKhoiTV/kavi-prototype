@@ -9,8 +9,6 @@ Covers:
 from __future__ import annotations
 
 import numpy as np
-import pytest
-
 
 # ── _mel_spectrogram ────────────────────────────────────────────────
 
@@ -67,17 +65,17 @@ class TestStripIsnanNodes:
     """Bug #2 regression: np.zeros crashes on None / str shape dims."""
 
     @staticmethod
-    def _make_isnan_graph(shape: tuple) -> "gs.Graph":  # noqa: F821
+    def _make_isnan_graph(shape: tuple) -> gs.Graph:  # noqa: F821
         """Build a minimal graph with one IsNaN node of given output shape."""
         import onnx_graphsurgeon as gs
 
-        X = gs.Variable("X", dtype=np.float32, shape=(1, 4))
-        Y = gs.Variable("Y", dtype=np.bool_, shape=shape)
-        isnan_node = gs.Node("IsNaN", inputs=[X], outputs=[Y], name="isnan_0")
+        x = gs.Variable("X", dtype=np.float32, shape=(1, 4))
+        y = gs.Variable("Y", dtype=np.bool_, shape=shape)
+        isnan_node = gs.Node("IsNaN", inputs=[x], outputs=[y], name="isnan_0")
         graph = gs.Graph(
             nodes=[isnan_node],
-            inputs=[X],
-            outputs=[Y],
+            inputs=[x],
+            outputs=[y],
             name="test_graph",
         )
         return graph
@@ -135,10 +133,10 @@ class TestStripIsnanNodes:
 
         from bench.qnn.patch_whisper_decoder import strip_isnan_nodes
 
-        X = gs.Variable("X", dtype=np.float32, shape=(1, 4))
-        Y = gs.Variable("Y", dtype=np.float32, shape=(1, 4))
-        relu_node = gs.Node("Relu", inputs=[X], outputs=[Y], name="relu_0")
-        graph = gs.Graph(nodes=[relu_node], inputs=[X], outputs=[Y], name="no_isnan")
+        x = gs.Variable("X", dtype=np.float32, shape=(1, 4))
+        y = gs.Variable("Y", dtype=np.float32, shape=(1, 4))
+        relu_node = gs.Node("Relu", inputs=[x], outputs=[y], name="relu_0")
+        graph = gs.Graph(nodes=[relu_node], inputs=[x], outputs=[y], name="no_isnan")
         count = strip_isnan_nodes(graph)
         assert count == 0
         assert len(graph.nodes) == 1
