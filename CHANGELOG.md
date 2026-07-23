@@ -74,6 +74,7 @@
 - Migrate qairt-converters venv into repo as dependency group
 - Update android submodule (stale .dlc refs removed)
 - Update android submodule (doc fixes)
+- **gitignore:** Ignore generated QNN artifacts, keep README (#81)([#81](https://github.com/TanKhoiTV/kavi-prototype/pull/81))
 
 ### Refactoring
 
