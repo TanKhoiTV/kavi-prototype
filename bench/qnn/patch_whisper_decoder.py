@@ -52,10 +52,13 @@ def strip_isnan_nodes(graph: gs.Graph) -> int:
 
         # Replace with constant False
         # The output shape is typically [batch, seq_len] or [batch, heads, seq, seq]
-        shape = out_var.shape if out_var.shape is not None else ()
+        raw_shape = out_var.shape if out_var.shape is not None else ()
+        # Replace dynamic dims (None / str) with 1 for the constant's storage shape;
+        # onnx-graphsurgeon will broadcast the constant at graph level.
+        safe_shape = tuple(s if isinstance(s, int) else 1 for s in raw_shape)
         false_const = gs.Constant(
             name=f"{node.name}_false_const",
-            values=np.zeros(shape, dtype=np.bool_),
+            values=np.zeros(safe_shape, dtype=np.bool_),
         )
 
         # Redirect all consumers: replace the output variable in consumer inputs

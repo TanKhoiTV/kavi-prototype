@@ -122,7 +122,7 @@ def _mel_spectrogram(audio: np.ndarray) -> np.ndarray:
         f_max=WHISPER_F_MAX,
     )  # shape: (80, 201)
 
-    mel_spec = mel_filters @ powers.numpy()  # shape: (80, T)
+    mel_spec = mel_filters @ powers  # shape: (80, T) — powers is already numpy
 
     # Log
     log_spec = np.log10(np.clip(mel_spec, a_min=1e-10, a_max=None))
