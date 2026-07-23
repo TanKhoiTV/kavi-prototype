@@ -51,6 +51,7 @@
 - Add Phase 4 QNN setup, Phase 5 RTranslator prep, Phase 6 denoising gate
 - **qnn:** Add Whisper Small ONNX export script with fixed-shape encoder
 - **qnn:** Add Piper surgery script, calibration lists, and QNN adapter stubs
+- **qnn:** Whisper decoder patch + Opus-MT encoder conversion (#75)([#75](https://github.com/TanKhoiTV/kavi-prototype/pull/75))
 
 ### Miscellaneous
 
