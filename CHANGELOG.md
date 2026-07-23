@@ -15,6 +15,7 @@
 - Lint cleanup for eval_denoising.py
 - **android:** Remove stale .dlc reference in MainActivity.kt
 - **android:** Remove stale .dlc reference in MainActivity.kt([#79](https://github.com/TanKhoiTV/kavi-prototype/pull/79))
+- **bench:** Guard peak_ram_mb against missing resource module on Windows (#80)([#80](https://github.com/TanKhoiTV/kavi-prototype/pull/80))
 
 ### Documentation
 
