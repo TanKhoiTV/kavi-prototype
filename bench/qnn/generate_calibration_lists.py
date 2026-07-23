@@ -93,25 +93,25 @@ def _load_audio_mono(path: str, target_sr: int = WHISPER_SAMPLE_RATE) -> np.ndar
 def _mel_spectrogram(audio: np.ndarray) -> np.ndarray:
     """Compute Whisper-compatible log-mel spectrogram (80-band, 3000 frames).
 
-    Implementation mirrors ``whisper.log_mel_spectrogram`` without requiring
-    the ``openai-whisper`` package.
+    Implementation mirrors ``whisper.log_mel_spectrogram`` using
+    ``scipy.signal.stft`` so it runs without PyTorch.
     """
-    import torch  # pyright: ignore[reportMissingImports]
+    import scipy.signal  # pyright: ignore[reportMissingImports]
 
-    # PyTorch STFT
-    audio_t = torch.from_numpy(audio)
-    window = torch.hann_window(WHISPER_N_FFT)
-    stft = torch.stft(
-        audio_t,
-        n_fft=WHISPER_N_FFT,
-        hop_length=WHISPER_HOP_LENGTH,
-        win_length=WHISPER_N_FFT,
+    window = np.hanning(WHISPER_N_FFT).astype(np.float32)
+    _, _, stft = scipy.signal.stft(
+        audio,
+        fs=WHISPER_SAMPLE_RATE,
         window=window,
-        return_complex=True,
-    )  # shape: (201, T)
+        nperseg=WHISPER_N_FFT,
+        noverlap=WHISPER_N_FFT - WHISPER_HOP_LENGTH,
+        nfft=WHISPER_N_FFT,
+        boundary=None,  # no zero-padding (matches whisper center=False)
+        padded=False,
+    )  # stft shape: (201, T), complex
 
     # Power spectrogram
-    powers = stft.abs() ** 2  # shape: (201, T)
+    powers = np.abs(stft) ** 2  # shape: (201, T)
 
     # Mel filterbank (80 bands, 0-8000 Hz, 201 FFT bins)
     mel_filters = _mel_filterbank(
