@@ -24,12 +24,12 @@ def peak_ram_mb() -> float:
     if sys.platform == "win32":
         import psutil
 
-        return psutil.Process().memory_info().peak_wset / (1024.0 ** 2)
+        return psutil.Process().memory_info().peak_wset / (1024.0**2)
 
     import resource
 
     rss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
-    divisor = 1024.0 ** 2 if sys.platform == "darwin" else 1024.0
+    divisor = 1024.0**2 if sys.platform == "darwin" else 1024.0
     return rss / divisor
 
 
