@@ -37,7 +37,7 @@ PR #73 review identified critical architectural issues with the proposed Android
 │                                                     │
 │  ┌──────────────────────────────────────────────┐  │
 │  │ InstrumentedTest (Kotlin)                    │  │
-│  │ - ManifestReader.parse("eval_manifest.json") │  │
+│  │ - ManifestReader.parse("eval_manifest_v1.json") │  │
 │  │ - For each item:                             │  │
 │  │     - QnnModelLoader.run Encoder (NPU)       │  │
 │  │     - CPU fallback Decoder                    │  │
