@@ -93,25 +93,25 @@ def _load_audio_mono(path: str, target_sr: int = WHISPER_SAMPLE_RATE) -> np.ndar
 def _mel_spectrogram(audio: np.ndarray) -> np.ndarray:
     """Compute Whisper-compatible log-mel spectrogram (80-band, 3000 frames).
 
-    Implementation mirrors ``whisper.log_mel_spectrogram`` without requiring
-    the ``openai-whisper`` package.
+    Implementation mirrors ``whisper.log_mel_spectrogram`` using
+    ``scipy.signal.stft`` so it runs without PyTorch.
     """
-    import torch  # pyright: ignore[reportMissingImports]
+    import scipy.signal  # pyright: ignore[reportMissingImports]
 
-    # PyTorch STFT
-    audio_t = torch.from_numpy(audio)
-    window = torch.hann_window(WHISPER_N_FFT)
-    stft = torch.stft(
-        audio_t,
-        n_fft=WHISPER_N_FFT,
-        hop_length=WHISPER_HOP_LENGTH,
-        win_length=WHISPER_N_FFT,
+    window = np.hanning(WHISPER_N_FFT).astype(np.float32)
+    _, _, stft = scipy.signal.stft(
+        audio,
+        fs=WHISPER_SAMPLE_RATE,
         window=window,
-        return_complex=True,
-    )  # shape: (201, T)
+        nperseg=WHISPER_N_FFT,
+        noverlap=WHISPER_N_FFT - WHISPER_HOP_LENGTH,
+        nfft=WHISPER_N_FFT,
+        boundary=None,  # no zero-padding (matches whisper center=False)
+        padded=False,
+    )  # stft shape: (201, T), complex
 
     # Power spectrogram
-    powers = stft.abs() ** 2  # shape: (201, T)
+    powers = np.abs(stft) ** 2  # shape: (201, T)
 
     # Mel filterbank (80 bands, 0-8000 Hz, 201 FFT bins)
     mel_filters = _mel_filterbank(
@@ -122,7 +122,7 @@ def _mel_spectrogram(audio: np.ndarray) -> np.ndarray:
         f_max=WHISPER_F_MAX,
     )  # shape: (80, 201)
 
-    mel_spec = mel_filters @ powers.numpy()  # shape: (80, T)
+    mel_spec = mel_filters @ powers  # shape: (80, T) — powers is already numpy
 
     # Log
     log_spec = np.log10(np.clip(mel_spec, a_min=1e-10, a_max=None))
@@ -313,16 +313,12 @@ def generate_whisper_list(
             print(f"  [skip] {item.get('id', '?')}: {exc}", file=sys.stderr)
             continue
 
-    # Fallback: if no samples were generated, use the existing single-sample file
+    # Fail loudly if no samples were generated (consistent with MT path)
     if not list_lines:
-        existing = os.path.join(out_dir, "whisper-small", "input_features.bin")
-        if os.path.exists(existing):
-            rel = os.path.relpath(existing, out_dir)
-            list_lines.append(f"{rel} input_features")
-            print(
-                "  [fallback] using existing input_features.bin (single sample)",
-                file=sys.stderr,
-            )
+        raise ValueError(
+            "No valid Whisper items found for calibration. "
+            "Cannot proceed with a single sample as it degrades w8a16 quantization."
+        )
 
     list_path = os.path.join(out_dir, "whisper_input_list.txt")
     with open(list_path, "w") as f:
@@ -373,17 +369,12 @@ def generate_opusmt_list(
             print(f"  [skip] {item.get('id', '?')}: {exc}", file=sys.stderr)
             continue
 
-    # Fallback: synthetic sequence
+    # Require real calibration data (PR #73 review: random tokens degrade quantization)
     if not list_lines:
-        synth_path = os.path.join(calib_dir, "opusmt_calib_synthetic.bin")
-        rng = np.random.default_rng(42)
-        ids = rng.integers(3, 32000, size=(1, 128)).astype(np.int32)
-        ids[0, -1] = 0  # pad
-        ids.tofile(synth_path)
-        list_lines.append(f"{os.path.relpath(synth_path, out_dir)} input_ids")
-        print(
-            "  [fallback] using synthetic token sequence (no valid MT items)",
-            file=sys.stderr,
+        raise ValueError(
+            "No valid MT items found for calibration. "
+            "Cannot proceed with synthetic tokens as they degrade w8a16 quantization. "
+            "Ensure eval_manifest_v1.json contains MT items or provide FLEURS data."
         )
 
     list_path = os.path.join(out_dir, "opusmt_input_list.txt")

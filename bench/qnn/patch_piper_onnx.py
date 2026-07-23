@@ -135,7 +135,26 @@ def pin_duration_to_fixed(graph: gs.Graph, t_fixed: int) -> bool:
         values=np.array(float(t_fixed), dtype=np.float32),
     )
 
-    # 2. Div: scale = T_FIXED / ReduceSum(raw_durations)  (shape [batch])
+    # 1b. Epsilon constant to prevent division by zero (PR #73 review)
+    epsilon_const = gs.Constant(
+        name="duration_epsilon",
+        values=np.array(1e-5, dtype=np.float32),
+    )
+
+    # 1c. Add epsilon to denominator: ReduceSum + epsilon
+    denom_var = gs.Variable(
+        name="duration_denom",
+        dtype=np.float32,
+        shape=raw_durations.shape[:1],  # [batch]
+    )
+    add_node = gs.Node(
+        op="Add",
+        name="/duration/Add_epsilon",
+        inputs=[raw_sum_var, epsilon_const],
+        outputs=[denom_var],
+    )
+
+    # 2. Div: scale = T_FIXED / (ReduceSum(raw_durations) + epsilon)  (shape [batch])
     scale_var = gs.Variable(
         name="duration_scale",
         dtype=np.float32,
@@ -144,7 +163,7 @@ def pin_duration_to_fixed(graph: gs.Graph, t_fixed: int) -> bool:
     div_node = gs.Node(
         op="Div",
         name="/duration/Div",
-        inputs=[t_fixed_const, raw_sum_var],
+        inputs=[t_fixed_const, denom_var],
         outputs=[scale_var],
     )
 
@@ -180,7 +199,7 @@ def pin_duration_to_fixed(graph: gs.Graph, t_fixed: int) -> bool:
 
     # 5. Wire new nodes into graph
     graph.nodes.extend(  # type: ignore[attr-defined]
-        [new_rs_node, div_node, unsq_node, mul_node]
+        [new_rs_node, add_node, div_node, unsq_node, mul_node]
     )
 
     # 6. Re-wire Ceil's input from raw → scaled
