@@ -108,5 +108,5 @@ This is documented in the patched Piper surgery script comments.
 ## References
 
 - PR #73 review comment from @winterSolstice25
-- `docs/adr/005-qnn-conversion-workarounds.md`
+- `docs/decisions/ADR-005-qnn-conversion-workarounds.md`
 - `android/app/src/main/java/com/kavi/app/` (Kotlin loader/runner)

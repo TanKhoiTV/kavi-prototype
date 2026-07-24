@@ -20,6 +20,7 @@ harness (what to build, in what order).
   Precedes the Phase-4 implementation (ADR-003 determination method).
 - `decisions/` — Architecture Decision Records (ADR-001 offline-first,
   ADR-002 target platform, ADR-003 Hexagon runtime, ADR-004 ASR/MT/TTS
+  architecture, ADR-005 QNN conversion workarounds, ADR-006 Android runner
   architecture, plus `license-situation.md`). Source of truth for
   architecture choices.
 
