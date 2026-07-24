@@ -28,6 +28,9 @@ from typing import Any
 
 import numpy as np
 
+# Repo root: bench/qnn/generate_calibration_lists.py → repo root is two levels up
+_REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+
 # ═══════════════════════════════════════════════════════════════════════
 # Whisper mel-spectrogram helpers  (matches openai/whisper exactly)
 # ═══════════════════════════════════════════════════════════════════════
@@ -308,7 +311,7 @@ def generate_whisper_list(
                 audio = audio[:WHISPER_N_SAMPLES]
             mel = _mel_spectrogram(audio)
             mel.tofile(bin_path)
-            list_lines.append(f"{os.path.relpath(bin_path, out_dir)} input_features")
+            list_lines.append(f"{os.path.relpath(bin_path, _REPO_ROOT)} input_features")
         except Exception as exc:
             print(f"  [skip] {item.get('id', '?')}: {exc}", file=sys.stderr)
             continue
@@ -364,7 +367,7 @@ def generate_opusmt_list(
         try:
             ids = _tokenize_opusmt([source_text], tokenizer_path)
             ids.tofile(bin_path)
-            list_lines.append(f"{os.path.relpath(bin_path, out_dir)} input_ids")
+            list_lines.append(f"{os.path.relpath(bin_path, _REPO_ROOT)} input_ids")
         except Exception as exc:
             print(f"  [skip] {item.get('id', '?')}: {exc}", file=sys.stderr)
             continue
