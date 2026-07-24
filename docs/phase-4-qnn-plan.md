@@ -294,7 +294,7 @@ do not compromise the benchmark with synthetic tensors.**
    stays on CPU. Items 1–3 below are retained for reference if Piper QNN is ever
    re-evaluated.
 2. **(Deferred — reference only, see item 1)** Piper output length is data-dependent (duration predictor → length regulator
-   → `sum(durations) × hop_length`). Pin it by **normalizing the duration-sum to a 
+   → `sum(durations) × hop_length`). Pin it by **normalizing the duration-sum to a
    fixed `T_FIXED`** (insert a `Div` rescale node preserving phoneme ratios) — do
    **not** rely on `onnx-simplifier` with `input_data` alone (it bakes in one
    traced example's timing = misalignment bug). `T_FIXED` is a design constant
