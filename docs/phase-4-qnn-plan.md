@@ -102,18 +102,23 @@ benchmark below is what decides.
   set requires it.
 - **Output:** `<model>.cpp` (graph) → HTP v73 context binary (Windows).
 
-### 3.3 TTS — Piper (MIT-era `rhasspy/piper`, ONNX)
+### 3.3 TTS — Piper (MIT-era `rhasspy/piper`, ONNX) — **Deferred** (ADR-005 Decision 3)
+
+> **ADR-005 Decision 3 supersedes this section.** Piper stays on CPU: cyclic
+> graph, `RandomNormalLike` unsupported, already fast on CPU (RTF 0.06–0.22),
+> and TTS is not the pipeline bottleneck. The QNN conversion path below is
+> retained for reference only.
 
 - **v0 (CPU):** Piper-CPU, **EN leg only** (`en_US-lessac-medium`; `vais1000` VI
   voice not in repo).
-- **For QNN:** Piper is ONNX, but **not a short hop.** `en_US-lessac-medium.onnx`
-  contains `RandomNormalLike` (stochastic decoder sampling), which
-  `qnn-onnx-converter` 2.31.0.250130 **does not support**. Required surgery:
-  replace with deterministic zero-noise (Mul-by-0 of the reference tensor), then
-  pin the data-dependent output length by normalizing the duration-sum to a fixed
-  `T_FIXED` (see §10). See `license-situation.md` for the MIT-era vs GPL engine
-  fork decision.
-- **Output:** `<model>.cpp` (graph) → HTP v73 context binary (Windows).
+- **For QNN (deferred):** Piper is ONNX, but **not a short hop.**
+  `en_US-lessac-medium.onnx` contains `RandomNormalLike` (stochastic decoder
+  sampling), which `qnn-onnx-converter` 2.31.0.250130 **does not support**.
+  Required surgery: replace with deterministic zero-noise (Mul-by-0 of the
+  reference tensor), then pin the data-dependent output length by normalizing
+  the duration-sum to a fixed `T_FIXED` (see §10).
+- **Output (if ever re-evaluated):** `<model>.cpp` (graph) → HTP v73 context
+  binary (Windows).
 
 ---
 
@@ -176,10 +181,9 @@ that finalize **ADR-004** (tech stack).
 - **Conversion order (lowest-risk first):** (1) **Whisper-Small encoder** —
   static `[1,80,3000]`, no decoder loop, and Qualcomm already ships a
   Whisper-Small-Quantized-QNN re-source proving the path; (2) **Opus-MT vi→en** —
-  same autoregressive decoder pattern, no sampling op; (3) **Piper
-  en_US-lessac-medium** last — heaviest, because its `RandomNormalLike`
-  stochastic-decoder nodes must be reformulated deterministically (§3.3 / §10) before
-  conversion. The WSL host runs `qnn-onnx-converter` → `<model>.cpp`; the model
+  same autoregressive decoder pattern, no sampling op. **(3) Piper — Deferred**
+  per ADR-005 Decision 3 (cyclic graph, unsupported ops, already fast on CPU).
+  The WSL host runs `qnn-onnx-converter` → `<model>.cpp`; the model
   `.so` + HTP v73 context binary are built on Windows (clang++ / NDK / MSVC), per
   the §1 env split.
 - **Risks:**
@@ -268,7 +272,8 @@ do not compromise the benchmark with synthetic tensors.**
   ranges). Build VI→EN pairs by aligning FLEURS `vi_vn` and `en_us` rows on the
   shared sentence **`id`**.
 - **TTS (Piper):** real espeak-ng phonemizations of representative English
-  sentences (factory-domain phrase list), not random phoneme IDs.
+  sentences (factory-domain phrase list), not random phoneme IDs. **Deferred**
+  per ADR-005 Decision 3 (Piper stays on CPU).
 - **Split discipline:** calibration draws from FLEURS **train**; `eval_manifest_v1.json`
   scoring draws from FLEURS **test** (same distribution, no overlap). Teacher-force
   reference transcripts into decoder calibration (not the model's own greedy output).
@@ -285,19 +290,17 @@ do not compromise the benchmark with synthetic tensors.**
 
 ## 10. Pre-execution checklist / known pitfalls
 
-1. **Piper is NOT a short hop.** `en_US-lessac-medium.onnx` contains
-   `RandomNormalLike` (unsupported by `qnn-onnx-converter` 2.31.0.250130) →
-   deterministic zero-noise (Mul-by-0 of the reference tensor), then fix the
-   data-dependent output length (next item). §3.3's old "already ONNX → short hop"
-   wording is retired.
-2. **Piper output length is data-dependent** (duration predictor → length regulator
+1. ~~**Piper is NOT a short hop.**~~ **Deferred** per ADR-005 Decision 3 — Piper
+   stays on CPU. Items 1–3 below are retained for reference if Piper QNN is ever
+   re-evaluated.
+2. **(Deferred — reference only, see item 1)** Piper output length is data-dependent (duration predictor → length regulator
    → `sum(durations) × hop_length`). Pin it by **normalizing the duration-sum to a
    fixed `T_FIXED`** (insert a `Div` rescale node preserving phoneme ratios) — do
    **not** rely on `onnx-simplifier` with `input_data` alone (it bakes in one
    traced example's timing = misalignment bug). `T_FIXED` is a design constant
    (e.g. 400 latent frames ≈ 4.6 s @ 22050 Hz / hop 256); trim trailing silence
    **outside** the QNN graph.
-3. **`onnx-graphsurgeon`** is now in `pyproject.toml` (dependency group `qairt`)
+3. **(Deferred — reference only, see item 1)** `onnx-graphsurgeon` is now in `pyproject.toml` (dependency group `qairt`)
    and installed automatically by `scripts/qairt-env.sh`. The exact `DURATION_OUTPUT_NAME` /
    expand-node names need a **manual Netron inspection** of the patched ONNX first.
 4. **WSL validation must `np.save('ref_encoder_out.npy', out[0])`** — the on-device
@@ -315,4 +318,4 @@ do not compromise the benchmark with synthetic tensors.**
 - **Related:** `benchmarking-todo.md` §Phase 4 (terse checklist), `ADR-003`
   (determination method → this plan), `ADR-004` open params #1–4.
 - **Issues:** #51 (this doc), #52 (ADR-003 tightening), #57 (verified-command
-  corrections + pitfalls folded in).
+  corrections + pitfalls folded in), #78 (ADR status consolidation — closed).
