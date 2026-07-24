@@ -293,14 +293,14 @@ do not compromise the benchmark with synthetic tensors.**
 1. ~~**Piper is NOT a short hop.**~~ **Deferred** per ADR-005 Decision 3 — Piper
    stays on CPU. Items 1–3 below are retained for reference if Piper QNN is ever
    re-evaluated.
-2. **Piper output length is data-dependent** (duration predictor → length regulator
+2. **(Deferred — reference only, see item 1)** Piper output length is data-dependent (duration predictor → length regulator
    → `sum(durations) × hop_length`). Pin it by **normalizing the duration-sum to a
    fixed `T_FIXED`** (insert a `Div` rescale node preserving phoneme ratios) — do
    **not** rely on `onnx-simplifier` with `input_data` alone (it bakes in one
    traced example's timing = misalignment bug). `T_FIXED` is a design constant
    (e.g. 400 latent frames ≈ 4.6 s @ 22050 Hz / hop 256); trim trailing silence
    **outside** the QNN graph.
-3. **`onnx-graphsurgeon`** is now in `pyproject.toml` (dependency group `qairt`)
+3. **(Deferred — reference only, see item 1)** `onnx-graphsurgeon` is now in `pyproject.toml` (dependency group `qairt`)
    and installed automatically by `scripts/qairt-env.sh`. The exact `DURATION_OUTPUT_NAME` /
    expand-node names need a **manual Netron inspection** of the patched ONNX first.
 4. **WSL validation must `np.save('ref_encoder_out.npy', out[0])`** — the on-device
