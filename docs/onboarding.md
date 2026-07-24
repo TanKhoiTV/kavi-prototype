@@ -30,6 +30,8 @@ kavi-prototype/               (PRIVATE submodule — the real repo)
       ├─ ADR-002 …            ⑧  one phone: Snapdragon 8 Gen 2
       ├─ ADR-003 …            ⑨  CPU now, NPU later
       ├─ ADR-004 …            ⑩  tech stack NOT decided yet
+      ├─ ADR-005 …            ⑭  QNN conversion workarounds (Accepted)
+      ├─ ADR-006 …            ⑮  Android runner architecture (Accepted)
       └─ license-situation …  ⑬  license gate
 ```
 
@@ -66,6 +68,12 @@ kavi-prototype/               (PRIVATE submodule — the real repo)
     the ASR/MT/TTS candidate landscape, the pluggable harness design, the lean v0.
 13. **`docs/benchmarking-todo.md`** → the **execution checklist** (phases 0–7,
     checkboxes) to produce those numbers — what you'd actually pick up and work on.
+14. **`ADR-005` (QNN conversion workarounds)** → when the QAIRT converter rejected
+    ops (IsNaN, cyclic graphs), these are the workarounds: strip IsNaN from the
+    Whisper decoder, run decoders on CPU, keep Piper on CPU.
+15. **`ADR-006` (Android runner architecture)** → native on-device instrumented
+    test (no ADB bridge), single push/pull, internal timing, zero-network
+    assertion.
 
 > **Skip for now:** `archive/` (historical, superseded) and `docs/README.md`
 > (just an index).
@@ -150,7 +158,7 @@ QAIRT). **NNAPI is explicitly avoided** (deprecated in Android 15; we target
 | --- | --- | --- |
 | **S2ST / S2S** | Speech-to-speech translation | What Kavi *is*. |
 | **VI↔EN** | Vietnamese ↔ English | Our language pair (later ZH, KO). |
-| **ADR** | Architecture Decision Record | A written, durable "we chose X because Y". In `docs/decisions/`. |
+| **ADR** | Architecture Decision Record | A written, durable "we chose X because Y". In `docs/decisions/` (ADR-001–006). |
 | **SoC** | System-on-Chip | The whole phone computer on one chip (CPU + GPU + NPU). |
 | **NPU** | Neural Processing Unit | The chip's AI accelerator; far faster / power-efficient than CPU for models. |
 | **Hexagon** | Qualcomm's NPU brand | Our NPU. |
@@ -186,7 +194,7 @@ under `archive/` for reference.
 | `models/` | Checked-in model weights. Today: **Opus-MT vi-en** (CTranslate2 + SentencePiece) — our current MT. |
 | `voices/` | TTS voice model(s) (Piper). Usually gitignored / downloaded at runtime. |
 | `docs/` | Internal docs (this file's siblings). |
-| `docs/decisions/` | The ADRs (001–004) + `license-situation.md`. Source of truth for architecture + licensing. |
+| `docs/decisions/` | The ADRs (001–006) + `license-situation.md`. Source of truth for architecture + licensing. |
 | `docs/benchmarking-plan.md` | The plan to *measure* models before picking them (gates ADR-004). **Read this next.** |
 | `.pi/AGENTS.md`, `CONTRIBUTING.md`, `README.md` | Project / agent guidance, how we work, quickstart. |
 | `Makefile`, `pyproject.toml`, `LICENSE` | Build / run, deps (uv), MIT license. |
