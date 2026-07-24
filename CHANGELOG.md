@@ -42,6 +42,7 @@
 - Update PLAN.md — mark Batch 1 done, add Batch 2 task breakdown
 - Fix stale SDK paths, venv names, and .dlc references
 - **adr:** Accept ADR-005, update follow-up status table (#82)([#82](https://github.com/TanKhoiTV/kavi-prototype/pull/82))
+- Consolidate ADR directory, move ADR-005/006 to docs/decisions/ (#83)([#83](https://github.com/TanKhoiTV/kavi-prototype/pull/83))
 
 ### Features
 
