@@ -82,7 +82,7 @@ Tier 1: ADSP AI-ECNS (DSP, if available)
 Tier 2: GTCRN denoiser (ONNX CPU)
     ↓
 ASR encoder (NPU via QNN context binary)  ← single shared encoder
-    ↓  ION zero-copy barrier (~1–3 µs cache-coherency fence)
+    ↓  ION zero-copy barrier (~1–3 ms cache-coherency fence)
 ASR decoder (CPU, batch=2, greedy)  ← dual ASR selects direction via confidence
     ↓
 MT encoder (NPU via QNN context binary)
