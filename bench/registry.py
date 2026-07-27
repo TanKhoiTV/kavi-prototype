@@ -8,6 +8,7 @@ from .candidates.qnn_opusmt_mt import QnnOpusMTMTCandidate
 from .candidates.qnn_piper_tts import QnnPiperTTSCandidate
 from .candidates.qnn_whisper_asr import QnnWhisperASRCandidate
 from .candidates.rtranslator import RTranslatorCandidate
+from .candidates.moonshine_asr import MoonshineASRCandidate
 from .candidates.whisper_asr import WhisperASRCandidate
 from .schema import EvalItem
 
@@ -15,6 +16,7 @@ RegistryEntry = tuple[type, str | None, dict]
 
 REGISTRY: dict[str, RegistryEntry] = {
     WhisperASRCandidate.id: (WhisperASRCandidate, None, {}),
+    MoonshineASRCandidate.id: (MoonshineASRCandidate, None, {}),
     OpusMTMTCandidate.id: (OpusMTMTCandidate, None, {}),
     PiperTTSCandidate.id: (PiperTTSCandidate, None, {}),
     QnnWhisperASRCandidate.id: (QnnWhisperASRCandidate, None, {}),
