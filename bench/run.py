@@ -39,11 +39,9 @@ def run_manifest(
         cid = item.candidate_id
         if cid is None:
             cid = default_candidate_id_for_stage(item.stage)
-        cid_label = cid
-        if cid_label is None:
-            cid_label = "unknown"
-        elif cid != candidate_filter:
+        if candidate_filter is not None and cid != candidate_filter:
             continue
+        cid_label = cid if cid is not None else "unknown"
         try:
             cached = None
             if cid is not None:
@@ -131,6 +129,9 @@ def print_table(records: list[dict]) -> None:
 
 
 def main() -> None:
+    import sys
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(errors="replace")
     ap = argparse.ArgumentParser(description="Kavi benchmark harness (host-side v0)")
     ap.add_argument("--manifest", help="path to eval_manifest_v1.json")
     ap.add_argument(

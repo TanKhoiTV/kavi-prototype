@@ -38,6 +38,7 @@ class Candidate(ABC):
     id: str = ""
 
     def run(self, item: EvalItem) -> StageResult:
+        baseline_mb = peak_ram_mb()
         start = time.perf_counter()
         try:
             out_text, out_audio = self._infer(item)
@@ -48,7 +49,7 @@ class Candidate(ABC):
                 output_text=out_text,
                 output_audio_path=out_audio,
                 latency_s=round(time.perf_counter() - start, 4),
-                peak_ram_mb=peak_ram_mb(),
+                peak_ram_mb=round(max(0.0, peak_ram_mb() - baseline_mb), 2),
             )
         except Exception as exc:  # noqa: BLE001 - one bad candidate must not kill the run
             return StageResult(

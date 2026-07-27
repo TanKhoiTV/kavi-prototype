@@ -136,6 +136,7 @@ def run_denoising_eval(
 
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
+    (out / "tmp").mkdir(parents=True, exist_ok=True)
 
     # ---- Load manifest & filter ASR items ---------------------------------
     manifest = RunManifest.from_json(manifest_path)
@@ -384,6 +385,9 @@ def run_denoising_eval(
 
 
 def main() -> None:
+    import sys
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(errors="replace")
     ap = argparse.ArgumentParser(description="Phase 6 — Denoising gate evaluation")
     ap.add_argument("--manifest", default="eval_data/eval_manifest_v1.json")
     ap.add_argument("--out", default="bench-results/denoising")
