@@ -24,6 +24,7 @@ class WhisperASRCandidate(Candidate):
 
         cfg = config or {}
         self.language = cfg.get("language", "vi")
+        self.beam_size = cfg.get("beam_size", 5)  # faster-whisper default is 5
         # model_path here is a faster-whisper model size/name (e.g. "small").
         self.model = WhisperModel(
             model_size_or_path=cfg.get("model_size", "small"),
@@ -36,7 +37,9 @@ class WhisperASRCandidate(Candidate):
         if not audio_path or not os.path.exists(audio_path):
             raise FileNotFoundError(f"ASR needs an audio_ref path; got {audio_path!r}")
         segments, _info = self.model.transcribe(
-            audio_path, language=item.language or self.language
+            audio_path,
+            language=item.language or self.language,
+            beam_size=self.beam_size,
         )
         text = " ".join(seg.text for seg in segments).strip()
         return text or "", None
