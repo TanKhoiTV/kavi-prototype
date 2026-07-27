@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from .candidates.m2m_mt import M2M100MTCandidate
 from .candidates.opusmt_mt import OpusMTMTCandidate
 from .candidates.piper_tts import PiperTTSCandidate
 from .candidates.qnn_opusmt_mt import QnnOpusMTMTCandidate
@@ -15,6 +16,7 @@ RegistryEntry = tuple[type, str | None, dict]
 
 REGISTRY: dict[str, RegistryEntry] = {
     WhisperASRCandidate.id: (WhisperASRCandidate, None, {}),
+    M2M100MTCandidate.id: (M2M100MTCandidate, None, {}),
     OpusMTMTCandidate.id: (OpusMTMTCandidate, None, {}),
     PiperTTSCandidate.id: (PiperTTSCandidate, None, {}),
     QnnWhisperASRCandidate.id: (QnnWhisperASRCandidate, None, {}),
