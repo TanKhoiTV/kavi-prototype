@@ -15,7 +15,7 @@ from ..schema import EvalItem
 
 class WhisperASRCandidate(Candidate):
     stage = "ASR"
-    id = "whisper-small-faster-whisper-cpu"
+    id = "whisper-small-multilang-ct2-cpu"
 
     def __init__(
         self, model_path: str | None = None, config: dict | None = None
@@ -23,8 +23,16 @@ class WhisperASRCandidate(Candidate):
         from faster_whisper import WhisperModel
 
         cfg = config or {}
-        self.language = cfg.get("language", "vi")
-        # model_path here is a faster-whisper model size/name (e.g. "small").
+        # Chi beam_size la bien sweep, co dinh cho suot 1 lan chay.
+        # KHONG dat "language" o day -- ngon ngu la thuoc tinh cua
+        # TUNG item audio (vi hoac en), khong phai bien cau hinh co dinh.
+        self._decode_kwargs = dict(
+            beam_size=cfg.get("beam_size", 5),
+            temperature=0,
+            condition_on_previous_text=False,
+            without_timestamps=True,
+        )
+
         self.model = WhisperModel(
             model_size_or_path=cfg.get("model_size", "small"),
             device=cfg.get("device", "cpu"),
@@ -34,9 +42,15 @@ class WhisperASRCandidate(Candidate):
     def _infer(self, item: EvalItem) -> tuple[str | None, str | None]:
         audio_path = item.audio_ref or item.input_text
         if not audio_path or not os.path.exists(audio_path):
-            raise FileNotFoundError(f"ASR needs an audio_ref path; got {audio_path!r}")
+            return None, f"audio file not found: {audio_path!r}"
+
+        # Doc ngon ngu theo tung item -- ep, khong auto-detect.
+        lang = getattr(item, "language", None)
+        if lang not in ("vi", "en"):
+            return None, f"missing/invalid language tag on item {item.id}: {lang!r}"
+
         segments, _info = self.model.transcribe(
-            audio_path, language=item.language or self.language
+            audio_path, language=lang, **self._decode_kwargs
         )
-        text = " ".join(seg.text for seg in segments).strip()
+        text = "".join(seg.text for seg in segments).strip()
         return text or "", None
