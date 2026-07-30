@@ -18,7 +18,7 @@ Three key findings drove this decision:
 
 2. **Zipformer is streaming-native** — transducer architecture processes audio in chunks, unlike Whisper/Moonshine which operate on fixed-length windows. This fundamentally changes the pipeline design and latency profile.
 
-3. **A dual-instance approach** (one Zipformer per language) achieves bidirectional coverage without sacrificing the streaming advantage, while fitting in ~20 MB total model weights (int8) — 20× smaller than Whisper Small's ~430 MB ASR footprint.
+3. **A dual-instance approach** (one Zipformer per language) achieves bidirectional coverage without sacrificing the streaming advantage, while fitting in ~60 MB total model weights (int8: ~32 MB VI + ~28 MB EN) — 7× smaller than Whisper Small's ~430 MB ASR footprint.
 
 ### What stays from ADR-007
 
@@ -46,10 +46,12 @@ Kavi v1 implements ASR as **two parallel Zipformer-30M transducer instances** �
 
 ### Model selection
 
-| Direction | Model | Params | Size (int8) | WER | Runtime |
+| Direction | Model | Params | Size (int8, on-disk) | WER | Runtime |
 | ----------- | ------- | -------- | ------------ | ----- | --------- |
-| VI→EN | `sherpa-onnx-zipformer-vi-30M-int8-2026-02-09` | ~30M | ~10 MB | 7.97% (VLSP2025) | CPU via sherpa-onnx |
-| EN→VI | `csukuangfj/sherpa-onnx-zipformer-small-en-2023-06-26` | ~20M | ~8 MB | N/A | CPU via sherpa-onnx |
+| VI→EN | `sherpa-onnx-zipformer-vi-30M-int8-2026-02-09` | ~30M | **~32 MB** (encoder 26 MB + decoder 4.9 MB fp32 + joiner 1.0 MB + tokens 23 KB) | 7.97% (VLSP2025) | CPU via sherpa-onnx |
+| EN→VI | `csukuangfj/sherpa-onnx-zipformer-small-en-2023-06-26` | ~20M | **~28 MB** (encoder 26 MB + decoder 1.3 MB + joiner 259 KB + tokens 5 KB) | N/A | CPU via sherpa-onnx |
+
+*Note: The decoder stays fp32 in the VI int8 variant; the EN variant has int8 decoder at 1.31 MB. On-disk sizes verified from [sherpa-onnx model catalog](https://k2-fsa.github.io/sherpa/onnx/pretrained_models/offline-transducer/zipformer-transducer-models.html) and [HuggingFace file listings](https://huggingface.co/csukuangfj/sherpa-onnx-zipformer-small-en-2023-06-26/tree/main).*
 
 **Confirmed in sherpa-onnx model catalog (Feb 2026):** Multiple English Zipformer transducer variants exist — Small (~20M), Medium, Large, and GigaSpeech-trained. The Small variant is the best parity match for the ~30M VI model. All English models are 2023 vintage, but English ASR is a mature domain; Vietnamese-accented English benchmarking during Phase 4 will confirm adequacy.
 
@@ -67,8 +69,8 @@ Kavi v1 implements ASR as **two parallel Zipformer-30M transducer instances** �
 | **WER (Vietnamese)** | **7.97%** | ~15–18% (est.) | **Zipformer** |
 | **License** | **Apache 2.0** (unrestricted) | Community ($1M revenue cap) | **Zipformer** |
 | **Streaming** | ✅ **Native** (transducer) | ❌ Offline only | **Zipformer** |
-| **Model size (int8)** | **~10 MB** | ~50 MB | **Zipformer** |
-| **RTF** | **0.025** (40× real-time) | 0.05–0.08 | **Zipformer** |
+| **Model size (int8, on-disk)** | **~32 MB** | ~50 MB | **Zipformer** |
+| **RTF** | **0.011** (91× real-time, desktop 1 thread) | 0.05–0.08 | **Zipformer** |
 | **Confidence scores** | **Built-in `ys_log_probs`** (native per-token output) | Built-in token_log_probs | **Tie** |
 
 Zipformer decisively wins on accuracy, license, streaming, size, and speed. The confidence score gap from earlier research is eliminated — Zipformer natively outputs `ys_log_probs` per token, making language detection via confidence comparison a simple extraction from the existing JSON result.
@@ -78,7 +80,7 @@ Zipformer decisively wins on accuracy, license, streaming, size, and speed. The 
 | Aspect | Whisper Small batch=2 (ADR-007) | Dual Zipformer (this ADR) |
 | -------- | ------------------------------- | -------------------------- |
 | **Encoder TTFT** | ~400–800 ms | **~40 ms** (10–20× faster) |
-| **Total ASR memory** | ~430 MB | **~20 MB** |
+| **Total ASR memory** | ~430 MB | **~60 MB** (32 MB VI + 28 MB EN on-disk) |
 | **Streaming** | Fixed 30s window | **Native chunk processing** |
 | **Language detection** | Batch=2 in one decoder | **Parallel confidence from two streams** |
 | **Vietnamese WER** | ~20–25% | **7.97%** |
@@ -103,14 +105,14 @@ The removal of Whisper Small's decoder (~350 MB) and its KV cache (~240 MB) dram
 | Component | ADR-007 (Whisper) | ADR-008 (Dual Zipformer) | Delta |
 | ----------- | ------------------- | -------------------------- | ------- |
 | ASR encoder (NPU) | ~80 MB | **Eliminated** (CPU-only for v1) | −80 MB |
-| ASR decoder (CPU) | ~350 MB | **~10 MB** (Dual Zipformer int8) | −340 MB |
+| ASR decoder (CPU) | ~350 MB | **~60 MB** (Dual Zipformer int8 on-disk: 32 MB VI + 28 MB EN) | −290 MB |
 | ASR KV cache (batch=2) | ~240 MB | **~0** (transducer, no KV cache) | −240 MB |
-| **Total ASR** | **~670 MB** | **~10 MB** | **−660 MB** |
+| **Total ASR** | **~670 MB** | **~60 MB** | **−610 MB** |
 
-**New total accounted (statically allocated, max-size):** ~1.05 GB (down from ~1.71 GB)
-**Remaining headroom within 4 GB ceiling:** ~2.95 GB (up from ~2.3 GB)
+**New total accounted (statically allocated, max-size):** ~1.16 GB (down from ~1.71 GB)
+**Remaining headroom within 4 GB ceiling:** ~2.84 GB (up from ~2.3 GB)
 
-This ~660 MB saving provides substantial headroom for the TTS model (when selected), larger denoising models, or additional safety margin.
+This ~610 MB saving provides substantial headroom for the TTS model (when selected), larger denoising models, or additional safety margin.
 
 **NPU path ruled out for ASR v1 (confirmed):** Investigation of the sherpa-onnx QNN model catalog (Feb 2026) reveals that **Zipformer transducer (RNN-T) has no prebuilt QNN context binaries** — only Zipformer CTC (Chinese), Paraformer, and SenseVoice are available, all for SM8850 (Snapdragon 8 Elite) and newer chips. Even if DIY QNN compilation via QAIRT were pursued, three fundamental incompatibilities block it:
 
@@ -118,7 +120,7 @@ This ~660 MB saving provides substantial headroom for the TTS model (when select
 2. **RNN-T decoder loop** — the iterative frame-by-frame decoder does not map cleanly to the HTP's fixed-graph execution model.
 3. **Context binary size bloat** — existing QNN models are 241–351 MB (model.bin) vs ~10 MB ONNX int8, defeating the memory savings of Zipformer.
 
-**Decision:** ASR stays **CPU-only** for v1. Zipformer RTF 0.011 on desktop (0.011 for a 3.7s clip at 1 thread) is fast enough that NPU offload provides no meaningful benefit within the 2.0 s turnaround budget. The ADR-007 NPU→CPU ION zero-copy pipeline still applies to **Opus-MT encoder** (which has real transformer decoder complexity and verified Qualcomm AI Hub support).
+**Decision:** ASR stays **CPU-only** for v1. Zipformer RTF 0.011 on desktop ([verified from sherpa-onnx benchmark](https://k2-fsa.github.io/sherpa/onnx/pretrained_models/offline-transducer/zipformer-transducer-models.html): 0.041 s elapsed on a 3.74 s clip, 1 thread) is fast enough that NPU offload provides no meaningful benefit within the 2.0 s turnaround budget. The ADR-007 NPU→CPU ION zero-copy pipeline still applies to **Opus-MT encoder** (which has real transformer decoder complexity and verified Qualcomm AI Hub support).
 
 ---
 
@@ -233,7 +235,7 @@ Dual Zipformer running concurrently on 8 cores:
 
 - **Best-in-class Vietnamese ASR accuracy** — 7.97% WER vs Whisper Small's ~20–25%, directly improving translation quality
 - **Streaming-native architecture** — no fixed 30s window overhead; per-chunk processing eliminates ~400 ms of unnecessary encoder compute on short utterances
-- **~660 MB memory savings** — ASR footprint drops from ~670 MB to ~10 MB, freeing substantial headroom for TTS and future enhancements
+- **~610 MB memory savings** — ASR footprint drops from ~670 MB to ~60 MB (on-disk model weights), freeing substantial headroom for TTS and future enhancements
 - **Apache 2.0 license** — no revenue caps or enterprise licensing gates, unlike Moonshine
 - **NPU path confirmed infeasible** for Zipformer transducer — QNN's static input shapes are incompatible with streaming RNN-T architectures. ASR stays CPU-only, matching Zipformer's native RTF of 0.011–0.025 on desktop. NPU remains allocated to Opus-MT encoder via prebuilt Qualcomm AI Hub artifacts.
 - **Dual confidence comparison** preserves ADR-007's key win of eliminating external language detection
@@ -242,7 +244,7 @@ Dual Zipformer running concurrently on 8 cores:
 ### Negative / risk
 
 - **Confidence scores are native** — Zipformer outputs `ys_log_probs` (offline) / `ys_probs` (streaming) per token in the JSON result. No manual logit extraction or softmax shim required. Mitigation: validate mean-confidence comparison works across both model variants during Phase 4.
-- **Dual models double the loading time** — two Zipformer instances at cold start vs one Whisper. Mitigation: both are tiny (~10 MB each vs Whisper's ~430 MB), so total load time is still dramatically faster.
+- **Dual models double the loading time** — two Zipformer instances at cold start vs one Whisper. Mitigation: both are small (~32 MB + ~28 MB on-disk vs Whisper's ~430 MB), so total load time is still dramatically faster.
 - **No QNN path for Zipformer transducer** — prebuilt QNN artifacts exist only for Zipformer CTC, Paraformer, and SenseVoice (all Chinese-focused, SoC-locked). QNN's fixed input shapes fundamentally conflict with streaming transducer processing. The RNN-T iterative decoder loop does not map to HTP's graph-execution model. Mitigation: CPU-only ASR is the correct architectural choice; NPU investment stays focused on Opus-MT.
 - **EN Zipformer model quality unverified** — the EN-side Zipformer Small (2023 vintage) may underperform on Vietnamese-accented English. Mitigation: benchmark against FLEURS-en during Phase 4; fall back to Whisper Small EN-only or sherpa-onnx's other EN models if needed.
 - **Two maintained ASR models** — instead of one multilingual model, v1 carries two separate Zipformer checkpoints with different update cycles. Mitigation: both use the same sherpa-onnx transducer interface, so maintenance is uniform.
@@ -288,8 +290,8 @@ rm -rf test_wavs README.md   # strip test artifacts
 
 Stripped model size per language:
 
-- **Vi int8:** encoder 25 MB + decoder 4.9 MB + joiner 1.2 MB + tokens.txt 55 KB ≈ **~31 MB**
-- **EN Small int8:** similar profile ≈ **~30 MB**
+- **Vi int8:** encoder 26 MB + decoder 4.9 MB (fp32) + joiner 1.0 MB + tokens.txt 23 KB + bpe.model 262 KB ≈ **~32 MB** ([source](https://k2-fsa.github.io/sherpa/onnx/pretrained_models/offline-transducer/zipformer-transducer-models.html#sherpa-onnx-zipformer-vi-30m-int8-2026-02-09))
+- **EN Small int8:** encoder 26 MB + decoder 1.3 MB (int8) + joiner 259 KB + tokens.txt 5 KB ≈ **~28 MB** ([source](https://huggingface.co/csukuangfj/sherpa-onnx-zipformer-small-en-2023-06-26/tree/main))
 
 ### Kotlin API usage
 
@@ -330,9 +332,9 @@ This provides an immediate test artifact for device-level validation before our 
 
 ### Open items for Phase 4 benchmarking
 
-- [ ] **Benchmark fp32 vs int8 for Zipformer-30M-VI** — both variants are available on the sherpa-onnx releases page (`sherpa-onnx-zipformer-vi-30M-2026-02-09` fp32 at ~100 MB encoder vs `sherpa-onnx-zipformer-vi-30M-int8-2026-02-09` int8 at ~26 MB encoder). Compare WER and RTF on the Kavi eval set. Int8 is expected to add 0–0.5% WER degradation while running ~20–30% faster; confirm this holds for Vietnamese-accented speech and factory noise conditions. The decision memo below will be updated with the winning variant.
+- [ ] **Benchmark fp32 vs int8 for Zipformer-30M-VI** — both variants are available on the sherpa-onnx releases page (`sherpa-onnx-zipformer-vi-30M-2026-02-09` fp32 at ~91 MB encoder vs `sherpa-onnx-zipformer-vi-30M-int8-2026-02-09` int8 at ~26 MB encoder). Compare WER and RTF on the Kavi eval set. Int8 is expected to add 0–0.5% WER degradation while running ~20–30% faster; confirm this holds for Vietnamese-accented speech and factory noise conditions. The decision memo below will be updated with the winning variant.
 - [ ] Verify Zipformer-30M-VI WER on Kavi's bespoke factory/logistics eval set (not just VLSP2025)
-- [ ] Benchmark Dual Zipformer RTF and peak RAM on the Meizu 21 Note (SD8G2)
+- [ ] **Benchmark Dual Zipformer RTF on Meizu 21 Note (SD8G2) — hard gate.** The current RTF 0.011 is from a desktop benchmark (1 thread, 3.7 s clip). The entire CPU-only ASR architecture rests on this assumption. If device RTF exceeds ~0.05 (20× real-time), the 2.0 s turnaround budget is at risk and NPU offload must be reconsidered. This is a go/no-go gate for the CPU-only decision, not a nice-to-have.
 - [ ] Implement and validate confidence-based language detection against a held-out code-switched set
 - [ ] Evaluate EN Zipformer Small on Vietnamese-accented English (FLEURS-en subset)
 - [ ] Compare turnaround latency: Dual Zipformer streaming vs Whisper Small fixed-window
