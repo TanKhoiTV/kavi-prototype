@@ -20,7 +20,7 @@ ADR-007 and ADR-008 reserve a TTS slot in the inference pipeline but leave the m
 | **Latency** | RTF < 1.0 (real-time); RTF < 0.5 preferred for snappy UX |
 | **License** | Must permit commercial use (MIT, Apache-2.0, or CC BY 4.0 with attribution) |
 | **Android** | Must integrate via sherpa-onnx JNI with the existing Kotlin `OfflineTts` API |
-| **Memory** | Must fit within the 4 GB peak budget established in ADR-007 Decision 5, shared with ASR (~20 MB), MT (~100 MB), denoiser (~50 MB), and runtime overhead |
+| **Memory** | Must fit within the 4 GB peak budget established in ADR-007 Decision 5, shared with ASR (~60 MB dual Zipformer int8, per ADR-008 deployment section), MT (~500 MB encoder+decoder+KV cache, per ADR-007 Decision 5), denoiser (~50 MB), and runtime overhead |
 | **Multi-speaker** | At minimum one male and one female voice for each language (optional but strongly preferred) |
 | **Prosody control** | Nice-to-have, not a requirement |
 
@@ -43,11 +43,12 @@ The full sherpa-onnx TTS model catalog was surveyed. Models were screened for:
 
 | Attribute | Detail |
 | --------- | ------ |
-| **License** | **MIT** (model weights + code, Supertone Inc.) |
+| **License** | **BigScience OpenRAIL-M** (model weights) + **MIT** (code). OpenRAIL-M permits commercial use but includes use-based restrictions — see [LICENSE](https://huggingface.co/Supertone/supertonic-3/blob/main/LICENSE). |
 | **Languages** | **31 languages** — `vi` + `en` + 29 others in a single model |
 | **Parameters** | 99M (open-weight ONNX) |
-| **Compressed** | **122.8 MB** (tar.bz2) |
-| **On-disk extracted** | ~280–320 MB (4 ONNX sub-models + vocoder + voice.bin + config) |
+| **Compressed download** | **122.8 MB** (tar.bz2 from sherpa-onnx releases) |
+| **On-disk extracted (sherpa-onnx int8 bundle)** | ~280–320 MB (4 ONNX int8 sub-models + vocoder + voice.bin + config) |
+| **Native model (upstream Python SDK)** | ~400 MB (fp32 weights, not used in sherpa-onnx deployment) |
 | **Sample rate** | **44.1 kHz** 16-bit WAV — studio-grade, no upsampling needed |
 | **Voices** | **10 built-in voice styles**: M1–M5 (male), F1–F5 (female), per language |
 | **RTF (M4 Pro CPU)** | **0.012–0.023** — significantly faster than real-time |
@@ -67,7 +68,7 @@ The full sherpa-onnx TTS model catalog was surveyed. Models were screened for:
 - 44.1 kHz output — production-ready audio quality
 - 10 built-in voices across gender spectrum
 - Pre-built Android APK for immediate device testing
-- MIT license — no attribution boilerplate, no revenue cap
+- OpenRAIL-M license (model) + MIT (code) — permits commercial use with use-based restrictions; no revenue cap
 - Voice cloning via Voice Builder JSON export (available until August 31, 2026)
 
 **Cons / risks:**
@@ -159,7 +160,7 @@ The full sherpa-onnx TTS model catalog was surveyed. Models were screened for:
 - **Larger peak RAM** — ~250–350 MB vs Supertonic's ~200 MB. Still fits within the 4 GB budget but consumes more headroom.
 - **English voice quality is accented** — English output carries a Vietnamese speaker accent. For EN→VI direction (Vietnamese user hearing translated English), this may be acceptable; for VI→EN direction (English speaker hearing the translation), it may sound less natural.
 - **Emotion tags are experimental** — marked experimental in v3 Turbo early access. Standard tags (`[cười]`, `[thở dài]`) work consistently at natural punctuation pauses, but can occasionally cause pitch instability during aggressive voice cloning or high-speed streaming.
-- **Model format fragmentation** — the optimal hybrid path (GGUF backbone + ONNX codec) means two different inference engines in the same pipeline, increasing build complexity.
+- **Model format fragmentation / toolchain sprawl** — the optimal hybrid path (GGUF backbone + ONNX codec) means two different inference engines in the same pipeline, increasing build complexity. This adds a fourth runtime family (GGUF/llama.cpp) on top of QNN/QAIRT, ONNX Runtime, and sherpa-onnx JNI — cross-referencing ADR-003's toolchain sprawl risk.
 
 ---
 
@@ -193,7 +194,7 @@ For the initial v1 release, use **SupertonicTTS 3** as the single-model TTS engi
 
 3. **Latency headroom** — RTF 0.012 on M4 Pro CPU is dramatically faster than real-time. Even on SD8G2, the expected RTF (~0.10–0.15) leaves headroom in the 2.0 s pipeline budget.
 
-4. **MIT license** — no attribution boilerplate, no revenue cap.
+4. **OpenRAIL-M + MIT license** — permits commercial use; no revenue cap. See [Supertonic 3 LICENSE](https://huggingface.co/Supertone/supertonic-3/blob/main/LICENSE) for use-based restrictions.
 
 ### Phase 2 (v1.x or v2): Migrate to VieNeu-TTS v3 Turbo
 
@@ -213,7 +214,7 @@ Build the `VieNeu-TTS.cpp` NDK/JNI bridge and switch to VieNeu-TTS v3 Turbo as t
 
 | Risk | Mitigation |
 | ---- | ---------- |
-| Repository archived after 2026-08 | The model is MIT-licensed and frozen, not removed. sherpa-onnx releases will continue to bundle the ONNX assets. Phase 2 migration to VieNeu-TTS removes dependency entirely. |
+| Repository archived after 2026-08 | The model is OpenRAIL-M-licensed and frozen, not removed. sherpa-onnx releases will continue to bundle the ONNX assets. Phase 2 migration to VieNeu-TTS removes dependency entirely. |
 | No upstream bug fixes | The model is a static ONNX graph — no runtime patches needed. Sherpa-onnx itself maintains the inference engine separately. |
 | Voice Builder shutdown after 2026-08-31 | If the team wants a custom Kavi voice, create and export the JSON profile before the shutdown date. Pre-built voices (M1–M5, F1–F5) remain available indefinitely. |
 
@@ -226,15 +227,20 @@ TranslationService pipeline (from ADR-007 Decision 1)
 │ TTS: SupertonicTTS 3 (single ONNX session via sherpa-onnx) │
 │                                                             │
 │  OfflineTtsConfig:                                          │
-│    model = "sherpa-onnx-supertonic-3-tts-int8"              │
-│    voice = "M1" / "F1" / ... (10 built-in)                  │
-│    lang  = "vi" or "en"  (switched per utterance)           │
+│    model.supertonic = {                                     │
+│      durationPredictor, textEncoder, vectorEstimator,       │
+│      vocoder, ttsJson, unicodeIndexer, voiceStyle           │
+│    }                                                        │
 │    numThreads = 4                                            │
 │    provider = "cpu"                                          │
 │                                                              │
-│  OfflineTts.createStream() → OfflineTtsStream                │
-│  stream.addText(text, sid, speed)                            │
-│  tts.synthesize(stream) → float[] audio_samples              │
+│  GenerationConfig:                                          │
+│    sid = 0–9 (selects voice: M1–M5, F1–F5)                  │
+│    lang = "vi" or "en" (switched per utterance)              │
+│    speed = 1.0                                               │
+│                                                              │
+│  tts.generateWithConfigAndCallback(text, genConfig)          │
+│  → float[] audio_samples                                     │
 └────────────────────────────────────────────────────────────┘
     ↓ (44.1 kHz PCM float)
 AudioTrack → playback / Bluetooth A2DP
@@ -243,24 +249,39 @@ AudioTrack → playback / Bluetooth A2DP
 Example Kotlin integration (Phase 1):
 
 ```kotlin
-// Single config, both languages (Sherpa-onnx Java API)
+// Single config, both languages (Sherpa-onnx Kotlin API)
+// Source: https://github.com/k2-fsa/sherpa-onnx/blob/master/kotlin-api-examples/test_supertonic_tts.kt
 val ttsConfig = OfflineTtsConfig(
-    model = "$modelDir/sherpa-onnx-supertonic-3-tts-int8",
-    voice = "M1",          // or F1–F5, M2–M5
-    numThreads = 4,
-    provider = "cpu"
+    model = OfflineTtsModelConfig(
+        supertonic = OfflineTtsSupertonicModelConfig(
+            durationPredictor = "$modelDir/duration_predictor.int8.onnx",
+            textEncoder = "$modelDir/text_encoder.int8.onnx",
+            vectorEstimator = "$modelDir/vector_estimator.int8.onnx",
+            vocoder = "$modelDir/vocoder.int8.onnx",
+            ttsJson = "$modelDir/tts.json",
+            unicodeIndexer = "$modelDir/unicode_indexer.bin",
+            voiceStyle = "$modelDir/voice.bin",
+        ),
+        numThreads = 4,
+    ),
 )
-val tts = OfflineTts(ttsConfig)
+val tts = OfflineTts(config = ttsConfig)
 
 // For each utterance, select language based on ASR language detection (ADR-008):
+// VI_TO_EN: user spoke VI → translated text is English → TTS lang="en"
+// EN_TO_VI: user spoke EN → translated text is Vietnamese → TTS lang="vi"
 fun synthesize(text: String, direction: TranslationDirection): FloatArray {
     val lang = when (direction) {
-        VI_TO_EN -> "vi"
-        EN_TO_VI -> "en"
+        VI_TO_EN -> "en"   // translated text is English
+        EN_TO_VI -> "vi"   // translated text is Vietnamese
     }
-    val stream = tts.createStream()
-    stream.addText(text, sid = 0, speed = 1.0)
-    return tts.synthesize(stream)
+    val genConfig = GenerationConfig(
+        sid = 0,           // speaker ID: 0–9 maps to M1–M5, F1–F5
+        speed = 1.0f,
+        numSteps = 8,
+        extra = mapOf("lang" to lang),
+    )
+    return tts.generateWithConfigAndCallback(text, genConfig) { samples -> 1 }
 }
 ```
 
@@ -337,9 +358,9 @@ class VieNeuTTSWrapper(modelPath: String) {
 - **Single model, single config, zero branching** — the TTS pipeline is a straight line. Load one ONNX session, switch `lang` per utterance. No dual-manifest management, no model-swap logic.
 - **44.1 kHz native output** — matches Bluetooth A2DP high-quality profile. No resampling needed.
 - **10 voices built-in** — male and female options for both VI and EN without additional downloads.
-- **MIT license** — cleanest possible commercial terms. No attribution screen needed.
+- **OpenRAIL-M + MIT license** — permits commercial use; no revenue cap. Use-based restrictions apply to model weights (see LICENSE).
 - **Pre-built APK available now** — immediate device testing without custom JNI builds.
-- **Repository archival is not a service shutdown** — the model binaries remain downloadable and MIT-licensed indefinitely.
+- **Repository archival is not a service shutdown** — the model binaries remain downloadable under OpenRAIL-M indefinitely.
 
 ### Positive (Phase 2 — VieNeu-TTS)
 
@@ -351,7 +372,7 @@ class VieNeuTTSWrapper(modelPath: String) {
 
 ### Negative / risk
 
-- **~280–320 MB on-disk (Phase 1)** — Supertonic is non-trivial. Combined with ASR (~20 MB), MT (~100 MB), denoiser (~50 MB), total may push past 500 MB. Mitigation: Android APK expansion file (OBB) or on-device download on first run.
+- **~280–320 MB on-disk (Phase 1)** — Supertonic is non-trivial. Combined with ASR (~60 MB dual Zipformer int8), MT (~500 MB encoder+decoder+KV cache), denoiser (~50 MB), total may exceed 800 MB. Mitigation: Android APK expansion file (OBB) or on-device download on first run.
 - **Repository archival (Phase 1)** — Supertonic stops evolving after August 2026. Mitigation: Phase 2 migration to VieNeu-TTS removes this dependency entirely.
 - **44.1 kHz vocoder on mobile CPU (Phase 1)** — Supertonic's RTF may degrade on SD8G2 vs. M4 Pro benchmarks. If RTF exceeds 0.5, fall back to Piper VITS.
 - **Android integration effort (Phase 2)** — VieNeu-TTS requires a ~1.5–2 day NDK/JNI bridge. No pre-built AAR exists. Mitigation: start building in parallel with Phase 1.
@@ -369,8 +390,8 @@ class VieNeuTTSWrapper(modelPath: String) {
 - **VieNeu-TTS GitHub (active):** <https://github.com/pnnbao97/VieNeu-TTS>
 - **VieNeu-TTS v3 Turbo HuggingFace:** <https://huggingface.co/pnnbao-ump/VieNeu-TTS-v3-Turbo>
 - **VieNeu-TTS.cpp (C++ engine):** <https://github.com/dduongtrandai/VieNeu-TTS.cpp>
-- **MOSS-Audio-Tokenizer-Nano ONNX:** <https://huggingface.co/OpenMOSS-Team/MOSS-Audio-Tokenizer-Nano-ONNX>
-- **sea-g2p phonemizer:** <https://github.com/pnnbao97/sea-g2p>
+- **MOSS-Audio-Tokenizer-Nano ONNX:** <https://huggingface.co/OpenMOSS-Team/MOSS-Audio-Tokenizer-Nano-ONNX> (Apache 2.0 — [LICENSE](https://raw.githubusercontent.com/OpenMOSS/MOSS-Audio-Tokenizer/main/LICENSE))
+- **sea-g2p phonemizer:** <https://github.com/pnnbao97/sea-g2p> (Apache 2.0 — [LICENSE](https://raw.githubusercontent.com/pnnbao97/sea-g2p/main/LICENSE))
 - **Supertonic 3 Python SDK docs:** <https://supertone-inc.github.io/supertonic-py/>
 - **Supertonic 3 GitHub (to be archived):** <https://github.com/supertone-inc/supertonic>
 - **Supertonic 3 ONNX models (HuggingFace):** <https://huggingface.co/Supertone/supertonic-3>
@@ -381,6 +402,7 @@ class VieNeuTTSWrapper(modelPath: String) {
 - **Piper VITS voices (sherpa-onnx):** <https://k2-fsa.github.io/sherpa/onnx/tts/piper.html>
 - **Piper GitHub (active):** <https://github.com/rhasspy/piper>
 - **VAIS1000 dataset license (CC BY 4.0):** <https://zenodo.org/records/14034235>
-- **ADR-007:** Production Inference Architecture & Service Layer (TTS slot reserved)
-- **ADR-008:** v1 Android ASR Decision — Dual Zipformer (TTS remains TBD in pipeline)
+- **ADR-003:** Hexagon runtime / compiler strategy (toolchain sprawl risk — relevant to Phase 2 GGUF/llama.cpp addition)
+- **ADR-007:** Production Inference Architecture & Service Layer (TTS slot reserved, Decision 5 memory budget)
+- **ADR-008:** v1 Android ASR Decision — Dual Zipformer (TTS remains TBD in pipeline, corrected ASR memory ~60 MB)
 - **ADR-004:** Speech-to-Speech Architecture / Tech-Stack (deferred decisions)
