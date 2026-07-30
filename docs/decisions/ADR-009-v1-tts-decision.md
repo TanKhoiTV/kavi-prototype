@@ -120,12 +120,55 @@ The full sherpa-onnx TTS model catalog was surveyed. Models were screened for:
 
 ---
 
+### Candidate 3: VieNeu-TTS v3 Turbo (Strong Alternative — Outside sherpa-onnx)
+
+**Bilingual Vietnamese-English TTS trained from scratch on 10,000+ hours of speech.** Uses a two-stage architecture: an autoregressive transformer backbone (Qwen3-based, ~0.1B params) paired with the MOSS-Audio-Tokenizer-Nano neural codec for 48 kHz waveform output. Runs outside sherpa-onnx via the standalone [VieNeu-TTS.cpp](https://github.com/dduongtrandai/VieNeu-TTS.cpp) C++ inference engine.
+
+| Attribute | Detail |
+| --------- | ------ |
+| **License** | **Apache 2.0** (model weights + code) |
+| **Languages** | **Bilingual VI+EN** — trained for Vietnamese-first output with native English code-switching via `sea-g2p` phonemizer |
+| **Architecture** | Autoregressive transformer backbone (Qwen3-based, ~0.1B params) + MOSS neural audio codec decoder |
+| **Compressed (int8/Q4)** | **~160–200 MB** — backbone ~130–160 MB, codec decoder ~25–35 MB, phonemizer lexicon ~3–5 MB |
+| **Sample rate** | **48 kHz** 16-bit WAV — highest output quality of any candidate |
+| **Voices** | **8 built-in default voices**: Ngọc Lan, Ngọc Linh, Trúc Ly, Mỹ Duyên (female); Xuân Vĩnh, Thái Sơn, Gia Bảo, Đức Trí (male) |
+| **RTF (SD8G2 CPU, int8/Q4)** | **0.15–0.25** — 4–6× real-time on Snapdragon 8 Gen 2 |
+| **TTFT (first audio)** | ~120–180 ms for short sentences |
+| **Emotion tags** | ✅ **Native support** — `[cười]` (laugh), `[thở dài]` (sigh), `[hắng giọng]` (clear throat), `[ngập ngừng]` (hesitation), `[kể chuyện]` (storytelling), `[suy nghĩ]` (pause/ponder) |
+| **Reading styles** | natural, news, storytelling — selected via voice prompt |
+| **Voice cloning** | ✅ **Zero-shot** — from 3–5 s reference audio, no reference text needed. Temperature 0.7–0.8 for consistent identity |
+| **English quality** | Clear and intelligible, slight Vietnamese accent. Intrasentential code-switching (e.g., "Hệ thống sử dụng alternating current") executes smoothly |
+| **Android integration** | Requires **custom NDK build** of `VieNeu-TTS.cpp` + JNI bridge (~1.5–2 days). No pre-built AAR exists |
+| **Inference backends** | Two paths: (1) **GGUF/llama.cpp** — 20–30% faster on ARM NEON for autoregressive backbone; (2) **ONNX Runtime** — for codec decoder |
+| **Peak RAM** | ~250–350 MB during active synthesis |
+| **Repository status** | ✅ **Active development** — v3 Turbo early access now, full v3 targeted mid-to-late 2026. Maintained by Phạm Nguyễn Ngọc Bảo (model) and dduongtrandai (C++ engine) |
+
+**Pros:**
+
+- **Best Vietnamese quality of all candidates** — trained from scratch on 10,000+ hours of bilingual VI+EN speech, not a fine-tune or adaptation. 48 kHz output is the highest sample rate available.
+- **Native expression tags** — `[cười]`, `[thở dài]`, `[hắng giọng]` work inline, answering the prosody question that Supertonic leaves uncertain on mobile. Additional experimental tags (`[ngập ngừng]`, `[kể chuyện]`, `[suy nghĩ]`) for finer control.
+- **Apache 2.0 license** — clean commercial terms, no attribution required, no revenue cap. Active maintenance with no archival risk.
+- **Zero-shot voice cloning** — 3–5 s reference audio, no reference text needed. Available indefinitely (no Voice Builder shutdown deadline).
+- **GGUF/llama.cpp path is faster than ONNX for autoregressive decoding** — 20–30% speedup on ARM NEON vs ONNX Runtime for the backbone.
+- **Active community** — rapid iteration through v1 → v2 → v2 Turbo → v3 Turbo in under a year. Full v3 release with expanded features incoming.
+
+**Cons / risks:**
+
+- **Android integration effort** — no pre-built APK or AAR. Requires NDK cross-compilation of `VieNeu-TTS.cpp` and a ~1.5–2 day JNI bridge. This is the primary adoption barrier for v1.
+- **No sherpa-onnx compatibility** — uses a separate C++ runtime. Cannot reuse the `OfflineTts` Kotlin API from ADR-008's ASR integration pattern.
+- **Larger peak RAM** — ~250–350 MB vs Supertonic's ~200 MB. Still fits within the 4 GB budget but consumes more headroom.
+- **English voice quality is accented** — English output carries a Vietnamese speaker accent. For EN→VI direction (Vietnamese user hearing translated English), this may be acceptable; for VI→EN direction (English speaker hearing the translation), it may sound less natural.
+- **Emotion tags are experimental** — marked experimental in v3 Turbo early access. Standard tags (`[cười]`, `[thở dài]`) work consistently at natural punctuation pauses, but can occasionally cause pitch instability during aggressive voice cloning or high-speed streaming.
+- **Model format fragmentation** — the optimal hybrid path (GGUF backbone + ONNX codec) means two different inference engines in the same pipeline, increasing build complexity.
+
+---
+
 ### Ruled-out candidates
 
 | Model | Why ruled out |
 | ----- | ------------- |
 | **Kokoro** (v1.0, v1.1) | No Vietnamese support — only English, Chinese, Japanese, Korean. Int8 at 126–140 MB but does not cover the primary requirement. |
-| **MeloTTS** | RTF 6.7 on RPi4 single-thread — too slow for real-time without heavy multi-threading. zh_en bilingual only, no Vietnamese. |
+| **MeloTTS** (original) | RTF 6.7 on RPi4 single-thread — too slow for real-time without heavy multi-threading. zh_en bilingual only, no Vietnamese. A community Vietnamese fork exists (`nmcuong/MeloTTS-Vietnamese`, MIT) but the author warns of suboptimal voice quality and imprecise transcriptions from a 25 h dataset. Would need fine-tuning on quality data for production use — not a v1 path. |
 | **KittenTTS** | English-only models (nano/mini). No Vietnamese. Would require pairing with a separate VI TTS. |
 | **ZipVoice** | Zero-shot voice cloning model requiring both reference audio and exact reference text transcript. CN/EN bilingual only. |
 | **PocketTTS** | Zero-shot voice cloning requiring reference audio only, but CN/EN only. No Vietnamese. |
@@ -134,33 +177,47 @@ The full sherpa-onnx TTS model catalog was surveyed. Models were screened for:
 
 ---
 
-## Recommended Decision: SupertonicTTS 3 for v1 Android
+## Recommended Decision: Phased TTS Strategy for v1 Android
 
-Kavi v1 TTS should use **SupertonicTTS 3** as a single-model, single-config TTS engine via sherpa-onnx, covering both Vietnamese and English output with a unified ONNX session.
+Kavi v1 TTS should adopt a **two-phase approach**: start with **SupertonicTTS 3 via sherpa-onnx** for rapid integration, then transition to **VieNeu-TTS v3 Turbo** as the primary Vietnamese TTS engine once the NDK/JNI bridge is built. Piper VITS serves as a lightweight fallback if neither primary option meets latency or size constraints.
 
-### Rationale
+### Phase 1 (v1 launch): SupertonicTTS 3 via sherpa-onnx
 
-1. **Single-model simplicity** — `--lang vi` / `--lang en` switching on the same ONNX session avoids dual-configuration overhead, dual memory reservation, and branch logic in the pipeline. This aligns with ADR-008's architectural preference for merged simplicity.
+For the initial v1 release, use **SupertonicTTS 3** as the single-model TTS engine. This gets Kavi to market with minimal integration risk while the VieNeu-TTS bridge is developed in parallel.
 
-2. **Latency headroom** — RTF 0.012 on M4 Pro CPU is dramatically faster than real-time. Even accounting for less capable mobile SoCs (SD8G2), the headroom is substantial. The 44.1 kHz vocoder is the heaviest component but benefits from ONNX Runtime CPU optimisations (ALL_OPT, arena allocator) already established in ADR-007 Decision 10.
+**Rationale for Phase 1:**
 
-3. **Output quality** — 44.1 kHz native output matches (or exceeds) typical Bluetooth A2DP sink rates. No upsampling pipeline needed. The built-in numerical text handling (currency, dates, phone numbers) is best-in-class among open TTS models.
+1. **Zero integration lead time** — pre-built APKs exist. The `OfflineTts` Kotlin API mirrors the `OfflineRecognizer` from ADR-008. The team builds expertise with one sherpa-onnx API surface for both ASR and TTS.
 
-4. **10 built-in voices** — five male + five female per language, covering the multi-speaker requirement without any voice cloning or additional model downloads.
+2. **Single-model simplicity** — `--lang vi` / `--lang en` switching on the same ONNX session avoids dual-configuration overhead and branch logic in the pipeline. This aligns with ADR-008's architectural preference for merged simplicity.
 
-5. **Android readiness** — pre-built APKs exist. The `OfflineTts` Kotlin API mirrors the `OfflineRecognizer` integration from ADR-008, so the team builds expertise with one sherpa-onnx API surface.
+3. **Latency headroom** — RTF 0.012 on M4 Pro CPU is dramatically faster than real-time. Even on SD8G2, the expected RTF (~0.10–0.15) leaves headroom in the 2.0 s pipeline budget.
 
-6. **MIT license** — no attribution boilerplate, no revenue cap, no concerns about the $1M threshold that affected Moonshine Tiny in ADR-008's evaluation.
+4. **MIT license** — no attribution boilerplate, no revenue cap.
 
-### Key mitigations for the archival risk
+### Phase 2 (v1.x or v2): Migrate to VieNeu-TTS v3 Turbo
+
+Build the `VieNeu-TTS.cpp` NDK/JNI bridge and switch to VieNeu-TTS v3 Turbo as the primary Vietnamese TTS engine. Keep Supertonic as a fallback or for English-only paths.
+
+**Rationale for Phase 2:**
+
+1. **Superior Vietnamese quality** — 48 kHz output and 10,000+ hours of bilingual training produce more natural Vietnamese speech than Supertonic's multilingual generalist approach.
+
+2. **Native emotion tags** — `[cười]`, `[thở dài]`, `[hắng giọng]` enable inline expression control that Supertonic cannot guarantee on mobile. This directly addresses the prosody question.
+
+3. **Zero-shot voice cloning** — available indefinitely (no Voice Builder shutdown). With temperature 0.7–0.8, cloned voices remain consistent across utterances.
+
+4. **No archival risk** — Apache 2.0, active community, rapid iteration.
+
+### Key mitigations for the archival risk (Supertonic Phase 1)
 
 | Risk | Mitigation |
 | ---- | ---------- |
-| Repository archived after 2026-08 | The model is MIT-licensed and frozen, not removed. Pi releases from sherpa-onnx will continue to bundle the ONNX assets. No online dependency. |
-| No upstream bug fixes | The model is a static ONNX graph — no runtime patches needed. Sherpa-onnx itself maintains the inference engine (libsherpa-onnx-jni.so), which is separate and actively developed. |
-| Voice Builder shutdown after 2026-08-31 | Extract and save any desired custom voice JSON profiles before the shutdown date. Pre-built voices (M1–M5, F1–F5) remain available indefinitely. |
+| Repository archived after 2026-08 | The model is MIT-licensed and frozen, not removed. sherpa-onnx releases will continue to bundle the ONNX assets. Phase 2 migration to VieNeu-TTS removes dependency entirely. |
+| No upstream bug fixes | The model is a static ONNX graph — no runtime patches needed. Sherpa-onnx itself maintains the inference engine separately. |
+| Voice Builder shutdown after 2026-08-31 | If the team wants a custom Kavi voice, create and export the JSON profile before the shutdown date. Pre-built voices (M1–M5, F1–F5) remain available indefinitely. |
 
-### Integration architecture
+### Integration architecture (Phase 1 — Supertonic)
 
 ```
 TranslationService pipeline (from ADR-007 Decision 1)
@@ -183,7 +240,7 @@ TranslationService pipeline (from ADR-007 Decision 1)
 AudioTrack → playback / Bluetooth A2DP
 ```
 
-Example Kotlin integration:
+Example Kotlin integration (Phase 1):
 
 ```kotlin
 // Single config, both languages (Sherpa-onnx Java API)
@@ -207,6 +264,50 @@ fun synthesize(text: String, direction: TranslationDirection): FloatArray {
 }
 ```
 
+### Integration architecture (Phase 2 — VieNeu-TTS)
+
+```
+TranslationService pipeline (from ADR-007 Decision 1)
+    ↓ (translated text from Opus-MT decoder)
+┌───────────────────────────────────────────────────────────────┐
+│ TTS: VieNeu-TTS v3 Turbo (via VieNeu-TTS.cpp + JNI bridge)   │
+│                                                               │
+│  // Hybrid inference: GGUF backbone + ONNX codec decoder      │
+│  // C ABI via vieneu_tts.h → JNI → Kotlin                     │
+│                                                               │
+│  VieNeuTTS.init(modelDir, profile="vieneu-v3-onnx")          │
+│    ↓                                                            │
+│  audio = VieNeuTTS.synthesize(text, voice, lang)              │
+│    // emotion tags work inline: "Nghe hay quá [cười]"         │
+└───────────────────────────────────────────────────────────────┘
+    ↓ (48 kHz PCM float)
+AudioTrack → playback / Bluetooth A2DP
+```
+
+Example Kotlin integration (Phase 2):
+
+```kotlin
+// Custom JNI wrapper for VieNeu-TTS.cpp (estimated 1.5–2 days to build)
+class VieNeuTTSWrapper(modelPath: String) {
+    private var handle: Long = 0
+
+    suspend fun synthesize(
+        text: String,
+        voice: String = "Ngọc Lan",
+        lang: String = "vi"
+    ): FloatArray = withContext(Dispatchers.Default) {
+        nativeSynthesize(handle, text, voice, lang)
+    }
+
+    private external fun nativeSynthesize(
+        handle: Long,
+        text: String,
+        voice: String,
+        lang: String
+    ): FloatArray
+}
+```
+
 ---
 
 ## Open items
@@ -220,33 +321,56 @@ fun synthesize(text: String, direction: TranslationDirection): FloatArray {
 | **Pre-built APK evaluation** | Download and test the pre-built Android TTS Engine APK for Supertonic 3 VI and EN on the SD8G2 device. Validate audio quality and latency before custom build. | Integration | Phase 3 (ongoing) |
 | **Expression tag investigation** | Investigate whether sherpa-onnx's Supertonic wrapper supports the 10 inline expression tags (`<laugh>`, `<breath>`, etc.). If yes, document and evaluate for Kavi's UX. | Research | Phase 4 |
 | **Piper fallback verification** | Benchmark Piper VITS dual-model path (VAIS1000 + Amy/Lessac) as a fallback option if Supertonic is too slow on SD8G2 or the archival risk is deemed unacceptable. | Benchmarking | Phase 4 |
+| **VieNeu-TTS NDK build** | Cross-compile `VieNeu-TTS.cpp` for `arm64-v8a` using Android NDK r25c+. Validate the CMake toolchain with `-DENABLE_NEON=ON -DCMAKE_CXX_FLAGS="-O3 -flto"`. Measure build output size. | Integration | Phase 3 (parallel) |
+| **VieNeu-TTS JNI bridge** | Write JNI wrapper around `vieneu_tts.h` C ABI (vieneu_init, vieneu_synthesize, vieneu_free). Target ~1.5–2 days effort. Expose as `VieNeuTTSWrapper` Kotlin class with `suspend fun synthesize()`. | Integration | Phase 3 (parallel) |
+| **VieNeu-TTS Android RTF benchmark** | Measure RTF on SD8G2 for both inference paths (GGUF backbone + ONNX codec vs. pure ONNX). Compare to Supertonic 3 baseline. | Benchmarking | Phase 4 |
+| **VieNeu-TTS emotion tag reliability** | Test all documented tags (`[cười]`, `[thở dài]`, `[hắng giọng]`, `[ngập ngừng]`, `[kể chuyện]`, `[suy nghĩ]`) on device. Classify each as stable vs. experimental. Document sanitisation path for critical translations. | Research | Phase 4 |
+| **VieNeu-TTS English quality assessment** | Conduct listening test comparing VieNeu-TTS English output (accented) vs. Supertonic English output (native) for the VI→EN direction. Decide whether accent is acceptable for the target user. | UX / PM | Phase 4 |
+| **Phased migration plan** | Define cutover criteria from Phase 1 (Supertonic) to Phase 2 (VieNeu-TTS): RTF threshold, quality score, JNI bridge completion, emotion tag readiness. | Architecture | Phase 3 |
 
 ---
 
 ## Consequences
 
-### Positive
+### Positive (Phase 1 — Supertonic)
 
-- **Single model, single config, zero branching** — the TTS pipeline is a straight line. Load one ONNX session, switch `lang` per utterance. No dual-manifest management, no model-swap logic, no concurrency concerns with two TTS engines.
-- **44.1 kHz native output** — matches Bluetooth A2DP high-quality profile. No resampling or quality loss in the audio output path.
-- **10 voices built-in** — male and female options for both VI and EN without additional downloads. Users can toggle or the system can auto-select based on ASR-detected speaker gender.
-- **MIT license** — cleanest possible commercial terms. No attribution screen needed, no usage tracking.
-- **Pre-built APK available now** — the team can evaluate TTS quality on device today, without building custom JNI libs.
-- **Repository archival is not a service shutdown** — the model binaries remain downloadable and MIT-licensed indefinitely. The open-source ONNX assets are frozen, not removed. Sherpa-onnx (the integration layer) continues active development independently.
+- **Single model, single config, zero branching** — the TTS pipeline is a straight line. Load one ONNX session, switch `lang` per utterance. No dual-manifest management, no model-swap logic.
+- **44.1 kHz native output** — matches Bluetooth A2DP high-quality profile. No resampling needed.
+- **10 voices built-in** — male and female options for both VI and EN without additional downloads.
+- **MIT license** — cleanest possible commercial terms. No attribution screen needed.
+- **Pre-built APK available now** — immediate device testing without custom JNI builds.
+- **Repository archival is not a service shutdown** — the model binaries remain downloadable and MIT-licensed indefinitely.
+
+### Positive (Phase 2 — VieNeu-TTS)
+
+- **Best Vietnamese quality of any candidate** — 48 kHz, trained from scratch on 10,000+ hours of bilingual speech.
+- **Native expression tags** — `[cười]`, `[thở dài]`, `[hắng giọng]` enable inline prosody control that Supertonic cannot guarantee.
+- **Apache 2.0 license** — no archival risk, active maintenance, rapid iteration.
+- **Zero-shot voice cloning indefinitely** — no Voice Builder shutdown deadline.
+- **GGUF backbone path is faster than ONNX for autoregressive decoding** — 20–30% speedup on ARM NEON.
 
 ### Negative / risk
 
-- **~280–320 MB on-disk** is non-trivial. Combined with Zipformer ASR (~20 MB), Opus-MT (~100 MB), GTCRN denoiser (~50 MB), and runtime overhead, the total model storage may push past 500 MB. Mitigation: Android APK expansion file (OBB) or on-device download on first run.
-- **Repository archival (August 2026)** means the Supertonic open-source project stops evolving. No new languages, voices, or optimisations. Mitigation: the model is static ONNX — it does not need upstream updates to function.
-- **44.1 kHz vocoder on mobile CPU** may be more expensive than the M4 Pro benchmarks suggest. The ONNX vocoder graph includes a mel-spectrogram decoder and neural vocoder (HiFi-GAN or similar). If RTF exceeds 0.5 on SD8G2, fall back to int8 Piper VITS (22.05 kHz, ~5× less compute per sample).
-- **No fine-grained prosody control** — Kavi v1 cannot whisper, shout, or add emphasis inline. If the UX requires tonal variation (e.g., "ERROR: connection lost" read with urgency), a post-processing volume envelope or a separate "alert" voice would be needed.
-- **Voice Builder shutdown (2026-08-31)** — the window for creating custom cloned voices closes. If the team wants a unique Kavi-brand voice, they must act before this date. After shutdown, only pre-built voices remain.
-- **CC BY 4.0 dual-Piper path is available but lower quality** — if Supertonic proves unsuitable on target hardware, the fallback is two separate Piper models at 22.05 kHz, which is a significant quality regression. Consider evaluating Piper in parallel during Phase 4.
+- **~280–320 MB on-disk (Phase 1)** — Supertonic is non-trivial. Combined with ASR (~20 MB), MT (~100 MB), denoiser (~50 MB), total may push past 500 MB. Mitigation: Android APK expansion file (OBB) or on-device download on first run.
+- **Repository archival (Phase 1)** — Supertonic stops evolving after August 2026. Mitigation: Phase 2 migration to VieNeu-TTS removes this dependency entirely.
+- **44.1 kHz vocoder on mobile CPU (Phase 1)** — Supertonic's RTF may degrade on SD8G2 vs. M4 Pro benchmarks. If RTF exceeds 0.5, fall back to Piper VITS.
+- **Android integration effort (Phase 2)** — VieNeu-TTS requires a ~1.5–2 day NDK/JNI bridge. No pre-built AAR exists. Mitigation: start building in parallel with Phase 1.
+- **English voice is accented (Phase 2)** — VieNeu-TTS English carries a Vietnamese accent. Acceptable for VI→EN direction (Vietnamese user hears translated EN), but less natural for EN→VI. Mitigation: use Supertonic for EN→VI in a hybrid configuration if needed.
+- **Emotion tags are experimental (Phase 2)** — occasional pitch instability during aggressive voice cloning or high-speed streaming. Mitigation: sanitizable/optional for critical translation outputs.
+- **Model format fragmentation (Phase 2)** — hybrid GGUF + ONNX path means two inference engines in the same pipeline, increasing build complexity.
+- **Voice Builder shutdown (Phase 1)** — after 2026-08-31, no new custom Supertonic voices. Mitigation: create any desired Kavi voice profile before shutdown.
+- **No fine-grained prosody control (both phases)** — neither engine supports full SSML or per-word emphasis. Post-processing volume envelopes would be needed for alert/urgency scenarios.
 
 ---
 
 ## References
 
+- **VieNeu-TTS official docs:** <https://docs.vieneu.io/>
+- **VieNeu-TTS GitHub (active):** <https://github.com/pnnbao97/VieNeu-TTS>
+- **VieNeu-TTS v3 Turbo HuggingFace:** <https://huggingface.co/pnnbao-ump/VieNeu-TTS-v3-Turbo>
+- **VieNeu-TTS.cpp (C++ engine):** <https://github.com/dduongtrandai/VieNeu-TTS.cpp>
+- **MOSS-Audio-Tokenizer-Nano ONNX:** <https://huggingface.co/OpenMOSS-Team/MOSS-Audio-Tokenizer-Nano-ONNX>
+- **sea-g2p phonemizer:** <https://github.com/pnnbao97/sea-g2p>
 - **Supertonic 3 Python SDK docs:** <https://supertone-inc.github.io/supertonic-py/>
 - **Supertonic 3 GitHub (to be archived):** <https://github.com/supertone-inc/supertonic>
 - **Supertonic 3 ONNX models (HuggingFace):** <https://huggingface.co/Supertone/supertonic-3>
