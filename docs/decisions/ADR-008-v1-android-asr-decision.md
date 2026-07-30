@@ -49,13 +49,14 @@ Kavi v1 implements ASR as **two parallel Zipformer-30M transducer instances** �
 | Direction | Model | Params | Size (int8) | WER | Runtime |
 | ----------- | ------- | -------- | ------------ | ----- | --------- |
 | VI→EN | `sherpa-onnx-zipformer-vi-30M-int8-2026-02-09` | ~30M | ~10 MB | 7.97% (VLSP2025) | CPU via sherpa-onnx |
-| EN→VI | `sherpa-onnx-zipformer-small-en-2023-06-26` (or streaming variant) | ~20M | ~8 MB | N/A | CPU via sherpa-onnx |
+| EN→VI | `csukuangfj/sherpa-onnx-zipformer-small-en-2023-06-26` | ~20M | ~8 MB | N/A | CPU via sherpa-onnx |
+
+**Confirmed in sherpa-onnx model catalog (Feb 2026):** Multiple English Zipformer transducer variants exist — Small (~20M), Medium, Large, and GigaSpeech-trained. The Small variant is the best parity match for the ~30M VI model. All English models are 2023 vintage, but English ASR is a mature domain; Vietnamese-accented English benchmarking during Phase 4 will confirm adequacy.
 
 ### Language detection
 
 - Both recognizers run **in parallel** on the same audio chunk
-- Logits from each model's joiner output are collected per-token
-- Per-token confidence = softmax(logits) averaged over decoded tokens
+- Each Zipformer transducer natively outputs per-token confidence scores in its JSON result (`ys_log_probs` for offline models, `ys_probs` for streaming models) — no manual logit extraction or softmax shim needed
 - Direction selected by argmax(mean_confidence_vi, mean_confidence_en)
 - Fallback threshold: if max confidence < 0.6, treat as undetermined and prompt user (push-to-talk manual direction)
 
@@ -68,9 +69,9 @@ Kavi v1 implements ASR as **two parallel Zipformer-30M transducer instances** �
 | **Streaming** | ✅ **Native** (transducer) | ❌ Offline only | **Zipformer** |
 | **Model size (int8)** | **~10 MB** | ~50 MB | **Zipformer** |
 | **RTF** | **0.025** (40× real-time) | 0.05–0.08 | **Zipformer** |
-| **Confidence scores** | Manual logit extraction | Built-in token_log_probs | Moonshine |
+| **Confidence scores** | **Built-in `ys_log_probs`** (native per-token output) | Built-in token_log_probs | **Tie** |
 
-Zipformer decisively wins on accuracy, license, streaming, size, and speed. The confidence score gap (manual extraction from ONNX logits) is straightforward engineering work.
+Zipformer decisively wins on accuracy, license, streaming, size, and speed. The confidence score gap from earlier research is eliminated — Zipformer natively outputs `ys_log_probs` per token, making language detection via confidence comparison a simple extraction from the existing JSON result.
 
 ### Why Dual (two models) over single multilingual (Whisper batch=2)
 
@@ -81,7 +82,7 @@ Zipformer decisively wins on accuracy, license, streaming, size, and speed. The 
 | **Streaming** | Fixed 30s window | **Native chunk processing** |
 | **Language detection** | Batch=2 in one decoder | **Parallel confidence from two streams** |
 | **Vietnamese WER** | ~20–25% | **7.97%** |
-| **QNN path** | Prebuilt on AI Hub | DIY (but Zipformer is so fast CPU-only is viable) |
+| **QNN path** | Prebuilt on AI Hub | ❌ **No QNN artifacts exist** for Zipformer transducer (RNN-T). Only Zipformer CTC, Paraformer, and SenseVoice have QNN builds. Even if compiled, QNN's static input shapes are fundamentally incompatible with streaming transducer architecture. CPU-only is the correct path. |
 
 The streaming architecture alone justifies this change — Whisper's fixed 30s window adds latency overhead on every utterance that directly pressures the 2.0 s turnaround budget. Zipformer's streaming avoids this entirely.
 
@@ -111,7 +112,13 @@ The removal of Whisper Small's decoder (~350 MB) and its KV cache (~240 MB) dram
 
 This ~660 MB saving provides substantial headroom for the TTS model (when selected), larger denoising models, or additional safety margin.
 
-**Note on CPU-only v1:** Zipformer is fast enough on CPU (RTF 0.025 on desktop-class CPU; estimated RTF 0.03–0.05 on SD8G2 mobile) that the NPU encoder path is **deferred** for ASR. The ADR-007 NPU→CPU ION zero-copy pipeline still applies to the Opus-MT encoder. If on-device benchmarking shows CPU Zipformer comfortably clears the 2.0 s turnaround budget, the NPU ASR path may be skipped entirely in v1, simplifying the QNN compilation pipeline.
+**NPU path ruled out for ASR v1 (confirmed):** Investigation of the sherpa-onnx QNN model catalog (Feb 2026) reveals that **Zipformer transducer (RNN-T) has no prebuilt QNN context binaries** — only Zipformer CTC (Chinese), Paraformer, and SenseVoice are available, all for SM8850 (Snapdragon 8 Elite) and newer chips. Even if DIY QNN compilation via QAIRT were pursued, three fundamental incompatibilities block it:
+
+1. **Static input shapes** — QNN requires fixed-duration models (5s/10s/30s) with silent truncation beyond the limit. This is incompatible with streaming transducer processing where audio arrives in chunks.
+2. **RNN-T decoder loop** — the iterative frame-by-frame decoder does not map cleanly to the HTP's fixed-graph execution model.
+3. **Context binary size bloat** — existing QNN models are 241–351 MB (model.bin) vs ~10 MB ONNX int8, defeating the memory savings of Zipformer.
+
+**Decision:** ASR stays **CPU-only** for v1. Zipformer RTF 0.011 on desktop (0.011 for a 3.7s clip at 1 thread) is fast enough that NPU offload provides no meaningful benefit within the 2.0 s turnaround budget. The ADR-007 NPU→CPU ION zero-copy pipeline still applies to **Opus-MT encoder** (which has real transformer decoder complexity and verified Qualcomm AI Hub support).
 
 ---
 
@@ -228,15 +235,15 @@ Dual Zipformer running concurrently on 8 cores:
 - **Streaming-native architecture** — no fixed 30s window overhead; per-chunk processing eliminates ~400 ms of unnecessary encoder compute on short utterances
 - **~660 MB memory savings** — ASR footprint drops from ~670 MB to ~10 MB, freeing substantial headroom for TTS and future enhancements
 - **Apache 2.0 license** — no revenue caps or enterprise licensing gates, unlike Moonshine
-- **CPU-only viable** — Zipformer's RTF 0.025 is fast enough that NPU offload can be deferred, simplifying the v1 software stack
+- **NPU path confirmed infeasible** for Zipformer transducer — QNN's static input shapes are incompatible with streaming RNN-T architectures. ASR stays CPU-only, matching Zipformer's native RTF of 0.011–0.025 on desktop. NPU remains allocated to Opus-MT encoder via prebuilt Qualcomm AI Hub artifacts.
 - **Dual confidence comparison** preserves ADR-007's key win of eliminating external language detection
 - **All other ADR-007 decisions stand** — the architecture change is scoped to ASR only
 
 ### Negative / risk
 
-- **Manual confidence extraction** — Zipformer's ONNX logits need a small shim to compute mean per-token confidence (straightforward softmax + averaging, but untested on this specific model). Mitigation: implement in Phase 4 benchmarking and verify against a held-out set.
+- **Confidence scores are native** — Zipformer outputs `ys_log_probs` (offline) / `ys_probs` (streaming) per token in the JSON result. No manual logit extraction or softmax shim required. Mitigation: validate mean-confidence comparison works across both model variants during Phase 4.
 - **Dual models double the loading time** — two Zipformer instances at cold start vs one Whisper. Mitigation: both are tiny (~10 MB each vs Whisper's ~430 MB), so total load time is still dramatically faster.
-- **No prebuilt QNN path** — both Zipformer models need DIY export to QNN if NPU offload is pursued later. Mitigation: CPU-only is fast enough for v1; QNN is a Phase-5 optimisation.
+- **No QNN path for Zipformer transducer** — prebuilt QNN artifacts exist only for Zipformer CTC, Paraformer, and SenseVoice (all Chinese-focused, SoC-locked). QNN's fixed input shapes fundamentally conflict with streaming transducer processing. The RNN-T iterative decoder loop does not map to HTP's graph-execution model. Mitigation: CPU-only ASR is the correct architectural choice; NPU investment stays focused on Opus-MT.
 - **EN Zipformer model quality unverified** — the EN-side Zipformer Small (2023 vintage) may underperform on Vietnamese-accented English. Mitigation: benchmark against FLEURS-en during Phase 4; fall back to Whisper Small EN-only or sherpa-onnx's other EN models if needed.
 - **Two maintained ASR models** — instead of one multilingual model, v1 carries two separate Zipformer checkpoints with different update cycles. Mitigation: both use the same sherpa-onnx transducer interface, so maintenance is uniform.
 
@@ -247,7 +254,7 @@ Dual Zipformer running concurrently on 8 cores:
 - [ ] Implement and validate confidence-based language detection against a held-out code-switched set
 - [ ] Evaluate EN Zipformer Small on Vietnamese-accented English (FLEURS-en subset)
 - [ ] Compare turnaround latency: Dual Zipformer streaming vs Whisper Small fixed-window
-- [ ] Decide whether NPU offload for Zipformer is worth pursuing (if CPU RTF already meets budget)
+- [x] NPU offload for Zipformer — ruled out. QNN's static input shapes and RNN-T decoder incompatibility make it infeasible for streaming transducer ASR. See QNN docs for context.
 
 ---
 
@@ -262,3 +269,6 @@ Dual Zipformer running concurrently on 8 cores:
 - `docs/decisions/license-situation.md` — License clearance for all candidate models (Zipformer Apache-2.0 confirmed)
 - [sherpa-onnx-zipformer-vi-30M-int8-2026-02-09](https://github.com/k2-fsa/sherpa-onnx/releases) — Vietnamese Zipformer model
 - [Moonshine confidence API (PR #2897)](https://github.com/k2-fsa/sherpa-onnx) — sherpa-onnx token_log_probs support
+- [sherpa-onnx QNN docs](https://k2-fsa.github.io/sherpa/onnx/qnn/) — QNN model catalog (Zipformer CTC/Paraformer/SenseVoice only; no Zipformer transducer)
+- [sherpa-onnx Zipformer transducer models](https://k2-fsa.github.io/sherpa/onnx/pretrained_models/offline-transducer/zipformer-transducer-models.html) — confirmed `csukuangfj/sherpa-onnx-zipformer-small-en-2023-06-26` and other EN variants
+- [sherpa-onnx Zipformer streaming models](https://k2-fsa.github.io/sherpa/onnx/pretrained_models/online-transducer/zipformer-transducer-models.html) — confirmed `ys_probs` native output for streaming variants
