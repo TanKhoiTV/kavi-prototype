@@ -247,6 +247,87 @@ Dual Zipformer running concurrently on 8 cores:
 - **EN Zipformer model quality unverified** — the EN-side Zipformer Small (2023 vintage) may underperform on Vietnamese-accented English. Mitigation: benchmark against FLEURS-en during Phase 4; fall back to Whisper Small EN-only or sherpa-onnx's other EN models if needed.
 - **Two maintained ASR models** — instead of one multilingual model, v1 carries two separate Zipformer checkpoints with different update cycles. Mitigation: both use the same sherpa-onnx transducer interface, so maintenance is uniform.
 
+---
+
+## Android Integration — sherpa-onnx
+
+The sherpa-onnx project provides a complete Android integration path via JNI with Kotlin API wrappers. The runtime overhead is minimal, and a pre-built APK already exists for the Vi Zipformer 30M int8 model.
+
+### Native library build
+
+```bash
+# Clone the repo
+git clone https://github.com/k2-fsa/sherpa-onnx
+cd sherpa-onnx
+
+# Set NDK path (requires Android NDK)
+export ANDROID_NDK=/path/to/ndk
+
+# Build for arm64-v8a (target device ABI)
+./build-android-arm64-v8a.sh
+
+# Produces two .so files:
+#   build-android-arm64-v8a/install/lib/libsherpa-onnx-jni.so  ~3.7 MB
+#   build-android-arm64-v8a/install/lib/libonnxruntime.so     ~5.8 MB (mobile build)
+# Total runtime overhead: ~10 MB
+```
+
+Alternatively, download pre-built shared libraries from the [releases page](https://github.com/k2-fsa/sherpa-onnx/releases/latest). Pre-built libs are available for all four Android ABIs (arm64-v8a, armeabi-v7a, x86_64, x86).
+
+### Model deployment
+
+```bash
+# Place model files in app/src/main/assets/
+cd android/SherpaOnnx/app/src/main/assets/
+
+wget https://github.com/k2-fsa/sherpa-onnx/releases/download/\
+  asr-models/sherpa-onnx-zipformer-vi-30M-int8-2026-02-09.tar.bz2
+tar xvf sherpa-onnx-zipformer-vi-30M-int8-2026-02-09.tar.bz2
+rm -rf test_wavs README.md   # strip test artifacts
+```
+
+Stripped model size per language:
+
+- **Vi int8:** encoder 25 MB + decoder 4.9 MB + joiner 1.2 MB + tokens.txt 55 KB ≈ **~31 MB**
+- **EN Small int8:** similar profile ≈ **~30 MB**
+
+### Kotlin API usage
+
+The JNI exposes `OfflineRecognizer` (for Zipformer transducer models) directly:
+
+```kotlin
+// Configure a single Zipformer recognizer
+val config = OfflineRecognizerConfig(
+    tokens    = "$modelDir/tokens.txt",
+    encoder   = "$modelDir/encoder.int8.onnx",
+    decoder   = "$modelDir/decoder.onnx",            // stays fp32 even in int8 variant
+    joiner    = "$modelDir/joiner.int8.onnx",
+    numThreads = 4,
+    provider  = "cpu"
+)
+val recognizer = OfflineRecognizer(config)
+
+// Transcribe audio buffer (16 kHz PCM float)
+val stream = recognizer.createStream()
+stream.acceptWaveform(samples, sampleRate)
+recognizer.decode(stream)
+val result = recognizer.getResult(stream)
+// result.text — transcribed text
+// result.ys_log_probs — per-token log-probabilities (native confidence scores)
+```
+
+For the dual setup, create two `OfflineRecognizer` instances (Vi + EN) and run them concurrently as shown in the concurrency model above.
+
+### Pre-built APK reference
+
+A ready-to-download APK bundling the exact Vi Zipformer 30M int8 model with VAD-based simulated streaming is available on the sherpa-onnx releases page:
+
+```
+sherpa-onnx-1.13.4-arm64-v8a-simulated_streaming_asr-vi-zipformer_vi_30M_int8_2026_02_09.apk
+```
+
+This provides an immediate test artifact for device-level validation before our bespoke dual-model APK is built. For production, the `android/SherpaOnnx` template is forked and adapted to the dual-instance pipeline documented above.
+
 ### Open items for Phase 4 benchmarking
 
 - [ ] **Benchmark fp32 vs int8 for Zipformer-30M-VI** — both variants are available on the sherpa-onnx releases page (`sherpa-onnx-zipformer-vi-30M-2026-02-09` fp32 at ~100 MB encoder vs `sherpa-onnx-zipformer-vi-30M-int8-2026-02-09` int8 at ~26 MB encoder). Compare WER and RTF on the Kavi eval set. Int8 is expected to add 0–0.5% WER degradation while running ~20–30% faster; confirm this holds for Vietnamese-accented speech and factory noise conditions. The decision memo below will be updated with the winning variant.
@@ -274,3 +355,6 @@ Dual Zipformer running concurrently on 8 cores:
 - [sherpa-onnx QNN docs](https://k2-fsa.github.io/sherpa/onnx/qnn/) — QNN model catalog (Zipformer CTC/Paraformer/SenseVoice only; no Zipformer transducer)
 - [sherpa-onnx Zipformer transducer models](https://k2-fsa.github.io/sherpa/onnx/pretrained_models/offline-transducer/zipformer-transducer-models.html) — confirmed `csukuangfj/sherpa-onnx-zipformer-small-en-2023-06-26` and other EN variants
 - [sherpa-onnx Zipformer streaming models](https://k2-fsa.github.io/sherpa/onnx/pretrained_models/online-transducer/zipformer-transducer-models.html) — confirmed `ys_probs` native output for streaming variants
+- [sherpa-onnx Android build guide](https://k2-fsa.github.io/sherpa/onnx/android/build-sherpa-onnx.html) — NDK setup, native .so build, and APK generation
+- [sherpa-onnx Kotlin API examples](https://github.com/k2-fsa/sherpa-onnx/tree/master/kotlin-api-examples) — OfflineRecognizer, OnlineRecognizer, Tts, AudioTagging, and more
+- [sherpa-onnx pre-built APK catalog](https://k2-fsa.github.io/sherpa/onnx/android/apk-simulate-streaming-asr.html) — downloadable APKs for Vi Zipformer 30M int8 and many other models
