@@ -44,13 +44,14 @@ def run_manifest(
         if config_override:
             item.config = {**(item.config or {}), **config_override}
 
+        # --candidate ghi đè candidate_id của item (không chỉ filter như cũ).
+        if candidate_filter is not None:
+            item.candidate_id = candidate_filter
         cid = item.candidate_id
         if cid is None:
             cid = default_candidate_id_for_stage(item.stage)
-        cid_label = cid
-        if cid_label is None:
-            cid_label = "unknown"
-        elif cid != candidate_filter:
+        if cid is None:
+            print(f"  skipped item {item.id}: no candidate resolved")
             continue
         try:
             cached = None
