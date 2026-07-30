@@ -45,6 +45,7 @@
 - **adr:** Accept ADR-005, update follow-up status table (#82)([#82](https://github.com/TanKhoiTV/kavi-prototype/pull/82))
 - Consolidate ADR directory, move ADR-005/006 to docs/decisions/ (#83)([#83](https://github.com/TanKhoiTV/kavi-prototype/pull/83))
 - Defer Piper QNN per ADR-005 Decision 3([#84](https://github.com/TanKhoiTV/kavi-prototype/pull/84))
+- **adr:** ADR-007 production inference architecture and service layer (#89)([#89](https://github.com/TanKhoiTV/kavi-prototype/pull/89))
 
 ### Features
 
@@ -92,6 +93,8 @@
 ### Build
 
 - Bump kavi-android to AGP 8.10.0 / Gradle 8.11.1 (API 36)
+- **deps:** Bump actions/checkout from 7.0.0 to 7.0.1 (#87)([#87](https://github.com/TanKhoiTV/kavi-prototype/pull/87))
+- **deps:** Bump astral-sh/setup-uv from 8.3.2 to 9.0.0 (#86)([#86](https://github.com/TanKhoiTV/kavi-prototype/pull/86))
 
 ### Ci
 
