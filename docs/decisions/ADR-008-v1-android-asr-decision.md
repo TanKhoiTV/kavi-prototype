@@ -249,6 +249,7 @@ Dual Zipformer running concurrently on 8 cores:
 
 ### Open items for Phase 4 benchmarking
 
+- [ ] **Benchmark fp32 vs int8 for Zipformer-30M-VI** — both variants are available on the sherpa-onnx releases page (`sherpa-onnx-zipformer-vi-30M-2026-02-09` fp32 at ~100 MB encoder vs `sherpa-onnx-zipformer-vi-30M-int8-2026-02-09` int8 at ~26 MB encoder). Compare WER and RTF on the Kavi eval set. Int8 is expected to add 0–0.5% WER degradation while running ~20–30% faster; confirm this holds for Vietnamese-accented speech and factory noise conditions. The decision memo below will be updated with the winning variant.
 - [ ] Verify Zipformer-30M-VI WER on Kavi's bespoke factory/logistics eval set (not just VLSP2025)
 - [ ] Benchmark Dual Zipformer RTF and peak RAM on the Meizu 21 Note (SD8G2)
 - [ ] Implement and validate confidence-based language detection against a held-out code-switched set
@@ -267,7 +268,8 @@ Dual Zipformer running concurrently on 8 cores:
 - `docs/benchmarking-plan.md` §4.1–4.3 — ASR candidate landscape (Zipformer, Whisper, Moonshine comparison)
 - `docs/benchmarking-plan.md` §4.2 — Latency & memory estimates for Zipformer on SD8G2
 - `docs/decisions/license-situation.md` — License clearance for all candidate models (Zipformer Apache-2.0 confirmed)
-- [sherpa-onnx-zipformer-vi-30M-int8-2026-02-09](https://github.com/k2-fsa/sherpa-onnx/releases) — Vietnamese Zipformer model
+- [sherpa-onnx-zipformer-vi-30M-int8-2026-02-09](https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-zipformer-vi-30M-int8-2026-02-09.tar.bz2) — VI Zipformer 30M int8 (25 MB compressed)
+- [sherpa-onnx-zipformer-vi-30M-2026-02-09](https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-zipformer-vi-30M-2026-02-09.tar.bz2) — VI Zipformer 30M fp32 (91 MB compressed)
 - [Moonshine confidence API (PR #2897)](https://github.com/k2-fsa/sherpa-onnx) — sherpa-onnx token_log_probs support
 - [sherpa-onnx QNN docs](https://k2-fsa.github.io/sherpa/onnx/qnn/) — QNN model catalog (Zipformer CTC/Paraformer/SenseVoice only; no Zipformer transducer)
 - [sherpa-onnx Zipformer transducer models](https://k2-fsa.github.io/sherpa/onnx/pretrained_models/offline-transducer/zipformer-transducer-models.html) — confirmed `csukuangfj/sherpa-onnx-zipformer-small-en-2023-06-26` and other EN variants
