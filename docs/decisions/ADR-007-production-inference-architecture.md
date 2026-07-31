@@ -1,9 +1,10 @@
 # ADR-007: Production Inference Architecture & Service Layer
 
-**Status:** Proposed
-**Date:** 2026-07-26
+**Status:** Superseded by ADR-008
+**Date:** 2026-07-26 (Superseded: 2026-07-27)
 **Deciders:** Kavi team
 **Supersedes / relates to:** ADR-004 (tech-stack deferred decisions), ADR-005 (QNN workarounds — encoder/NPU, decoder/CPU split confirmed), ADR-006 (Android runner — feeds into service design)
+**Superseded by:** [ADR-008](ADR-008-v1-android-asr-decision.md) — v1 Android implementation decision (Dual Zipformer ASR, confirming Opus-MT MT and TBD TTS)
 
 ---
 
