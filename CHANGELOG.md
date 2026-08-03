@@ -47,6 +47,7 @@
 - Defer Piper QNN per ADR-005 Decision 3([#84](https://github.com/TanKhoiTV/kavi-prototype/pull/84))
 - **adr:** ADR-007 production inference architecture and service layer (#89)([#89](https://github.com/TanKhoiTV/kavi-prototype/pull/89))
 - ADR-008 — v1 Android Dual Zipformer ASR decision ([#92](https://github.com/TanKhoiTV/kavi-prototype/pull/92))
+- ADR-009 — v1 Android TTS decision (Supertonic Phase 1 → VieNeu-TTS Phase 2) (#93)([#93](https://github.com/TanKhoiTV/kavi-prototype/pull/93))
 
 ### Features
 
