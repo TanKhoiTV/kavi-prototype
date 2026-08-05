@@ -22,7 +22,7 @@ form factor, CPU baseline with NPU deferred to on-device results). The actual
 `docs/decisions/license-situation.md` has now cleared the candidate set:
 most components are license-clean, and the remaining unknowns are few. This ADR
 records what is **settled** and what stays **open** until the v0 harness
-(`docs/benchmarking-plan.md` §8) produces on-device numbers.
+(`docs/reference/benchmarking-plan.md` §8) produces on-device numbers.
 
 > **No tech-stack decision is made here.** The final ASR/MT/TTS/runtime pick
 > follows the harness results. Anything below marked *option* / *open* is a
@@ -102,5 +102,5 @@ MeloTTS) so the harness can run. The v0 host-side harness is implemented in
 
 - ADR-001 / 002 / 003.
 - `docs/decisions/license-situation.md` (license gate).
-- `docs/benchmarking-plan.md` §4 (candidate landscape), §8 (v0 harness).
+- `docs/reference/benchmarking-plan.md` §4 (candidate landscape), §8 (v0 harness).
 - `docs/onboarding.md` (architecture decoded for newcomers).
