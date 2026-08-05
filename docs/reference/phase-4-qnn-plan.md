@@ -1,6 +1,7 @@
 # Phase 4 — On-device QNN Conversion & Comparison Plan
 
 > **Status:** Planning (precedes and parallels the Phase-4 implementation, job (1))
+> **Superseded scope (2026-08-05):** the ASR (Whisper) and TTS (Piper) QNN paths are **obsolete** — ADR-008 keeps ASR CPU-only (Dual Zipformer via sherpa-onnx); ADR-009 replaces Piper with Supertonic Phase 1 (ADR-005 D3 already deferred Piper QNN). **Live scope = Opus-MT encoder only** (§2, §8, §9). Whisper/Piper sections are retained for reference only.
 > **Companion docs:** `benchmarking-todo.md` §Phase 4, `ADR-003` (Hexagon runtime, *Proposed*), `ADR-004` (architecture, *Draft*).
 > **Tracking:** issue #51, issue #57 (verified-command corrections), issue #59 (converter output / `.dlc` corrections).
 
@@ -82,6 +83,8 @@ benchmark below is what decides.
 
 ### 3.1 ASR — Whisper Small (244M, MIT) — *evaluate re-source*
 
+> **Superseded (ADR-008):** ASR is CPU-only Dual Zipformer. The Whisper ONNX/QNN path below is retained for reference only.
+
 - **v0 (CPU):** `faster-whisper` Small int8 — ggml, **not** QNN-convertible.
 - **For QNN:** export Whisper Small to **ONNX** (e.g. `optimum` Whisper ONNX
   export), **or** use Qualcomm-optimized **Whisper-Small-Quantized** (w8a16) from
@@ -109,6 +112,8 @@ benchmark below is what decides.
 > and TTS is not the pipeline bottleneck. The QNN conversion path below is
 > retained for reference only.
 
+> **ADR-009 supersedes further (2026-07-30):** v1 TTS is Supertonic Phase 1 (sherpa-onnx `OfflineTts`) → VieNeu-TTS Phase 2, with Piper VITS as fallback. Piper QNN conversion is permanently out of scope.
+
 - **v0 (CPU):** Piper-CPU, **EN leg only** (`en_US-lessac-medium`; `vais1000` VI
   voice not in repo).
 - **For QNN (deferred):** Piper is ONNX, but **not a short hop.**
@@ -131,6 +136,7 @@ benchmark below is what decides.
     plus the compiled model `.so` library.
   - `app/src/main/assets/` — model `.so` library + HTP v73 context binaries (read at
     runtime, kept out of `jniLibs` binary load path if preferred).
+- **Provenance & commit (ADR-011):** on-device artifacts (HTP v73 context binary, model `.so`, ONNX decoder) are committed **inside `kavi-android` assets**. Host-side `prototype/models/qnn/*` outputs are gitignored (`.gitignore` `models/qnn/*`, commit 3502156) and regenerable — never treat them as deliverables.
 - **License:** AI Stack License §1(iv) permits distributing the runtime in object
   code within the app; `public.libraries.txt` does **not** list `libQnn*.so`, so
   the app **bundles** them (ADR-002 / QAIRT gate *ADOPT clean*).
@@ -315,6 +321,7 @@ do not compromise the benchmark with synthetic tensors.**
 ## 11. Status / tracking
 
 - **Precedes** job (1) (the actual conversion). Implementation tracks this spec.
+  → **2026-08-05:** superseded scope — see banner. Only the Opus-MT encoder path (§2, §8, §9) is live; Whisper/Piper are reference-only.
 - **Related:** `benchmarking-todo.md` §Phase 4 (terse checklist), `ADR-003`
   (determination method → this plan), `ADR-004` open params #1–4.
 - **Issues:** #51 (this doc), #52 (ADR-003 tightening), #57 (verified-command

@@ -84,7 +84,7 @@ make bench         # run the v0 benchmark harness (CPU-default candidates)
 
 The v0 harness runs **CPU-only** today (faster-whisper / CTranslate2 Opus-MT /
 Piper-CPU). On-device QNN candidates land in Phase-4 (see
-`docs/phase-4-qnn-plan.md`). `make bench-data` works offline with a built-in
+`docs/reference/phase-4-qnn-plan.md`). `make bench-data` works offline with a built-in
 fallback eval set; fetching real FLEURS parquets is optional and only needed once
 the large-file download path is available in your environment.
 
@@ -131,7 +131,7 @@ runs conversion natively on Windows; the split is an environment quirk, not a
 project requirement.
 
 **QAIRT conversion toolchain (Phase-4):** host build-time only, needed solely when
-producing HTP v73 context binaries. See `docs/phase-4-qnn-plan.md` §1 for
+producing HTP v73 context binaries. See `docs/reference/phase-4-qnn-plan.md` §1 for
 the exact env contract (`QAIRT_SDK_ROOT`, `ANDROID_NDK_ROOT`, `qairt-env.sh`,
 `.venv-qairt` venv). The Android-side SDK/NDK install is documented in
 [`kavi-android/CONTRIBUTING.md`](android/CONTRIBUTING.md).

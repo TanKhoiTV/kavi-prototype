@@ -2,7 +2,7 @@
 
 > **Pitch doc for team members.** This is the *execution checklist* for the
 > benchmarking work that gates **ADR-004 (architecture / tech-stack)**. It is
-> derived from `docs/benchmarking-plan.md` (what we measure + datasets) and
+> derived from `docs/reference/benchmarking-plan.md` (what we measure + datasets) and
 > `docs/specifications.md` §3 (the six contest metrics). **No tech-stack decision
 > is made here** — the harness is pluggable; we swap candidates in and score them
 > against identical data.
@@ -259,7 +259,7 @@ checklist.
       archived custom RMS mix).
 - [x] Trigger binary gate: denoiser beats raw-noisy WER → tune `prop_decrease`;
       else VAD-only pipeline. **Result: ADOPT Wiener** (noisy WER 49.82% vs raw
-      51.23%). See `docs/denoising-gate-results.md`.
+      51.23%). See `docs/reference/denoising-gate-results.md`.
 
 ### Phase 7 — v1 (quality depth)
 
@@ -283,7 +283,7 @@ checklist.
 
 ## 9. References
 
-- `docs/benchmarking-plan.md` — datasets, candidate landscape, harness design, v0.
+- `docs/reference/benchmarking-plan.md` — datasets, candidate landscape, harness design, v0.
 - `docs/specifications.md` §3 — the six contest metrics + thresholds.
 - `docs/decisions/ADR-004-architecture.md` — tech-stack deferred; open params #1–4.
 - `docs/decisions/license-situation.md` — license-clean candidate set.

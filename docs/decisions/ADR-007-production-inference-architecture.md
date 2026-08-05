@@ -259,6 +259,12 @@ AudioRecord (mic, 16 kHz PCM float)
 
 The final denoising choice (GTCRN vs. alternative) is gated on benchmark results, per ADR-004 parameter #4. This ADR records the *architectural slot* — where denoising sits, how it loads, how it toggles — not the final model pick.
 
+> **Status note (2026-08-05):** the Phase-6 denoising gate
+> (`docs/reference/denoising-gate-results.md`) ran the archived binary gate and
+> **ADOPTED Wiener** (`noisereduce`, `prop_decrease=0.5`): weighted-average WER
+> 49.82% vs raw 51.23%; RNNoise rejected (64.36%). The GTCRN-vs-Wiener on-device
+> choice remains open — see `docs/android-implementation-plan.md` Risk R1.
+
 ---
 
 ## Decision 8: QNN runtime bundling — precise jniLibs/arm64-v8a roster

@@ -189,12 +189,12 @@ but **defers the final tech-stack pick** until the v0 benchmark harness runs.
 Remaining gates: **Piper engine GPL split** (deferred — MIT-era is the clean
 option), and harness confirmation that the CPU-default stack is license-clean.
 The **QAIRT runtime gate is RESOLVED** (ADOPT, clean — see above). Lookups #3–#8
-are closed or advanced. Candidate shortlist in `docs/benchmarking-plan.md` §4
+are closed or advanced. Candidate shortlist in `docs/reference/benchmarking-plan.md` §4
 stands, with the avoid-list already dropped.
 
 ## References
 
-+ `docs/benchmarking-plan.md` §3.6 (license watch-outs), §4.4 (MT), §4.5 (TTS).
++ `docs/reference/benchmarking-plan.md` §3.6 (license watch-outs), §4.4 (MT), §4.5 (TTS).
 + `docs/onboarding.md` (commercial-clean vs avoid rule).
 + ADR-001 / 002 / 003.
-+ **Corrections to `docs/benchmarking-plan.md`** (this record supersedes): §3.3 / §3.6 — VietSuperSpeech is **MIT** (not "verify"); PhoST is **research-only, no redistribution** (not "verify") → move to avoid; §4.1 — Whisper is **MIT** (plan's "Apache-2.0" is wrong).
++ **Corrections to `docs/reference/benchmarking-plan.md`** (this record supersedes): §3.3 / §3.6 — VietSuperSpeech is **MIT** (not "verify"); PhoST is **research-only, no redistribution** (not "verify") → move to avoid; §4.1 — Whisper is **MIT** (plan's "Apache-2.0" is wrong).

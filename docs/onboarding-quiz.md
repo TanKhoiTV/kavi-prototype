@@ -23,7 +23,7 @@ NPU runtime is QAIRT/QNN · (d) the exact ASR model · (e) Hy-MT is commercially
 usable · (f) Piper's distribution model (subprocess vs bundled) · (g) the Qualcomm
 runtime EULA for shipping QNN model artifacts (model `.so` + context binary).
 
-**Q3 — Short answer (benchmark method).** *Source: ADR-004, benchmarking-plan §8.*
+**Q3 — Short answer (benchmark method).** *Source: ADR-004, reference/benchmarking-plan §8.*
 Why do we stand up a benchmark harness **before** finalizing the ASR/MT/TTS stack?
 What is the **single question the v0 harness must answer**, and name **one thing v0
 deliberately leaves out**?
@@ -42,7 +42,7 @@ Our current prototype runs ASR via **whisper.cpp** and MT via **CTranslate2**. W
 can't these simply run on the Hexagon NPU today, and what does reaching NPU speed
 likely require?
 
-**Q7 — Short answer (baseline).** *Source: benchmarking-plan §5.*
+**Q7 — Short answer (baseline).** *Source: reference/benchmarking-plan §5.*
 RTranslator is our product baseline. What latency/RAM figure must Kavi **not be
 worse than**? What is our **verifiable offline advantage** over RTranslator, and
 what must you **record** when testing it?
@@ -51,22 +51,22 @@ what must you **record** when testing it?
 A new member runs `git clone git@github.com:TanKhoiTV/aivoice-2026.git` and finds
 `prototype/` empty. Why, and what is the correct clone command?
 
-**Q9 — Classification (metrics).** *Source: specifications §3, benchmarking-plan §7.*
+**Q9 — Classification (metrics).** *Source: specifications §3, reference/benchmarking-plan §7.*
 Label each as **Hard gate**, **Target**, or **Named contest metric**: RTF ·
 EOS→SA turnaround · no-internet-at-runtime · MT BLEU + COMET · TTS MOS · stability
 (crash / silent-failure rate).
 
-**Q10 — Short answer (denoising gate).** *Source: benchmarking-plan §8.*
-Pre-ASR denoising is still an open pipeline question. What is the **open question**,
-what is the **historical noisy WER ceiling** it must beat, and what must the v0
-harness do to close the gate?
+**Q10 — Short answer (denoising gate).** *Source: `reference/denoising-gate-results.md`.*
+The Phase-6 denoising gate ran a smoke test (2 utterances × 5 conditions) on
+faster-whisper Small int8. What was **ADOPTED** and at what weighted-average WER,
+and what caveat does the results file flag before ADR-004 finalization?
 
-**Q11 — Scenario (TTS voice licensing).** *Source: license-situation, benchmarking-plan §4.5.*
-A member picks the Piper **`vivos`** Vietnamese voice because it is a real VI voice
-and easy to find. What is wrong, and name a **commercially-clean VI voice**
-alternative we already have?
+**Q11 — Scenario (TTS voice licensing).** *Source: `license-situation.md`, ADR-009.*
+A member picks the Piper **`vivos`** Vietnamese voice because it is a real VI
+voice and easy to find. What is wrong, and what is the **v1 TTS plan** that
+supersedes the Piper voice question?
 
-**Q12 — Short answer (VI↔EN speech-translation corpus).** *Source: benchmarking-plan §3.3.*
+**Q12 — Short answer (VI↔EN speech-translation corpus).** *Source: reference/benchmarking-plan §3.3.*
 Why can't we build the VI↔EN test set from **CoVoST-2** or **MuST-C**? What purpose-
 built corpus covers the **EN→VI** direction, and what are the two **VI→EN**
 workarounds?
