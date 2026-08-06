@@ -14,6 +14,8 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
 
+from bench.adapters import Candidate
+from bench.registry import REGISTRY, default_candidate_id_for_stage
 from bench.schema import EvalItem, RunManifest, StageResult
 from bench.scorer import score_item
 
@@ -147,3 +149,127 @@ def test_fleurs_load_pairs_audio_to_transcript_by_id(tmp_path: Path) -> None:
         i = expected[uid]
         assert abs(audio[0, 0].item() - i) < 1e-6
         assert tx == f"text_{i}"
+
+
+# --- Registration of new benchmark candidates (M2M, Moonshine, Zipformer) ---
+
+NEW_CANDIDATE_IDS = {
+    "m2m100-vi-en-ct2-cpu": "MT",
+    "moonshine-tiny-vi-hf-cpu": "ASR",
+    "moonshine-tiny-en-hf-cpu": "ASR",
+    "zipformer-vi-30m-sherpa-onnx-cpu": "ASR",
+    "zipformer-en-sherpa-onnx-cpu": "ASR",
+}
+
+
+def test_new_candidates_registered() -> None:
+    """All 5 ported candidates are registered with the right stage."""
+    for cid, stage in NEW_CANDIDATE_IDS.items():
+        assert cid in REGISTRY, f"{cid} missing from REGISTRY"
+        cls, _, cfg = REGISTRY[cid]
+        assert cls.id == cid
+        assert cls.stage == stage
+        assert isinstance(cfg, dict)
+
+
+def test_candidate_ids_unique() -> None:
+    assert len(REGISTRY) == len(set(REGISTRY))
+
+
+def test_stage_defaults_unchanged() -> None:
+    """D2: Whisper (ASR) and Opus-MT (MT) remain the stage defaults."""
+    assert default_candidate_id_for_stage("ASR") == "whisper-small-faster-whisper-cpu"
+    assert default_candidate_id_for_stage("MT") == "opus-mt-vi-en-ct2-cpu"
+    assert default_candidate_id_for_stage("TTS") == "piper-en-lessac-cpu"
+
+
+def test_zipformer_beam_decoding_mapping() -> None:
+    from bench.candidates.zipformer_asr import decoding_method_for_beam
+
+    assert decoding_method_for_beam(1) == "greedy_search"
+    for beam in (2, 4, 5, 8):
+        assert decoding_method_for_beam(beam) == "modified_beam_search"
+
+
+# --- run_manifest regression: --candidate override, no-filter, --config-override ---
+
+
+class _FakeCandidate(Candidate):
+    """Weight-free stand-in so run_manifest tests never touch a real model."""
+
+    def __init__(self, cid: str = "fake-cand") -> None:
+        self.id = cid
+
+    def _infer(self, item: EvalItem) -> tuple[str | None, str | None]:
+        return "fake output", None
+
+
+def _fake_manifest() -> RunManifest:
+    return RunManifest(
+        version="eval_manifest_v1",
+        items=[
+            EvalItem(id="a", stage="ASR", language="vi", reference_text="x"),
+            EvalItem(
+                id="b",
+                stage="MT",
+                language="vi",
+                direction="vi->en",
+                input_text="y",
+                reference_text="z",
+            ),
+        ],
+    )
+
+
+def test_run_manifest_no_filter_processes_all(monkeypatch, tmp_path: Path) -> None:
+    """Regression for the fba5a2b filter bug: no --candidate must run every item."""
+    from bench import run as bench_run
+
+    def fake_build(item):  # noqa: ANN001
+        return _FakeCandidate()
+
+    monkeypatch.setattr(bench_run, "build_candidate", fake_build)
+    monkeypatch.setattr(
+        bench_run, "default_candidate_id_for_stage", lambda stage: "fake-cand"
+    )
+    records = bench_run.run_manifest(_fake_manifest(), tmp_path, None)
+    assert len(records) == 2
+    assert all(r["result"]["candidate_id"] == "fake-cand" for r in records)
+    assert all(r["result"]["error"] is None for r in records)
+
+
+def test_run_manifest_candidate_override(monkeypatch, tmp_path: Path) -> None:
+    """--candidate overrides item.candidate_id (6898497 semantics)."""
+    from bench import run as bench_run
+
+    seen: list[str | None] = []
+
+    def fake_build(item):  # noqa: ANN001
+        seen.append(item.candidate_id)
+        return _FakeCandidate(cid="fake-2")
+
+    monkeypatch.setattr(bench_run, "build_candidate", fake_build)
+    records = bench_run.run_manifest(_fake_manifest(), tmp_path, "fake-2")
+    assert len(records) == 2
+    assert all(r["result"]["candidate_id"] == "fake-2" for r in records)
+    # build_candidate runs once per cid (cached); the item it saw must have the
+    # overridden candidate_id (without the override it would be None -> default).
+    assert seen == ["fake-2"]
+
+
+def test_run_manifest_config_override(monkeypatch, tmp_path: Path) -> None:
+    """--config-override reaches build_candidate via item.config."""
+    from bench import run as bench_run
+
+    captured: dict = {}
+
+    def fake_build(item):  # noqa: ANN001
+        captured["config"] = dict(item.config or {})
+        return _FakeCandidate()
+
+    monkeypatch.setattr(bench_run, "build_candidate", fake_build)
+    monkeypatch.setattr(
+        bench_run, "default_candidate_id_for_stage", lambda stage: "fake-cand"
+    )
+    bench_run.run_manifest(_fake_manifest(), tmp_path, None, {"beam_size": 7})
+    assert captured["config"]["beam_size"] == 7
