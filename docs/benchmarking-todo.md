@@ -76,23 +76,27 @@ being **100% offline**.
 ## 3. Models to benchmark (candidates)
 
 > License-clean set only (see `docs/decisions/license-situation.md`). "v0?" =
-> in the first lean harness.
+> in the first lean harness. **Registered** = has a candidate adapter in
+> `bench/` (see `bench/registry.py`; ported per
+> `docs/benchmark/register-missing-candidates.md`).
 
 ### ASR
 
 | Candidate | License | Runtime (v0) | EN+VI? | v0? |
 | --- | --- | --- | --- | --- |
-| Whisper Small (244M) | MIT | CPU + QNN | **Yes** | **Yes** (baseline pair) |
+| Whisper Small (244M) | MIT | CPU + QNN | **Yes** | **Yes** (baseline; registered) |
 | PhoWhisper Small (244M) | BSD-3 | CPU + DIY QNN | Inherited (unbench) | Follow-up |
-| Zipformer-30M-VI | Apache-2.0 | CPU / DIY | **VI only** | No (VI→EN only) |
-| Moonshine Tiny VI (27M) | Apache-2.0 | CPU / DIY | **VI only** | No (VI→EN only) |
+| Zipformer-30M-VI | Apache-2.0 | CPU / DIY | **VI only** | **Yes** (registered) |
+| Zipformer-Small-EN | Apache-2.0 | CPU / DIY | **EN only** | **Yes** (registered) |
+| Moonshine Tiny VI (27M) | Apache-2.0 | CPU / DIY | **VI only** | **Yes** (registered) |
+| Moonshine Tiny EN (27M) | Apache-2.0 | CPU / DIY | **EN only** | **Yes** (registered) |
 
 ### MT
 
 | Candidate | License | Runtime (v0) | Bidirectional? | v0? |
 | --- | --- | --- | --- | --- |
-| Opus-MT (vi-en + en-vi) | Apache-2.0 | CTranslate2-int8 / ORT+QNN | **Yes (2 models)** | **Yes** (baseline pair) |
-| M2M-100 (418M) | MIT | CPU / ONNX-QNN | Yes (one model) | Follow-up |
+| Opus-MT (vi-en + en-vi) | Apache-2.0 | CTranslate2-int8 / ORT+QNN | **Yes (2 models)** | **Yes** (baseline; registered) |
+| M2M-100 (418M) | MIT | CPU / ONNX-QNN | Yes (one model) | **Yes** (registered) |
 | Hy-MT1.5-1.8B | HY Community (ADOPT) | CPU-only STQ | Yes (one model) | Follow-up |
 | NLLB-200-distilled-600M | CC-BY-NC-4.0 | — | Yes | **Reference only** (NC) |
 | SeamlessM4T v2 | CC-BY-NC-4.0 | — | Yes | Avoid (NC) |
