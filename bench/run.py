@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from dataclasses import asdict
 from pathlib import Path
 
@@ -29,20 +30,29 @@ def audio_duration(path: str | None) -> float | None:
 
 
 def run_manifest(
-    manifest: RunManifest, out_dir: Path, candidate_filter: str | None
+    manifest: RunManifest,
+    out_dir: Path,
+    candidate_filter: str | None,
+    config_override: dict | None = None,
 ) -> list[dict]:
     records: list[dict] = []
     # Cache one candidate instance per cid so model weights load once per run,
     # not once per item (which would reload e.g. Whisper for every ASR clip).
     candidates: dict[str, Candidate] = {}
     for item in manifest.items:
+        # Merge config override into the item BEFORE building the candidate so
+        # e.g. beam_size takes effect from the first Translator construction.
+        if config_override:
+            item.config = {**(item.config or {}), **config_override}
+
+        # --candidate overrides the item's candidate_id (not just filters).
+        if candidate_filter is not None:
+            item.candidate_id = candidate_filter
         cid = item.candidate_id
         if cid is None:
             cid = default_candidate_id_for_stage(item.stage)
-        cid_label = cid
-        if cid_label is None:
-            cid_label = "unknown"
-        elif cid != candidate_filter:
+        if cid is None:
+            print(f"  skipped item {item.id}: no candidate resolved")
             continue
         try:
             cached = None
@@ -59,7 +69,7 @@ def run_manifest(
             result = candidate.run(item)
         except Exception as exc:  # noqa: BLE001 - one bad candidate must not abort the run
             result = StageResult(
-                candidate_id=cid_label,
+                candidate_id=cid,
                 item_id=item.id,
                 stage=item.stage,
                 error=f"{type(exc).__name__}: {exc}",
@@ -131,6 +141,12 @@ def print_table(records: list[dict]) -> None:
 
 
 def main() -> None:
+    if hasattr(sys.stdout, "reconfigure"):
+        # Windows cp1252 console cannot encode Vietnamese diacritics; print the
+        # table with replacement chars instead of crashing (JSON output is
+        # unaffected).
+        sys.stdout.reconfigure(errors="replace")
+
     ap = argparse.ArgumentParser(description="Kavi benchmark harness (host-side v0)")
     ap.add_argument("--manifest", help="path to eval_manifest_v1.json")
     ap.add_argument(
@@ -138,6 +154,10 @@ def main() -> None:
     )
     ap.add_argument("--out", default="bench-results", help="output directory")
     ap.add_argument("--candidate", help="only run this candidate_id")
+    ap.add_argument(
+        "--config-override",
+        help='JSON dict merged into every item.config, e.g. \'{"beam_size": 4}\'',
+    )
     args = ap.parse_args()
 
     out_dir = Path(args.out)
@@ -150,7 +170,8 @@ def main() -> None:
     else:
         ap.error("either --manifest PATH or --smoke required")
 
-    records = run_manifest(manifest, out_dir, args.candidate)
+    config_override = json.loads(args.config_override) if args.config_override else None
+    records = run_manifest(manifest, out_dir, args.candidate, config_override)
     (out_dir / "run_results.json").write_text(
         json.dumps(records, indent=2, ensure_ascii=False), encoding="utf-8"
     )
