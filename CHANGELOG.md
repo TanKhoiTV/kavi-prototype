@@ -54,6 +54,10 @@
 
 - Scaffold host-side v0 benchmark harness (Phases 0-3)
 - Build lean eval set + SNR recipe in data_prep (Phase 1)
+- **bench:** Register M2M-100, Moonshine Tiny (vi/en), Zipformer (vi/en) candidates with sweep-optimal beam defaults
+- **bench:** Fix --candidate to override item candidate_id; repair no-filter manifest runs; add --config-override
+- **bench:** Honor beam_size config in Whisper + Opus-MT candidates (uniform config across all models)
+- **bench:** Case-normalize WER/CER in scorer (Zipformer outputs ALL CAPS)
 - **bench:** Support a real noise bank in data_prep([#36](https://github.com/TanKhoiTV/kavi-prototype/pull/36))
 - **qnn:** Add Phase 4 QNN conversion pipeline setup
 - Add Phase 4 QNN setup, Phase 5 RTranslator prep, Phase 6 denoising gate
