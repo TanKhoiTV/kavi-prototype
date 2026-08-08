@@ -151,6 +151,60 @@ def test_fleurs_load_pairs_audio_to_transcript_by_id(tmp_path: Path) -> None:
         assert tx == f"text_{i}"
 
 
+def _write_synthetic_mt_parquets(
+    dir_path: Path, n_vi: int = 40, n_en: int = 35
+) -> None:
+    """Write synthetic vi/en FLEURS parquets with overlapping ids."""
+    import pyarrow as pa
+
+    vi_rows = [
+        {"id": f"{1000 + i}", "transcription": f"van ban tieng viet {i}"}
+        for i in range(n_vi)
+    ]
+    en_rows = [
+        {"id": f"{1000 + i}", "transcription": f"vietnamese text {i}"}
+        for i in range(n_en)
+    ]
+    for rows, name in (
+        (vi_rows, "fleurs_vi_vn_test.parquet"),
+        (en_rows, "fleurs_en_us_test.parquet"),
+    ):
+        tbl = pa.table(
+            {
+                "id": pa.array([r["id"] for r in rows]),
+                "transcription": pa.array([r["transcription"] for r in rows]),
+            }
+        )
+        pq.write_table(tbl, str(dir_path / name))
+
+
+def test_build_mt_manifest_full_pool_and_subsample(tmp_path: Path) -> None:
+    from bench.data_prep import build_mt_manifest
+    from bench.schema import RunManifest
+
+    raw = tmp_path / "raw"
+    raw.mkdir()
+    _write_synthetic_mt_parquets(raw)  # 35 overlapping ids (n_en < n_vi)
+    out = tmp_path / "mt.json"
+
+    build_mt_manifest(str(out), workdir=str(tmp_path))
+    m = RunManifest.from_json(str(out))
+    assert len(m.items) == 35
+    ids = [it.id for it in m.items]
+    assert ids == sorted(ids) and len(set(ids)) == 35
+    it = m.items[0]
+    assert it.stage == "MT" and it.direction == "vi->en" and it.language == "vi"
+    assert it.input_text.startswith("van ban") and it.reference_text.startswith(
+        "vietnamese"
+    )
+
+    # deterministic subsample (even spacing starts at round(step/2) = index 2)
+    build_mt_manifest(str(out), workdir=str(tmp_path), n_items=10)
+    m2 = RunManifest.from_json(str(out))
+    assert len(m2.items) == 10
+    assert m2.items[0].id == "vi-en-mt-1002"
+
+
 # --- Registration of new benchmark candidates (M2M, Moonshine, Zipformer) ---
 
 NEW_CANDIDATE_IDS = {
