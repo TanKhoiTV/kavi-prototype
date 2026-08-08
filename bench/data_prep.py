@@ -345,6 +345,186 @@ def _emit_asr_items(
             )
 
 
+def _load_vivos_utterances(
+    vivos_root: str | Path,
+    n_items: int = 100,
+    sample_rate: int = 16000,
+) -> list:
+    """Load (uid, transcript, audio_tensor) triples from the VIVOS test split.
+
+    Same speaker-stratified deterministic selection as
+    ``bench/scripts/convert_vivos_manifest.py`` (19 speakers, round-robin
+    base + remainder allocation, evenly-spaced picks per speaker, sorted by
+    uid), so the sampled utterances match the existing
+    ``vivos_vi_test_manifest.json``. Audio is decoded to mono (1, N) float32
+    at ``sample_rate``.
+    """
+    import torch
+    import torchaudio
+
+    test_dir = Path(vivos_root) / "test"
+    waves_dir = test_dir / "waves"
+
+    # prompts.txt: "<ID> <TRANSCRIPT>" per line
+    prompts: dict[str, str] = {}
+    for line in (test_dir / "prompts.txt").read_text(encoding="utf-8").strip().split("\n"):
+        parts = line.split(" ", 1)
+        if len(parts) == 2:
+            prompts[parts[0]] = parts[1].strip()
+
+    # Group by speaker (VIVOSDEV01..19), preserve file order; drop missing audio
+    speakers: dict[str, list[str]] = {}
+    for uid in prompts:
+        speakers.setdefault(uid.rsplit("_", 1)[0], []).append(uid)
+    for spk in list(speakers):
+        speakers[spk] = [
+            uid
+            for uid in speakers[spk]
+            if (waves_dir / spk / f"{uid}.wav").exists()
+        ]
+        if not speakers[spk]:
+            del speakers[spk]
+    n_total = sum(len(v) for v in speakers.values())
+    n_speakers = len(speakers)
+    if n_total < n_items:
+        raise ValueError(f"Only {n_total} VIVOS test utterances available, need {n_items}")
+    if n_items < n_speakers:
+        raise ValueError(
+            f"n_items ({n_items}) must be >= number of VIVOS speakers ({n_speakers})"
+        )
+
+    # Allocate counts per speaker: base + remainder to first speakers
+    base, rem = divmod(n_items, n_speakers)
+    counts = {
+        spk: base + (1 if i < rem else 0)
+        for i, spk in enumerate(sorted(speakers))
+    }
+    # Evenly-spaced picks within each speaker's ordered list
+    selected: list[str] = []
+    for spk in sorted(speakers):
+        uids = speakers[spk]
+        k = counts[spk]
+        step = len(uids) / k
+        picks = sorted(round(step / 2 + i * step) for i in range(k))
+        for p in picks:
+            selected.append(uids[min(p, len(uids) - 1)])
+    selected.sort()  # deterministic output order
+
+    out: list = []
+    for uid in selected:
+        spk = uid.rsplit("_", 1)[0]
+        data, sr = sf.read(
+            str(waves_dir / spk / f"{uid}.wav"), dtype="float32", always_2d=True
+        )
+        audio = torch.from_numpy(data).transpose(0, 1).mean(0, keepdim=True)
+        if sr != sample_rate:
+            audio = torchaudio.functional.resample(audio, sr, sample_rate)
+        out.append((uid, prompts[uid], audio))
+    return out
+
+
+def build_vivos_manifest(
+    out_path: str,
+    workdir: str = "eval_data",
+    n_items: int = 100,
+    sample_rate: int = 16000,
+    real_noise_dir: str | None = None,
+    mixed_dir: str | Path | None = None,
+) -> None:
+    """Build a full-schema ASR eval manifest from the VIVOS test split (clean vi).
+
+    Mirror of the FLEURS ASR path in :func:`build_lean_manifest`: each sampled
+    utterance is emitted as 9 EvalItems (clean + steady/impulsive @ 15/10/5/0 dB)
+    via :func:`_emit_asr_items`, with the mixed audio written to ``mixed_dir``
+    (default ``{workdir}/mixed``; pass e.g. ``eval_data/vivos-mixed`` to keep
+    VIVOS audio separate from the FLEURS bank). Uses the same synthetic noise
+    recipe, or real clips from ``real_noise_dir`` when supplied.
+    """
+    wd = Path(workdir)
+    mixed_dir = Path(mixed_dir) if mixed_dir else wd / "mixed"
+    mixed_dir.mkdir(parents=True, exist_ok=True)
+    real_noise = (
+        _load_real_noise(real_noise_dir, sample_rate) if real_noise_dir else None
+    )
+
+    utterances = _load_vivos_utterances(wd / "raw" / "vivos", n_items, sample_rate)
+    items: list[EvalItem] = []
+    for idx, (uid, transcript, audio) in enumerate(utterances):
+        _emit_asr_items(
+            items,
+            mixed_dir,
+            "vi",
+            idx,
+            uid,
+            transcript,
+            audio,
+            sample_rate,
+            real_noise=real_noise,
+        )
+    RunManifest(items=items).to_json(out_path)
+    print(
+        f"VIVOS: added {len(utterances)} VI ASR utterances -> {len(items)} items "
+        f"({sum(1 for it in items if it.stage == 'ASR')} ASR)"
+    )
+
+
+def build_mt_manifest(
+    out_path: str,
+    workdir: str = "eval_data",
+    n_items: int | None = None,
+) -> None:
+    """Build a text-only vi->en MT eval manifest from the full FLEURS parallel pool.
+
+    FLEURS is a parallel corpus: the vi and en test parquets share utterance
+    ids, so every id present in both parquets is a vi->en translation pair.
+    MT items need no audio (``input_text`` + ``reference_text`` only), so this
+    is decoupled from ASR sampling and cheap to build. Deterministic (sorted
+    by id); ``n_items`` optionally subsamples with even spacing. The authored
+    gold items are intentionally NOT included -- they stay in the FLEURS
+    manifest flow (:func:`build_lean_manifest`).
+    """
+    wd = Path(workdir)
+    vi_path = wd / "raw" / "fleurs_vi_vn_test.parquet"
+    en_path = wd / "raw" / "fleurs_en_us_test.parquet"
+    if not (vi_path.exists() and en_path.exists()):
+        raise FileNotFoundError(f"need both FLEURS parquets under {wd / 'raw'}")
+
+    import pyarrow.parquet as pq
+
+    def load(path: Path) -> dict[str, str]:
+        table = pq.read_table(str(path), columns=["id", "transcription"])
+        return {
+            str(r["id"]): (r.get("transcription") or "").strip()
+            for r in table.to_pylist()
+        }
+
+    vi_text = load(vi_path)
+    en_text = load(en_path)
+    pairs = [
+        (uid, vi_text[uid], en_text[uid])
+        for uid in sorted(set(vi_text) & set(en_text))
+        if vi_text[uid] and en_text[uid]
+    ]
+    if n_items is not None and 0 < n_items < len(pairs):
+        step = len(pairs) / n_items
+        picks = sorted(round(step / 2 + i * step) for i in range(n_items))
+        pairs = [pairs[min(p, len(pairs) - 1)] for p in picks]
+
+    items = [
+        EvalItem(
+            id=f"vi-en-mt-{uid}",
+            stage="MT",
+            language="vi",
+            direction="vi->en",
+            input_text=vi_t,
+            reference_text=en_t,
+        )
+        for uid, vi_t, en_t in pairs
+    ]
+    RunManifest(items=items).to_json(out_path)
+    print(f"MT: added {len(items)} VI->EN parallel pairs -> {out_path}")
+
+
 def build_lean_manifest(
     out_path: str,
     workdir: str = "eval_data",
