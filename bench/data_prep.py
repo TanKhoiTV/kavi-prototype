@@ -650,7 +650,52 @@ def main() -> None:
         "--noise-dir",
         help="dir with {steady,impulsive}/*.wav real noise clips (else synthetic)",
     )
+    ap.add_argument(
+        "--vivos",
+        nargs="?",
+        const=100,
+        type=int,
+        default=None,
+        metavar="N",
+        help="build a VIVOS ASR eval manifest instead (optional N items, default 100)",
+    )
+    ap.add_argument(
+        "--vivos-mixed-dir",
+        default=None,
+        help=(
+            "write VIVOS mixed wavs here instead of {workdir}/mixed "
+            "(e.g. eval_data/vivos-mixed)"
+        ),
+    )
+    ap.add_argument(
+        "--mt-only",
+        nargs="?",
+        const=0,
+        type=int,
+        default=None,
+        metavar="N",
+        help=(
+            "build a text-only vi->en MT manifest from ALL FLEURS parallel pairs "
+            "instead (optional N to subsample deterministically)"
+        ),
+    )
     args = ap.parse_args()
+    if args.vivos is not None:
+        build_vivos_manifest(
+            "eval_data/vivos_vi_eval_manifest.json",
+            workdir=args.workdir,
+            n_items=args.vivos,
+            real_noise_dir=args.noise_dir,
+            mixed_dir=args.vivos_mixed_dir,
+        )
+        return
+    if args.mt_only is not None:
+        build_mt_manifest(
+            "eval_data/mt_vi_en_eval_manifest.json",
+            workdir=args.workdir,
+            n_items=(args.mt_only or None),
+        )
+        return
     if args.download_fleurs:
         langs = tuple(args.lang) if args.lang else ("vi_vn", "en_us")
         download_fleurs(args.workdir, langs=langs)
