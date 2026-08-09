@@ -215,6 +215,10 @@ NEW_CANDIDATE_IDS = {
     "zipformer-en-sherpa-onnx-cpu": "ASR",
 }
 
+# Hy-MT runs via HF Transformers (issue #91: CT2 cannot convert it). Registered
+# like any other candidate; the model itself is never loaded in tests.
+HYMT_CANDIDATE_ID = "hy-mt1.5-1.8b-hf-cpu"
+
 
 def test_new_candidates_registered() -> None:
     """All 5 ported candidates are registered with the right stage."""
@@ -228,6 +232,24 @@ def test_new_candidates_registered() -> None:
 
 def test_candidate_ids_unique() -> None:
     assert len(REGISTRY) == len(set(REGISTRY))
+
+
+def test_hymt_candidate_registered() -> None:
+    """Hy-MT is registered as an MT candidate (model-free; no weights load)."""
+    assert HYMT_CANDIDATE_ID in REGISTRY
+    cls, _, cfg = REGISTRY[HYMT_CANDIDATE_ID]
+    assert cls.id == HYMT_CANDIDATE_ID
+    assert cls.stage == "MT"
+    assert cfg == {"beam_size": 5}
+
+
+def test_hymt_candidate_prompt_format() -> None:
+    """XX->XX prompt matches the model card template (no ZH path)."""
+    from bench.candidates.hy_mt_hf import HyMT15MTCandidate
+
+    # static check: no module-level model load happens at import time
+    assert HyMT15MTCandidate.stage == "MT"
+    assert HyMT15MTCandidate.id == HYMT_CANDIDATE_ID
 
 
 def test_stage_defaults_unchanged() -> None:
