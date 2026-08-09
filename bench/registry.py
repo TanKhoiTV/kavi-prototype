@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from .candidates.hy_mt_hf import HyMT15MTCandidate
 from .candidates.m2m_mt import M2M100MTCandidate
 from .candidates.moonshine_asr import (
     MoonshineTinyEnCandidate,
@@ -33,6 +34,7 @@ REGISTRY: dict[str, RegistryEntry] = {
     ZipformerEnCandidate.id: (ZipformerEnCandidate, None, {"beam_size": 4}),
     OpusMTMTCandidate.id: (OpusMTMTCandidate, None, {"beam_size": 5}),
     M2M100MTCandidate.id: (M2M100MTCandidate, None, {"beam_size": 4}),
+    HyMT15MTCandidate.id: (HyMT15MTCandidate, None, {"beam_size": 5}),
     PiperTTSCandidate.id: (PiperTTSCandidate, None, {}),
     QnnWhisperASRCandidate.id: (QnnWhisperASRCandidate, None, {}),
     QnnOpusMTMTCandidate.id: (QnnOpusMTMTCandidate, None, {}),
