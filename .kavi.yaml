@@ -1,0 +1,185 @@
+# Kavi — single source of truth for pinned configuration values.
+#
+# This file centralizes all version pins, hardware parameters, model configs,
+# and pipeline constants so that docs, scripts, and implementation reference
+# one location instead of scattering values across ADRs and plans.
+#
+# Per-machine paths (SDK, NDK) can be overridden via environment variables —
+# see the *_env fields. Everything else is a project-wide invariant.
+
+---
+metadata:
+  description: "Kavi prototype — pinned configuration values"
+  target_device: "Meizu 21 Note (Snapdragon 8 Gen 2 / SM8550 / Hexagon HTP v73)"
+  target_android: 16  # API 36
+  last_updated: "2026-08-10"
+
+# ── SDK & toolchain ──────────────────────────────────────────────────────────
+
+sdk:
+  qairt:
+    version: "2.31.0.250130"
+    path_env: "QAIRT_SDK_ROOT"
+    path_default: "/home/dmin/Qualcomm/AIStack/QAIRT/2.31.0.250130"
+    version_lock_reason: "Must match device qnn-2.31 / HTP v73 runtime. Do NOT upgrade."
+  ndk:
+    version: "26.1.10909125"  # r26c
+    path_env: "ANDROID_NDK_ROOT"
+  sherpa_onx:
+    version: "1.13.4"
+    canonical_source: "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/"
+    note: "No official Maven Central artifact — AAR/jniLibs path is canonical."
+
+build:
+  agp: "8.10.0"
+  gradle: "8.11.1"
+  kotlin: "2.0.21"
+  cmake: "3.22.1"
+  compile_sdk: 36
+  target_sdk: 36
+  min_sdk: 24
+  abi: "arm64-v8a"  # only
+  stl: "c++_shared"  # must match sherpa-onnx prebuilt
+
+# ── ASR (Dual Zipformer, ADR-008) ──────────────────────────────────────────
+
+asr:
+  provider: "sherpa-onnx"
+  num_threads: 4
+  decoding_method: "greedy_search"  # v1 default; modified_beam_search deferred
+  provider_name: "cpu"  # sherpa-onnx provider string
+  language_detection:
+    method: "argmax_mean_log_prob"
+    confidence_threshold: 0.6  # below → push-to-talk manual (ADR-008 fallback)
+  models:
+    vi:
+      name: "sherpa-onnx-zipformer-vi-30M-int8-2026-02-09"
+      size_mb: 32  # encoder 26 MB + decoder 4.9 MB + joiner 1.0 MB + tokens 23 KB
+      wer: "7.97%"  # VLSP2025
+    en:
+      name: "csukuangfj/sherpa-onnx-zipformer-small-en-2023-06-26"
+      size_mb: 27
+  gates:
+    rtf: 0.05  # hard gate on Meizu 21 Note (SD8G2)
+    rtf_desktop_benchmark: 0.011  # 1 thread, 3.74 s clip (sherpa-onnx bench)
+
+# ── MT (Opus-MT, ADR-007 Decision 3) ────────────────────────────────────────
+
+mt:
+  model: "Helsinki-NLP/opus-mt-vi-en"
+  onnx:
+    encoder: "models/qnn/opus-mt-vi-en/opus-mt-vi-en/encoder_model.onnx"  # 186 MB fp32
+    decoder: "models/qnn/opus-mt-vi-en/opus-mt-vi-en/decoder_model.onnx"  # 322 MB fp32
+  decoding:
+    method: "greedy"  # beam=1; beam=4 deferred to Phase 5 (ADR-007 §MT)
+    kv_cache_tokens: 256  # pre-allocated, never freed (D2 residency)
+    kv_cache_mb: 70
+  qnn_encoder:
+    context_binary: "opus_mt_vi_en_encoder_v73.bin"
+    model_lib: "libopus_mt_vi_en_encoder.so"
+    quantization: "w8a16"  # param_quantizer=tf, act_quantizer=tf
+    htp_arch: "v73"
+    conversion_script: "bench/qnn/convert_to_qnn.sh"
+
+# ── TTS (Supertonic Phase 1 → VieNeu-TTS Phase 2, ADR-009) ──────────────────
+
+tts:
+  phase: 1
+  provider: "sherpa-onnx"
+  api_class: "OfflineTts"
+  num_threads: 4
+  provider_name: "cpu"
+  model_name: "supertonic"
+  license: "OpenRAIL-M (weights) + MIT (code)"
+  generation_config:
+    sid: 0          # 0–9 maps to M1–M5, F1–F5
+    speed: 1.0
+    num_steps: 8
+    lang_values: ["vi", "en"]  # switched per utterance via extra={"lang": ...}
+  sample_rate_hz: 44100
+  gates:
+    rtf: 0.5  # hard gate; else Piper VITS fallback
+
+# ── ONNX Runtime (ADR-010) ──────────────────────────────────────────────────
+
+onnxruntime:
+  optimization_level: "ORT_ENABLE_ALL"  # ALL_OPT — safe because no custom ops
+  arena_allocator: true                 # CPUArenaAllocator(true)
+  memory_pattern: true                  # MemoryPatternOptimization(true)
+  single_copy: true                     # reuse sherpa's bundled libonnxruntime.so
+  note: "Kavi avoids RTranslator's NO_OPT limitation — no custom ONNX operators in pipeline."
+
+# ── QNN / jniLibs (ADR-007 Decision 8) ─────────────────────────────────────
+
+qnn:
+  jni_libs_trimmed: 7  # 39 → 7 per ADR-007 D8
+  keep_libs:
+    - "libQnnHtp.so"
+    - "libQnnHtpV73Stub.so"
+    - "libQnnHtpV73CalculatorStub.so"
+    - "libQnnHtpPrepare.so"
+    - "libQnnSystem.so"
+    - "libQnnCpu.so"
+    - "libqnn_loader_jni.so"
+  version_lock: "QAIRT 2.31.0.250130 = device qnn-2.31 / HTP v73"
+
+# ── Denoiser (ADR-007 Decision 7, Phase-6 gate) ─────────────────────────────
+
+denoiser:
+  method: "wiener"  # adopted Phase-6 gate (noisereduce, prop_decrease=0.5)
+  prop_decrease: 0.5
+  toggleable: true  # per-utterance
+  wer_noisy: "49.82%"  # smoke test: weighted avg, 2 utts × 5 conditions
+  wer_raw: "51.23%"
+  note: "On-device GTCRN-vs-Wiener pick remains open (Risk R1 in android plan)."
+
+# ── Memory budget (ADR-007/008 ≈ 1.16 GB) ───────────────────────────────────
+
+memory:
+  budget_mb: 1160
+  breakdown:
+    asr_dual_zipformer_mb: 60       # 2 × ~30 MB (int8)
+    denoiser_mb: 0.5               # GTCRN ONNX
+    mt_encoder_mb: 46              # 186 MB fp32 → int8 (~4× smaller, planned)
+    mt_decoder_mb: 80               # 322 MB fp32 → int8 (~80 MB)
+    kv_cache_mb: 70                 # pre-allocated, 256 tokens
+    tts_supertonic_mb: 280          # ~280–320 MB bundle
+    qnnlibs_and_rss_mb: 120         # trimmed 7 .so + sherpa libs + c++_shared
+  verify_method: "readPeakRssKb / VmPeak per stage on-device"
+
+# ── Pipeline timing ─────────────────────────────────────────────────────────
+
+timing:
+  turnaround_gate_sec: 2.0  # EOS→SA hard gate
+  audio_record_hz: 16000    # mono PCM float
+  audio_playback_hz: 44100  # from Supertonic
+  vad_speech_timeout_ms: 500
+  cold_start_load_sec: "2-3"  # mitigated by splash/progress bar
+
+# ── Fallback chain ──────────────────────────────────────────────────────────
+
+fallbacks:
+  encoder: "QNN → ORX CPU (automatic, logged)"
+  tts: "Supertonic → Piper VITS (MIT-era pinned snapshot)"
+  denoiser: "toggle off / pass-through if load fails"
+  language: "confidence < 0.6 → PTT manual direction"
+  service: "model load failure → notification + retry, no crash"
+
+# ── Path conventions (ADR-011) ──────────────────────────────────────────────
+
+paths:
+  host_models: "models/qnn/*"               # gitignored — regenerable only
+  on_device_assets: "android/app/src/main/assets/"
+  on_device_jnilibs: "android/app/src/main/jniLibs/arm64-v8a/"
+  sha256_manifest: "android/app/src/main/assets/SHA256SUMS"
+  note: "Never vendor from models/qnn/*. All on-device artifacts committed inside kavi-android with SHA-256 manifest."
+
+# ── Phase sequencing (PR #97 / android-implementation-plan) ─────────────────
+
+build_sequence:
+  A_plumbing: "Vendor sherpa-onnx, trim jniLibs 39→7, multi-target CMake, ModelRegistry + SHA256SUMS"
+  B_asr: "DualZipformerRecognizer, LanguageSelector, unit + instrumented smoke"
+  C_service: "TranslationService, Recorder/Vad, AudioSink, SupertonicTts, MtDecoder (ORT greedy), SpeechPipeline walkie-talkie"
+  D_qnn_encoder: "qnn_loader_jni rewrite, QnnTensorFactory, direct-Buffer zero-copy, version-lock assert"
+  E_tts_ble: "Supertonic tuning, Piper fallback, PeerLink BLE 5.2"
+  F_benchmark: "BenchmarkRunner, hard gates (RTF, ALL_OPT vs NO_OPT), WER/BLEU off-device scoring"
