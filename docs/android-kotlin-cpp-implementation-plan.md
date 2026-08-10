@@ -193,7 +193,7 @@ M0 (A), M1 (B), M2 (C), M3 (D), M4 (E), M5–M6 (F).
 
 ## 11. Risks & open questions
 
-1. **QAIRT SDK absent** (2.31.0.250130 not installed; HTP v73 ctx binary doesn't exist) — **hard blocker for real QNN exec (D)**; the C++ layer can still be written against the dlsym ABI and validated with a mock; context-binary generation needs a Windows/WSL host.
+1. **QAIRT SDK + HTP v73 ctx binary** — the SDK is installed (2.31.0.250130) and ONNX + calibration data are prepared, but the HTP v73 context binary for the Opus-MT encoder does **not** exist yet. **Runbook:** `docs/ndk-conversion-runbook.md` (NDK r6c set-up, conversion command, delivery into `kavi-android`). The C++ layer can be written against the dlsym ABI and validated with a mock backend while the NDK person runs the conversion.
 2. **ORT version match** — sherpa's bundled `libonnxruntime.so` version must satisfy the decoder graph's opset + `ALL_OPT`; if not, vendor a second ORT (size/roster impact) — decide in Build A.
 3. **STL policy** — `c++_shared` must match sherpa prebuilds; verify no `libc++` clash at runtime (`dlopen RTLD_LOCAL` for QNN already decided).
 4. **ION zero-copy** — needs QNN `QnnMem_register` + dma-buf heaps on SD8G2; feasibility to confirm on the physical device in Build D; fallback = one copy.
