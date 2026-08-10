@@ -20,11 +20,11 @@ metadata:
 sdk:
   qairt:
     version: "2.31.0.250130"
-    path_env: "QAIRT_SDK_ROOT"  # set in .kavi.env
+    path_env: "QAIRT_SDK_ROOT" # set in .kavi.env
     version_lock_reason: "Must match device qnn-2.31 / HTP v73 runtime. Do NOT upgrade."
   ndk:
     version: "26.1.10909125" # r26c
-    path_env: "ANDROID_NDK_ROOT"  # set in .kavi.env
+    path_env: "ANDROID_NDK_ROOT" # set in .kavi.env
   sherpa_onx:
     version: "1.13.4"
     canonical_source: "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/"
@@ -45,7 +45,7 @@ build:
 
 asr:
   provider: "sherpa-onnx"
-  num_threads: 4 # STARTING VALUE — must validate in Build B (see tuning below)
+  num_threads: 3 # STARTING VALUE — 3 per recognizer = 3+3 total (see tuning below)
   decoding_method: "greedy_search" # v1 default; modified_beam_search deferred
   provider_name: "cpu" # sherpa-onnx provider string
   language_detection:
@@ -91,8 +91,11 @@ asr:
 mt:
   model: "Helsinki-NLP/opus-mt-vi-en"
   onnx:
+    # Source ONNX files (exist on disk — doubled dir is HuggingFace hub naming)
     encoder: "models/qnn/opus-mt-vi-en/opus-mt-vi-en/encoder_model.onnx" # 186 MB fp32
     decoder: "models/qnn/opus-mt-vi-en/opus-mt-vi-en/decoder_model.onnx" # 322 MB fp32
+    # Step-1 output (QAIRT converter): encoder/opus_mt_vi_en_encoder.bin (74 MB raw-weights tar)
+    # Step-3 output (context binary): NOT YET PRODUCED — M3 deliverable (NDK-gated track)
   decoding:
     method: "greedy" # beam=1; beam=4 deferred to Phase 5 (ADR-007 §MT)
     kv_cache_tokens: 256 # pre-allocated, never freed (D2 residency)
@@ -135,7 +138,7 @@ onnxruntime:
 # ── QNN / jniLibs (ADR-007 Decision 8) ─────────────────────────────────────
 
 qnn:
-  jni_libs_trimmed: 7 # 39 → 7 per ADR-007 D8
+  jni_libs_trimmed: 8 # 39 → 8 per ADR-007 D8
   keep_libs:
     - "libQnnHtp.so"
     - "libQnnHtpV73Stub.so"
@@ -143,18 +146,20 @@ qnn:
     - "libQnnHtpPrepare.so"
     - "libQnnSystem.so"
     - "libQnnCpu.so"
+    - "libQnnGpu.so" # GPU fallback backend — future-proofing per ADR-007 D8
     - "libqnn_loader_jni.so"
   version_lock: "QAIRT 2.31.0.250130 = device qnn-2.31 / HTP v73"
 
 # ── Denoiser (ADR-007 Decision 7, Phase-6 gate) ─────────────────────────────
 
 denoiser:
-  method: "wiener" # adopted Phase-6 gate (noisereduce, prop_decrease=0.5)
+  method: "wiener" # host-side benchmarking reference (noisereduce, prop_decrease=0.5)
   prop_decrease: 0.5
   toggleable: true # per-utterance
   wer_noisy: "49.82%" # smoke test: weighted avg, 2 utts × 5 conditions
   wer_raw: "51.23%"
-  note: "On-device GTCRN-vs-Wiener pick remains open (Risk R1 in android plan)."
+  on_device_default: "GTCRN" # ADR-007 D7 — 523 KB ONNX via sherpa-onnx
+  note: "Wiener is host-side benchmarking reference. On-device denoiser is GTCRN (ADR-007 D7); final pick gated on Phase-6 benchmarks (Risk R1)."
 
 # ── Memory budget (ADR-007/008 ≈ 1.16 GB) ───────────────────────────────────
 
@@ -162,7 +167,7 @@ memory:
   budget_mb: 1160
   breakdown:
     asr_dual_zipformer_mb: 60 # 2 × ~30 MB (int8)
-    denoiser_mb: 0.5 # GTCRN ONNX
+    denoiser_mb: 50 # GTCRN ONNX — ADR-007 D5 (~50 MB); Wiener is host-side only (near-zero on-device)
     mt_encoder_mb: 46 # 186 MB fp32 → int8 (~4× smaller, planned)
     mt_decoder_mb: 80 # 322 MB fp32 → int8 (~80 MB)
     kv_cache_mb: 70 # pre-allocated, 256 tokens
