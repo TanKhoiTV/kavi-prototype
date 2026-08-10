@@ -44,7 +44,9 @@ speech-to-speech translator meeting the 2.0 s turnaround budget on a Snapdragon 
   `.raw` weights** (converter intermediate), **not** the on-device HTP v73
   context binary — that binary does **not** exist yet and is the M3
   deliverable (`qnn-context-binary-generator`, Windows host, `phase-4-qnn-plan`
-  §8). All `models/qnn/*` artifacts are **gitignored & uncommitted**
+  §8). **Runbook:** `docs/ndk-conversion-runbook.md` (step-by-step NDK + QAIRT
+  setup, conversion command, delivery into `kavi-android`). All `models/qnn/*`
+  artifacts are **gitignored & uncommitted**
   (`.gitignore` `models/qnn/*`) — provenance is unverifiable locally.
 - **Denoiser**: Phase-6 gate adopted Wiener (`noisereduce`, `prop_decrease=0.5`) —
   `docs/reference/denoising-gate-results.md`.
@@ -237,4 +239,5 @@ ADR-004 closure (per `.pi/PLAN.md` §8 acceptance criteria).
 - ADR-006 — Android Runner Architecture (benchmark runner design)
 - `.pi/PLAN.md` — Phases 4–7 task breakdown (QNN conversion, RTranslator, COMET/MOS)
 - `docs/reference/phase-4-qnn-plan.md` — executable QNN conversion spec
+- `docs/ndk-conversion-runbook.md` — step-by-step NDK conversion runbook (Opus-MT encoder → HTP v73 context binary)
 - `docs/reference/denoising-gate-results.md` — Phase-6 Wiener adoption
