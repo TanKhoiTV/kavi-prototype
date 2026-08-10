@@ -49,6 +49,7 @@
 - ADR-008 — v1 Android Dual Zipformer ASR decision ([#92](https://github.com/TanKhoiTV/kavi-prototype/pull/92))
 - ADR-009 — v1 Android TTS decision (Supertonic Phase 1 → VieNeu-TTS Phase 2) (#93)([#93](https://github.com/TanKhoiTV/kavi-prototype/pull/93))
 - Add ADR-010 — ALL_OPT decoder optimisation analysis (#94)([#94](https://github.com/TanKhoiTV/kavi-prototype/pull/94))
+- Index NDK conversion runbook in docs/README
 
 ### Features
 
