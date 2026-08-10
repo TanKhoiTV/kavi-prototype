@@ -28,6 +28,11 @@ kavi-prototype/               (PRIVATE submodule — the real repo)
    └─ decisions/
       ├─ ADR-001 …            ⑦  100% offline, forever
       ├─ ADR-002 …            ⑧  one phone: Snapdragon 8 Gen 2
+      ├─ ADR-003 …            ⑨  CPU now, NPU later
+      ├─ ADR-004 …            ⑩  tech stack decided (ADR-007–010); Draft until gates pass
+      ├─ ADR-005 …            ⑭  QNN conversion workarounds (Accepted)
+      ├─ ADR-006 …            ⑮  Android runner architecture (Accepted)
+      └─ license-situation …  ⑬  license gate
 ```
 
 **What to conclude from each:**
@@ -54,11 +59,14 @@ kavi-prototype/               (PRIVATE submodule — the real repo)
 9. **`ADR-003` (Hexagon runtime)** → start on **CPU (ORT-XNNPACK int8)** —
    license-clean, ships today; add **NPU / QAIRT later** after on-device
    benchmarks. NNAPI rejected.
-10. **`ADR-004` (architecture, draft)** → the **actual ASR / MT / TTS model
-    choices are NOT made yet** — they wait for benchmark numbers. The doc the
-    whole benchmarking effort feeds.
+10. **`ADR-004` (architecture, draft)** → the **tech stack is decided** — ADR-007
+    (production architecture), ADR-008 (Dual Zipformer ASR, CPU-only), ADR-009
+    (Supertonic Phase-1 TTS), ADR-010 (`ALL_OPT`). ADR-004 itself stays Draft
+    until the Phase-4/5/7 on-device gates pass.
 11. **`docs/decisions/license-situation.md`** → most candidates are license-clean;
-    this gate is *why* we can pick safely. One open item: the **Piper GPL split**.
+    this gate is *why* we can pick safely. TTS licensing is **resolved for v1**
+    (ADR-009: Supertonic); the **Piper GPL split** matters only if the fallback is
+    exercised — pin the MIT-era `rhasspy/piper` snapshot then.
 12. **`docs/reference/benchmarking-plan.md`** → we **benchmark before choosing** — datasets,
     the ASR/MT/TTS candidate landscape, the pluggable harness design, the lean v0.
 13. **`docs/reference/benchmarking-todo.md`** → the **execution checklist** (phases 0–7,

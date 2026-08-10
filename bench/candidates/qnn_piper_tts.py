@@ -1,5 +1,5 @@
 """Piper TTS adapter — CPU-only stub for on-device inference. **SUPERSEDED**
-(ADR-009): v1 TTS is Supertonic Phase 1 via sherpa-onnx`OfflineTts`; Piper VITS
+(ADR-009): v1 TTS is Supertonic Phase 1 via sherpa-onnx `OfflineTts`; Piper VITS
 is demoted to fallback. Retained for the record.
 
 ADR-005 Decision 3: Piper stays on CPU. QNN conversion is skipped because
