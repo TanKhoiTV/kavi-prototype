@@ -49,8 +49,8 @@
 - ADR-008 — v1 Android Dual Zipformer ASR decision ([#92](https://github.com/TanKhoiTV/kavi-prototype/pull/92))
 - ADR-009 — v1 Android TTS decision (Supertonic Phase 1 → VieNeu-TTS Phase 2) (#93)([#93](https://github.com/TanKhoiTV/kavi-prototype/pull/93))
 - Add ADR-010 — ALL_OPT decoder optimisation analysis (#94)([#94](https://github.com/TanKhoiTV/kavi-prototype/pull/94))
-- ADR-011 — Android model-asset provenance & delivery ([#95](https://github.com/TanKhoiTV/kavi-prototype/pull/95))
-- docs: reconcile plans with ADR-007–010; archive superseded docs to `docs/reference/` ([#95](https://github.com/TanKhoiTV/kavi-prototype/pull/95))
+- Index NDK conversion runbook in docs/README
+- Reconcile plans with ADR-007-010; archive superseded docs to reference/ ([#95](https://github.com/TanKhoiTV/kavi-prototype/pull/95))
 
 ### Features
 
@@ -111,4 +111,5 @@
 - Pin astral-sh/setup-uv to v8.3.2 (resolvable tag)([#25](https://github.com/TanKhoiTV/kavi-prototype/pull/25))
 - Pin GitHub Action tags to full commit SHAs([#27](https://github.com/TanKhoiTV/kavi-prototype/pull/27))
 - Stop recursing into the private kavi-android submodule
-[unreleased]: <https://github.com/TanKhoiTV/kavi-prototype/compare/v0.1.0...HEAD>
+[unreleased]: https://github.com/TanKhoiTV/kavi-prototype/compare/v0.1.0...HEAD
+
