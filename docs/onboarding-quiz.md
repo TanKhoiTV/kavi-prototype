@@ -124,17 +124,19 @@ Fix: `git clone --recurse-submodules …` then `cd prototype && git checkout mai
 Target: **BLEU + COMET**, **MOS**. Named contest metric: **stability**. *Rubric: the
 three hard gates are the common miss.*
 
-**Q10.** Open question: **do denoisers actually help WER on our pipeline** (the
-Phase-1 binary gate was never triggered). Historical ceiling: raw-noisy **20.23%**
-WER @ SNR 5 (Whisper Medium). v0 must add a **denoising toggle (raw / Wiener
-`prop_decrease=0.5` / RNNoise `stationary=False`)** as a fixed factor, using the
-same `torchaudio.add_noise` mixing as the rest of the harness. *Rubric: names the
-open gate + 20.23% ceiling + toggle in v0.*
+**Q10.** The Phase-6 gate **ADOPTED Wiener** (`noisereduce`, `prop_decrease=0.5`):
+weighted-average WER **49.82%** on noisy conditions vs raw **51.23%**; RNNoise
+**REJECTED** (64.36%). Caveat: smoke test only (2 utterances × 5 conditions) — a
+full lean-slice eval is still pending before ADR-004 finalization, and the
+on-device GTCRN-vs-Wiener pick (ADR-007 D7) remains open.
+*Rubric: names Wiener + 49.82% vs 51.23% + the smoke-test caveat.*
 
 **Q11.** `vivos` inherits **VIVOS CC-BY-NC-SA-4.0 (research-only)** → must not ship.
-Clean alternative we already have: Piper **`vais1000`** (**CC BY 4.0**, attribution to
-VAIS / IEEE DataPort). (Also: MIT-era `rhasspy/piper` engine + MeloTTS MIT as
-options.) *Rubric: names the NC taint + vais1000.*
+The **v1 TTS plan (ADR-009)** supersedes the Piper voice question: **Supertonic
+Phase 1** via sherpa-onnx `OfflineTts` (VI + EN voices, lang-switch per ASR
+lang-ID), **VieNeu-TTS Phase 2** later; Piper VITS is demoted to **fallback only**
+— pin the MIT-era `rhasspy/piper` snapshot then. *Rubric: names the NC taint +
+ADR-009 Supertonic Phase 1.*
 
 **Q12.** **CoVoST-2** translates 21 langs→EN + EN→15 (Vietnamese in neither);
 **MuST-C** is EN-source only — so neither covers Vietnamese speech translation.
