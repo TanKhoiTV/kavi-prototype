@@ -70,7 +70,7 @@ deferred to future per-stage ADRs (see Open Questions).
 
 ### Executable plan (pinned spec)
 
-The detailed, step-by-step spec lives in `docs/phase-4-qnn-plan.md`. In brief:
+The detailed, step-by-step spec lives in `docs/reference/phase-4-qnn-plan.md`. In brief:
 
 1. **Convert** each v0 candidate to a QAIRT / QNN artifact (host build-time only):
    - **ASR** — *evaluate* re-sourcing Whisper Small to ONNX (fixed-shape decoder,

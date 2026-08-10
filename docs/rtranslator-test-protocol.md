@@ -6,7 +6,7 @@
 >
 > **Target mode:** WalkieTalkie (one-phone, continuous listen + ASR → MT → TTS) —
 > the closest comparator to Kavi's single-phone speech-to-speech pipeline.
-> See `docs/benchmarking-plan.md` §5.1 for the rationale.
+> See `docs/reference/benchmarking-plan.md` §5.1 for the rationale.
 
 ---
 
@@ -232,8 +232,8 @@ notes: ""
 
 ## 9. References
 
-- `docs/benchmarking-plan.md` §5 — RTranslator as product baseline
-- `docs/benchmarking-todo.md` §7 Phase 5 — checklist
+- `docs/reference/benchmarking-plan.md` §5 — RTranslator as product baseline
+- `docs/reference/benchmarking-todo.md` §7 Phase 5 — checklist
 - `bench/score_rtranslator.py` — scoring script
 - `bench/candidates/rtranslator.py` — RTranslatorCandidate adapter
 - GitHub release: <https://github.com/niedev/RTranslator/releases/tag/2.1.5>

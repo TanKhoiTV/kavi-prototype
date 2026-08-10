@@ -23,7 +23,7 @@ NPU runtime is QAIRT/QNN · (d) the exact ASR model · (e) Hy-MT is commercially
 usable · (f) Piper's distribution model (subprocess vs bundled) · (g) the Qualcomm
 runtime EULA for shipping QNN model artifacts (model `.so` + context binary).
 
-**Q3 — Short answer (benchmark method).** *Source: ADR-004, benchmarking-plan §8.*
+**Q3 — Short answer (benchmark method).** *Source: ADR-004, reference/benchmarking-plan §8.*
 Why do we stand up a benchmark harness **before** finalizing the ASR/MT/TTS stack?
 What is the **single question the v0 harness must answer**, and name **one thing v0
 deliberately leaves out**?
@@ -42,7 +42,7 @@ Our current prototype runs ASR via **whisper.cpp** and MT via **CTranslate2**. W
 can't these simply run on the Hexagon NPU today, and what does reaching NPU speed
 likely require?
 
-**Q7 — Short answer (baseline).** *Source: benchmarking-plan §5.*
+**Q7 — Short answer (baseline).** *Source: reference/benchmarking-plan §5.*
 RTranslator is our product baseline. What latency/RAM figure must Kavi **not be
 worse than**? What is our **verifiable offline advantage** over RTranslator, and
 what must you **record** when testing it?
@@ -51,22 +51,22 @@ what must you **record** when testing it?
 A new member runs `git clone git@github.com:TanKhoiTV/aivoice-2026.git` and finds
 `prototype/` empty. Why, and what is the correct clone command?
 
-**Q9 — Classification (metrics).** *Source: specifications §3, benchmarking-plan §7.*
+**Q9 — Classification (metrics).** *Source: specifications §3, reference/benchmarking-plan §7.*
 Label each as **Hard gate**, **Target**, or **Named contest metric**: RTF ·
 EOS→SA turnaround · no-internet-at-runtime · MT BLEU + COMET · TTS MOS · stability
 (crash / silent-failure rate).
 
-**Q10 — Short answer (denoising gate).** *Source: benchmarking-plan §8.*
-Pre-ASR denoising is still an open pipeline question. What is the **open question**,
-what is the **historical noisy WER ceiling** it must beat, and what must the v0
-harness do to close the gate?
+**Q10 — Short answer (denoising gate).** *Source: `reference/denoising-gate-results.md`.*
+The Phase-6 denoising gate ran a smoke test (2 utterances × 5 conditions) on
+faster-whisper Small int8. What was **ADOPTED** and at what weighted-average WER,
+and what caveat does the results file flag before ADR-004 finalization?
 
-**Q11 — Scenario (TTS voice licensing).** *Source: license-situation, benchmarking-plan §4.5.*
-A member picks the Piper **`vivos`** Vietnamese voice because it is a real VI voice
-and easy to find. What is wrong, and name a **commercially-clean VI voice**
-alternative we already have?
+**Q11 — Scenario (TTS voice licensing).** *Source: `license-situation.md`, ADR-009.*
+A member picks the Piper **`vivos`** Vietnamese voice because it is a real VI
+voice and easy to find. What is wrong, and what is the **v1 TTS plan** that
+supersedes the Piper voice question?
 
-**Q12 — Short answer (VI↔EN speech-translation corpus).** *Source: benchmarking-plan §3.3.*
+**Q12 — Short answer (VI↔EN speech-translation corpus).** *Source: reference/benchmarking-plan §3.3.*
 Why can't we build the VI↔EN test set from **CoVoST-2** or **MuST-C**? What purpose-
 built corpus covers the **EN→VI** direction, and what are the two **VI→EN**
 workarounds?
@@ -124,17 +124,19 @@ Fix: `git clone --recurse-submodules …` then `cd prototype && git checkout mai
 Target: **BLEU + COMET**, **MOS**. Named contest metric: **stability**. *Rubric: the
 three hard gates are the common miss.*
 
-**Q10.** Open question: **do denoisers actually help WER on our pipeline** (the
-Phase-1 binary gate was never triggered). Historical ceiling: raw-noisy **20.23%**
-WER @ SNR 5 (Whisper Medium). v0 must add a **denoising toggle (raw / Wiener
-`prop_decrease=0.5` / RNNoise `stationary=False`)** as a fixed factor, using the
-same `torchaudio.add_noise` mixing as the rest of the harness. *Rubric: names the
-open gate + 20.23% ceiling + toggle in v0.*
+**Q10.** The Phase-6 gate **ADOPTED Wiener** (`noisereduce`, `prop_decrease=0.5`):
+weighted-average WER **49.82%** on noisy conditions vs raw **51.23%**; RNNoise
+**REJECTED** (64.36%). Caveat: smoke test only (2 utterances × 5 conditions) — a
+full lean-slice eval is still pending before ADR-004 finalization, and the
+on-device GTCRN-vs-Wiener pick (ADR-007 D7) remains open.
+*Rubric: names Wiener + 49.82% vs 51.23% + the smoke-test caveat.*
 
 **Q11.** `vivos` inherits **VIVOS CC-BY-NC-SA-4.0 (research-only)** → must not ship.
-Clean alternative we already have: Piper **`vais1000`** (**CC BY 4.0**, attribution to
-VAIS / IEEE DataPort). (Also: MIT-era `rhasspy/piper` engine + MeloTTS MIT as
-options.) *Rubric: names the NC taint + vais1000.*
+The **v1 TTS plan (ADR-009)** supersedes the Piper voice question: **Supertonic
+Phase 1** via sherpa-onnx `OfflineTts` (VI + EN voices, lang-switch per ASR
+lang-ID), **VieNeu-TTS Phase 2** later; Piper VITS is demoted to **fallback only**
+— pin the MIT-era `rhasspy/piper` snapshot then. *Rubric: names the NC taint +
+ADR-009 Supertonic Phase 1.*
 
 **Q12.** **CoVoST-2** translates 21 langs→EN + EN→15 (Vietnamese in neither);
 **MuST-C** is EN-source only — so neither covers Vietnamese speech translation.

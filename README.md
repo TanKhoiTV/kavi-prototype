@@ -44,7 +44,7 @@ make test         # run the pytest suite (manifest round-trip, scorer, FLEURS id
 
 ASR items use real VI/EN speech from FLEURS parquets. Real-noise clips
 (MUSAN/RIRS_NOISES) can be swapped in via `build_lean_manifest(real_noise_dir=...)`.
-See `docs/benchmarking-plan.md` and `docs/benchmarking-todo.md`.
+See `docs/reference/benchmarking-plan.md` and `docs/reference/benchmarking-todo.md`.
 
 > Public contest documentation (contest-info, registration checklist, Luma
 > answers, pitch deck) lives in the parent repo `aivoice-2026/docs/`.

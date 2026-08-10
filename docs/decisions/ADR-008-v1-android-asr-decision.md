@@ -348,8 +348,8 @@ This provides an immediate test artifact for device-level validation before our 
 - ADR-006: Android Runner Architecture (batch evaluation framework)
 - ADR-004: Speech-to-Speech Architecture / Tech-Stack (Draft — benchmark-gated candidate set)
 - ADR-002: Target Platform — Snapdragon 8 Gen 2, Android 16, Hexagon NPU
-- `docs/benchmarking-plan.md` §4.1–4.3 — ASR candidate landscape (Zipformer, Whisper, Moonshine comparison)
-- `docs/benchmarking-plan.md` §4.2 — Latency & memory estimates for Zipformer on SD8G2
+- `docs/reference/benchmarking-plan.md` §4.1–4.3 — ASR candidate landscape (Zipformer, Whisper, Moonshine comparison)
+- `docs/reference/benchmarking-plan.md` §4.2 — Latency & memory estimates for Zipformer on SD8G2
 - `docs/decisions/license-situation.md` — License clearance for all candidate models (Zipformer Apache-2.0 confirmed)
 - [sherpa-onnx-zipformer-vi-30M-int8-2026-02-09](https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-zipformer-vi-30M-int8-2026-02-09.tar.bz2) — VI Zipformer 30M int8 (25 MB compressed)
 - [sherpa-onnx-zipformer-vi-30M-2026-02-09](https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-zipformer-vi-30M-2026-02-09.tar.bz2) — VI Zipformer 30M fp32 (91 MB compressed)
