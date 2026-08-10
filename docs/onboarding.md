@@ -32,7 +32,7 @@ kavi-prototype/               (PRIVATE submodule — the real repo)
       ├─ ADR-004 …            ⑩  tech stack decided (ADR-007–010); Draft until gates pass
       ├─ ADR-005 …            ⑭  QNN conversion workarounds (Accepted)
       ├─ ADR-006 …            ⑮  Android runner architecture (Accepted)
-      └─ license-situation …  ⑪  license gate
+      └─ license-situation …  ⑬  license gate
 ```
 
 **What to conclude from each:**
