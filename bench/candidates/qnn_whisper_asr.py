@@ -1,4 +1,6 @@
-"""QNN Whisper ASR adapter — stub for on-device inference.
+"""QNN Whisper ASR adapter — stub for on-device inference. **SUPERSEDED**
+(ADR-008): ASR is CPU-only Dual Zipformer via sherpa-onnx; the Whisper QNN path
+is retained for the record only.
 
 This adapter is a placeholder for the Phase-4 on-device QNN benchmark runner.
 The actual QNN inference runs on a Snapdragon 8 Gen 2 (HTP v73) via the

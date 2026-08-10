@@ -2,37 +2,43 @@
 
 Internal documentation for the Kavi prototype. **Public** contest docs
 (contest-info, registration checklist, Luma answers, pitch deck) live in the
-parent repo `aivoice-2026/docs/`.
+parent repo `aivoice-2026/docs/` (the prototype copy is deprecated — see
+`reference/contest-info.md`).
 
-## Index
+## Current — read these first
 
-- `onboarding.md` — new-member guide: decodes the jargon, the ADRs, and
-the repo layout. **Start here.**
-- `onboarding-quiz.md` — comprehension checkpoint: 12 questions to verify a
-new member understands the current state.
-- `benchmarking-plan.md` — datasets, candidate models (ASR / MT / TTS), harness
-design, metrics, and the v0 minimal. Gates ADR-004.
-- `benchmarking-todo.md` — execution checklist / pitch for the v0 benchmark
-harness (what to build, in what order).
-- `phase-4-qnn-plan.md` — executable spec for the on-device QNN conversion &
-  comparison (Phase 4): env contract, per-model ONNX export, artifact
-  bundling, instrumented runner, and the RTF<1.0 / turnaround<2.0s gates.
-  Precedes the Phase-4 implementation (ADR-003 determination method).
-- `ndk-conversion-runbook.md` — step-by-step runbook for the NDK-gated part of
-  the QNN pipeline (Opus-MT encoder → HTP v73 context binary). For the person
-  handling NDK setup + conversion.
-- `decisions/` — Architecture Decision Records (ADR-001 offline-first,
-  ADR-002 target platform, ADR-003 Hexagon runtime, ADR-004 ASR/MT/TTS
-  architecture, ADR-005 QNN conversion workarounds, ADR-006 Android runner
-  architecture, plus `license-situation.md`). Source of truth for
-  architecture choices.
+- `onboarding.md` — new-member guide: decodes the jargon, the ADRs, and the
+  repo layout. **Start here.**
+- `onboarding-quiz.md` — comprehension checkpoint (12 questions).
+- `android-implementation-plan.md` — the active implementation plan
+  (ADR-007 → ADR-010): Milestones 0–6, risks R1–R5, execution order.
+- `rtranslator-test-protocol.md` — Phase-5 APK test procedure (live).
+- `specifications.md` — the six objective metrics + hard thresholds; cited by
+  every plan as the gate contract.
+
+## Hot reference — source of truth
+
+- `decisions/` — Architecture Decision Records (ADR-001 … ADR-011) +
+  `license-situation.md`. Immutable by convention; status changes are recorded
+  in the ADR header.
+
+## Cold reference — superseded / deprecated
+
+- `reference/` — everything no longer current, kept for history and for the
+  content still consulted:
+  - `benchmarking-plan.md` — pre-decision dataset/candidate landscape; the
+    **corpus catalog (§3) and licensing notes** are still consulted for eval work.
+  - `benchmarking-todo.md` — v0 harness execution checklist (implemented).
+  - `phase-4-qnn-plan.md` — QNN conversion spec; **only the Opus-MT encoder
+    path (§2, §8, §9) is live**; Whisper/Piper sections are reference-only.
+  - `denoising-gate-results.md` — Phase-6 gate result (Wiener ADOPTED).
+  - `contest-info.md` — stale copy; canonical version is in the parent repo.
+  - `additional-reading.md` — reading list.
 
 ## Planned / deferred
 
-- `architecture.md` — system architecture (deferred; we figure this out later).
-- `design.md` — design decisions.
+- `architecture.md` — system architecture (deferred; see ADR-007 instead).
 - Legacy ADRs (`001`, `002`) are in `../archive/docs/adr/`.
-- `pitch-deck/` — registration pitch materials (legacy in `../archive/docs/pitch-deck/`).
 
 ## Reference
 

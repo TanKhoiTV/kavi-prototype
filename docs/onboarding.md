@@ -23,13 +23,13 @@ kavi-prototype/               (PRIVATE submodule — the real repo)
 ├─ CONTRIBUTING.md            ⑤  cloning + tooling
 └─ docs/
    ├─ onboarding.md           ⑥  this file — architecture, decoded
-   ├─ benchmarking-plan.md    ⑪  datasets + candidate landscape + harness
-   ├─ benchmarking-todo.md    ⑫  execution checklist
+   ├─ android-implementation-plan.md  ⑪  the active plan (ADR-007 → ADR-010)
+   ├─ reference/              ⑫  superseded / deprecated docs (benchmarking-plan, phase-4-qnn-plan, …)
    └─ decisions/
       ├─ ADR-001 …            ⑦  100% offline, forever
       ├─ ADR-002 …            ⑧  one phone: Snapdragon 8 Gen 2
       ├─ ADR-003 …            ⑨  CPU now, NPU later
-      ├─ ADR-004 …            ⑩  tech stack NOT decided yet
+      ├─ ADR-004 …            ⑩  tech stack decided (ADR-007–010); Draft until gates pass
       ├─ ADR-005 …            ⑭  QNN conversion workarounds (Accepted)
       ├─ ADR-006 …            ⑮  Android runner architecture (Accepted)
       └─ license-situation …  ⑬  license gate
@@ -39,7 +39,7 @@ kavi-prototype/               (PRIVATE submodule — the real repo)
 
 1. **Parent `README.md`** → the public landing page; the code is in the private
    `prototype/` submodule; public docs are just the contest brief + our spec.
-2. **`docs/contest-info.md`** → Kavi is an entry to the **OneVoice AI Challenge**
+2. **`docs/reference/contest-info.md`** → Kavi is an entry to the **OneVoice AI Challenge**
    (Saigon AI Hub × Qualcomm, May–Nov 2026); an offline VI↔EN speech-to-speech
    translator; here are the contest rules + the six grading metrics.
 3. **`docs/specifications.md`** → our translated targets — offline, RTF < 1.0,
@@ -59,14 +59,17 @@ kavi-prototype/               (PRIVATE submodule — the real repo)
 9. **`ADR-003` (Hexagon runtime)** → start on **CPU (ORT-XNNPACK int8)** —
    license-clean, ships today; add **NPU / QAIRT later** after on-device
    benchmarks. NNAPI rejected.
-10. **`ADR-004` (architecture, draft)** → the **actual ASR / MT / TTS model
-    choices are NOT made yet** — they wait for benchmark numbers. The doc the
-    whole benchmarking effort feeds.
+10. **`ADR-004` (architecture, draft)** → the **tech stack is decided** — ADR-007
+    (production architecture), ADR-008 (Dual Zipformer ASR, CPU-only), ADR-009
+    (Supertonic Phase-1 TTS), ADR-010 (`ALL_OPT`). ADR-004 itself stays Draft
+    until the Phase-4/5/7 on-device gates pass.
 11. **`docs/decisions/license-situation.md`** → most candidates are license-clean;
-    this gate is *why* we can pick safely. One open item: the **Piper GPL split**.
-12. **`docs/benchmarking-plan.md`** → we **benchmark before choosing** — datasets,
+    this gate is *why* we can pick safely. TTS licensing is **resolved for v1**
+    (ADR-009: Supertonic); the **Piper GPL split** matters only if the fallback is
+    exercised — pin the MIT-era `rhasspy/piper` snapshot then.
+12. **`docs/reference/benchmarking-plan.md`** → we **benchmark before choosing** — datasets,
     the ASR/MT/TTS candidate landscape, the pluggable harness design, the lean v0.
-13. **`docs/benchmarking-todo.md`** → the **execution checklist** (phases 0–7,
+13. **`docs/reference/benchmarking-todo.md`** → the **execution checklist** (phases 0–7,
     checkboxes) to produce those numbers — what you'd actually pick up and work on.
 14. **`ADR-005` (QNN conversion workarounds)** → when the QAIRT converter rejected
     ops (IsNaN, cyclic graphs), these are the workarounds: strip IsNaN from the
@@ -195,7 +198,8 @@ under `archive/` for reference.
 | `voices/` | TTS voice model(s) (Piper). Usually gitignored / downloaded at runtime. |
 | `docs/` | Internal docs (this file's siblings). |
 | `docs/decisions/` | The ADRs (001–006) + `license-situation.md`. Source of truth for architecture + licensing. |
-| `docs/benchmarking-plan.md` | The plan to *measure* models before picking them (gates ADR-004). **Read this next.** |
+| `docs/android-implementation-plan.md` | The active implementation plan (ADR-007 → ADR-010). **Read this next.** |
+| `docs/reference/` | Superseded / deprecated docs (benchmarking-plan, phase-4-qnn-plan, …). |
 | `.pi/AGENTS.md`, `CONTRIBUTING.md`, `README.md` | Project / agent guidance, how we work, quickstart. |
 | `Makefile`, `pyproject.toml`, `LICENSE` | Build / run, deps (uv), MIT license. |
 | `.github/` | CI (lint + changelog) and PR / issue templates. |
@@ -204,17 +208,15 @@ under `archive/` for reference.
 
 The contest can lead to **commercialization**, so every model must permit
 commercial use. This single rule eliminates several otherwise-attractive models.
-Full detail is in `docs/benchmarking-plan.md` §4.4–§4.5.
+Full detail is in `docs/reference/benchmarking-plan.md` §4.4–§4.5.
 
 - **Commercial-clean (use these):** Opus-MT (Apache-2.0), MeloTTS (MIT),
   MADLAD-400 (Apache-2.0), M2M-100 (MIT), Kokoro (Apache-2.0),
   vietTTS / VITS (MIT / Apache, verify InfoRe terms), SpeechT5 (MIT).
-- **Live license decision — Piper:** **split / time-sensitive.** The old
-  `rhasspy/piper` is **MIT** (frozen, no fixes); the active `OHF-Voice/piper1-gpl`
-  is **GPL-3.0** (copyleft — problematic for a commercial product), and its
-  `espeak-ng` phonemizer is also GPL. Our prototype pins an MIT-era build today,
-  but we must decide pinned-version + distribution model (subprocess vs bundled)
-  before shipping. See `docs/benchmarking-plan.md` §4.5.
+- **TTS — resolved for v1 (ADR-009):** Supertonic Phase 1 → VieNeu-TTS Phase 2,
+  via sherpa-onnx; Piper VITS is fallback only. The old MIT/GPL fork question
+  matters only if the fallback is exercised (pin the MIT-era `rhasspy/piper`
+  snapshot then). See `docs/reference/benchmarking-plan.md` §4.5 for the landscape.
 - **Avoid (license blocks):** **NLLB** (CC-BY-NC), **MMS-TTS-vie** (CC-BY-NC),
   **Coqui XTTS** (CPML — restrictive; Coqui Inc. shut down Jan 2024).
 - **Caution (verify):** **Hy-MT** (HY Community License — commercial-permitted
@@ -222,11 +224,10 @@ Full detail is in `docs/benchmarking-plan.md` §4.4–§4.5.
 
 ## Where the architecture is going (ADR-004)
 
-The **tech stack** — exact ASR / MT / TTS models and runtimes — is **not yet
-decided**. That is **ADR-004**, and it is intentionally deferred until the
-**v0 benchmark harness** (spec'd in `docs/benchmarking-plan.md`) produces real
-on-device numbers. The candidate landscape in that plan (§4) is the working
-shortlist; the harness is what turns it into a decision.
+The **tech stack is decided**: ADR-007 (production architecture), ADR-008 (Dual
+Zipformer ASR, CPU-only), ADR-009 (Supertonic Phase-1 TTS), ADR-010 (`ALL_OPT`).
+**ADR-004 remains Draft** — it closes only after the Phase-4/5/7 on-device numbers
+and hard gates pass (see `.pi/PLAN.md` §8).
 
 ## How to get running & next steps
 
@@ -246,7 +247,7 @@ shortlist; the harness is what turns it into a decision.
 
 3. **Read in order** — see **Start here** (top of this guide): parent
    `README.md` → `contest-info.md` → `specifications.md`, then the submodule docs
-   (`README.md` → this guide → `benchmarking-plan.md` → `docs/decisions/*`).
+   (`README.md` → this guide → `reference/benchmarking-plan.md` → `docs/decisions/*`).
 4. **The v0 harness is built** (`bench/`) — build the eval set and run it:
 
    ```bash
