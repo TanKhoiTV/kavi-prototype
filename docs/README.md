@@ -18,6 +18,9 @@ harness (what to build, in what order).
   comparison (Phase 4): env contract, per-model ONNX export, artifact
   bundling, instrumented runner, and the RTF<1.0 / turnaround<2.0s gates.
   Precedes the Phase-4 implementation (ADR-003 determination method).
+- `ndk-conversion-runbook.md` — step-by-step runbook for the NDK-gated part of
+  the QNN pipeline (Opus-MT encoder → HTP v73 context binary). For the person
+  handling NDK setup + conversion.
 - `decisions/` — Architecture Decision Records (ADR-001 offline-first,
   ADR-002 target platform, ADR-003 Hexagon runtime, ADR-004 ASR/MT/TTS
   architecture, ADR-005 QNN conversion workarounds, ADR-006 Android runner
