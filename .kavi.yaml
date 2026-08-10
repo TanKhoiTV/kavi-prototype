@@ -25,7 +25,7 @@ sdk:
   ndk:
     version: "26.1.10909125" # r26c
     path_env: "ANDROID_NDK_ROOT" # set in .kavi.env
-  sherpa_onx:
+  sherpa_onnx:
     version: "1.13.4"
     canonical_source: "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/"
     note: "No official Maven Central artifact — AAR/jniLibs path is canonical."
@@ -55,10 +55,10 @@ asr:
     vi:
       name: "sherpa-onnx-zipformer-vi-30M-int8-2026-02-09"
       size_mb: 32 # encoder 26 MB + decoder 4.9 MB + joiner 1.0 MB + tokens 23 KB
-      wer: "7.97%" # VLSP2025
+      wer: "7.97%" # VLSP2025 — source: k2-fsa/sherpa-onnx VLSP2025 benchmark
     en:
       name: "csukuangfj/sherpa-onnx-zipformer-small-en-2023-06-26"
-      size_mb: 27
+      size_mb: 28 # ~28 MB per sherpa-onnx model card
   gates:
     rtf: 0.05 # hard gate on Meizu 21 Note (SD8G2)
     rtf_desktop_benchmark: 0.011 # 1 thread, 3.74 s clip (sherpa-onnx bench)
@@ -172,7 +172,8 @@ memory:
     mt_decoder_mb: 80 # 322 MB fp32 → int8 (~80 MB)
     kv_cache_mb: 70 # pre-allocated, 256 tokens
     tts_supertonic_mb: 280 # ~280–320 MB bundle
-    qnnlibs_and_rss_mb: 120 # trimmed 7 .so + sherpa libs + c++_shared
+    qnnlibs_and_rss_mb: 120 # trimmed 8 .so + sherpa libs + c++_shared
+  unaccounted_mb: 454 # deliberate headroom for OS RSS, transient allocations, safety margin
   verify_method: "readPeakRssKb / VmPeak per stage on-device"
 
 # ── Pipeline timing ─────────────────────────────────────────────────────────
@@ -187,7 +188,7 @@ timing:
 # ── Fallback chain ──────────────────────────────────────────────────────────
 
 fallbacks:
-  encoder: "QNN → ORX CPU (automatic, logged)"
+  encoder: "QNN → ORT CPU (automatic, logged)"
   tts: "Supertonic → Piper VITS (MIT-era pinned snapshot)"
   denoiser: "toggle off / pass-through if load fails"
   language: "confidence < 0.6 → PTT manual direction"
@@ -202,10 +203,10 @@ paths:
   sha256_manifest: "android/app/src/main/assets/SHA256SUMS"
   note: "Never vendor from models/qnn/*. All on-device artifacts committed inside kavi-android with SHA-256 manifest."
 
-# ── Phase sequencing (PR #97 / android-implementation-plan) ─────────────────
+# ── Phase sequencing (android-kotlin-cpp-implementation-plan, PR #97) ──────
 
 build_sequence:
-  A_plumbing: "Vendor sherpa-onnx, trim jniLibs 39→7, multi-target CMake, ModelRegistry + SHA256SUMS"
+  A_plumbing: "Vendor sherpa-onnx, trim jniLibs 39→8, multi-target CMake, ModelRegistry + SHA256SUMS"
   B_asr: "DualZipformerRecognizer, LanguageSelector, unit + instrumented smoke"
   C_service: "TranslationService, Recorder/Vad, AudioSink, SupertonicTts, MtDecoder (ORT greedy), SpeechPipeline walkie-talkie"
   D_qnn_encoder: "qnn_loader_jni rewrite, QnnTensorFactory, direct-Buffer zero-copy, version-lock assert"
