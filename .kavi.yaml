@@ -4,8 +4,9 @@
 # and pipeline constants so that docs, scripts, and implementation reference
 # one location instead of scattering values across ADRs and plans.
 #
-# Per-machine paths (SDK, NDK) can be overridden via environment variables —
-# see the *_env fields. Everything else is a project-wide invariant.
+# Per-machine paths (SDK, NDK) are set via environment variables —
+# see the *_env fields and the .kavi.env file. Everything else is a
+# project-wide invariant.
 
 ---
 metadata:
@@ -19,12 +20,11 @@ metadata:
 sdk:
   qairt:
     version: "2.31.0.250130"
-    path_env: "QAIRT_SDK_ROOT"
-    path_default: "/home/dmin/Qualcomm/AIStack/QAIRT/2.31.0.250130"
+    path_env: "QAIRT_SDK_ROOT"  # set in .kavi.env
     version_lock_reason: "Must match device qnn-2.31 / HTP v73 runtime. Do NOT upgrade."
   ndk:
     version: "26.1.10909125" # r26c
-    path_env: "ANDROID_NDK_ROOT"
+    path_env: "ANDROID_NDK_ROOT"  # set in .kavi.env
   sherpa_onx:
     version: "1.13.4"
     canonical_source: "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/"

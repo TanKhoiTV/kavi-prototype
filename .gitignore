@@ -46,3 +46,6 @@ eval_manifest_v1.json
 # Pi coding agent configurations
 .pi/
 .pi-subagents/
+
+# Per-machine env vars (contains absolute paths)
+.kavi.env
