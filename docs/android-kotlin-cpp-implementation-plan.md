@@ -144,6 +144,49 @@ Replaces the stub `nativeExecute` with, per inference:
 - **KV cache:** allocated once at service `onCreate` (~70 MB / 256 tokens, ADR-007 D3), passed by pointer to `ortDecoderDecode`; never freed until service teardown (D2 residency).
 - **Timing budget:** E2E turnaround (EOS→SA) < 2.0 s hard gate (Phase 4); per-stage latencies recorded by `SpeechPipeline` into `run_results_android.json` (`latency_ns`), WER/BLEU scored off-device per ADR-004.
 
+## 6.1 Config consumption — how `.kavi.yaml` values reach code
+
+`.kavi.yaml` is the single source of truth for pinned values. The app reads it at runtime — values are **not** hardcoded in Kotlin.
+
+**Mechanism:**
+
+1. `.kavi.yaml` ships in `android/app/src/main/assets/` (committed, like `SHA256SUMS`).
+2. `ModelRegistry` (§4, `util/ModelRegistry.kt`) already reads assets — it parses `.kavi.yaml` at service `onCreate` using a YAML library (e.g., `org.yaml:snakeyaml` or a lightweight Kotlin parser).
+3. Parsed values are injected into `AppContainer`, which passes them to each engine at construction time.
+
+**Example — ASR thread count:**
+
+```
+.kavi.yaml                AppContainer                  DualZipformerRecognizer
+┌──────────────────┐      ┌───────────────────────┐      ┌──────────────────────────┐
+│ asr:             │      │ val asrNumThreads =   │      │ class DualZipformer      │
+│   num_threads: 3 │───▶  │   config.asr.numThreads│───▶  │   recognizer(            │
+│                  │      │                       │      │     numThreads = ctx     │
+└──────────────────┘      └───────────────────────┘      │       .asrNumThreads)    │
+                                                          └──────────────────────────┘
+```
+
+**Critical rule:** Every numeric value that exists in `.kavi.yaml` MUST be read from the parsed config object at runtime. Hardcoding `3` (or any `.kavi.yaml` value) in Kotlin is a bug — the next person who updates the yaml without touching the code will silently ship a mismatch.
+
+**Config values consumed from `.kavi.yaml`:**
+
+| `.kavi.yaml` path | Consumer | Field |
+| --- | --- | --- |
+| `asr.num_threads` | `DualZipformerRecognizer` | `numThreads` per recognizer |
+| `asr.models.vi.name`, `asr.models.en.name` | `ModelRegistry` | asset paths |
+| `asr.language_detection.confidence_threshold` | `LanguageSelector` | PTT fallback threshold |
+| `mt.qnn_encoder.quantization` | `MtEncoder` | QNN quant config |
+| `mt.decoding.kv_cache_tokens` | `KvCache` | pre-alloc size |
+| `tts.num_threads` | `SupertonicTts` | thread count |
+| `tts.generation_config.*` | `SupertonicTts` | `sid`, `speed`, `numSteps` |
+| `memory.budget_mb` | `AppContainer` | OOM guard threshold |
+| `timing.turnaround_gate_sec` | `SpeechPipeline` | hard gate |
+| `timing.vad_speech_timeout_ms` | `VAD` | end-of-utterance timeout |
+
+**Build-time alternative (deferred):** If runtime YAML parsing is considered too heavy for the 2.0 s turnaround budget, a build-time Gradle task can parse `.kavi.yaml` and generate a `KaviConfig.kt` with `const val` fields. This keeps the single source of truth while avoiding runtime parse cost. The plan uses runtime parsing for v1 (simpler, one fewer build-time moving part); revisit in Build F if cold-start latency gates it.
+
+**Test guard:** Add a unit test in `androidTest/` that reads both `.kavi.yaml` and the parsed config object and asserts every mapped value matches. This catches drift even if someone hardcodes a value in code.
+
 ## 7. Memory budget mapping (ADR-007/008 ≈ 1.16 GB)
 
 | Asset | Loader | Size (est.) |
@@ -175,7 +218,7 @@ ADR-011 rule: every on-device asset ships with a `SHA256SUMS` entry in `kavi-and
 
 | Type | Scope | Notes |
 | --- | --- | --- |
-| JVM unit (`test/`) | `LanguageSelector` (argmax/confidence/<0.6 rule), `Vad` state machine, `KvCache` size math, `ModelRegistry` manifest parsing (Robolectric for `Context`) | pure-Kotlin; add `kotlinx-coroutines-test` |
+| JVM unit (`test/`) | `LanguageSelector` (argmax/confidence/<0.6 rule), `Vad` state machine, `KvCache` size math, `ModelRegistry` manifest parsing (Robolectric for `Context`), **config parity test** (every `.kavi.yaml` value matches the parsed `KaviConfig` — catches drift) | pure-Kotlin; add `kotlinx-coroutines-test` |
 | Instrumented (`androidTest/`) | Per-engine smoke (load + 1 utterance each: ASR, TTS, encoder[CTX], decoder), **`BenchmarkRunner`** (ADR-006: single push/pull, flight-mode assert, `run_results_android.json`) | needs physical Meizu 21 Note (Phase 5 shared blocker); emulator only for non-QNN engines |
 | Native | `ctest` on the two wrapper targets optional (log-format assertions); main validation is instrumented | — |
 | CI | `make check` (ruff) does not cover Kotlin — add ktlint or GitHub Action `android/composite` lint in a **separate follow-up** (not this branch) | — |
