@@ -53,7 +53,7 @@ Five layers, dependency direction strictly downward (Kotlin layers → JNI bound
 denoiser (optional) → DualZipformer offline ASR (VI+EN in parallel) → LanguageSelector
 (confidence argmax; < 0.6 ⇒ push-to-talk manual) → MT encoder (QNN; per-encoder CPU
 fallback) → MT decoder (ORT greedy, ALL_OPT, KV-cache pre-alloc) → Supertonic offline
-TTS (44.1 kHz) → AudioTrack.` PeerToPeer mode: after TTS input text is produced, ship
+TTS (44.1 kHz) → AudioSink (44.1k → AudioTrack).` PeerToPeer mode: after TTS input text is produced, ship
 the translated *text* over BLE; the peer synthesises locally (ADR-007 Decision 2).
 
 ## 4. Kotlin file plan (`app/src/main/java/com/kavi/app/`)
@@ -72,7 +72,7 @@ New/modified files (all under `com.kavi.app`):
 | `audio/Vad.kt` | Energy-threshold VAD state machine (start/stop/holdoff/turnaround timing) — pure Kotlin, unit-testable | `fun feed(frameRms: Float): VadState` |
 | `audio/AudioSink.kt` | `AudioTrack` 44.1 kHz stereo->mono correct, blocking write; underrun stats | `fun play(pcm: ShortArray)` |
 | `engine/SpeechPipeline.kt` | Coroutine chain: listen→denoise→dual ASR→select→MT encoder→MT decoder→TTS→play; keeps per-utterance telemetry (stage latencies) in a `PipelineStepTimings` data class | `fun processOneUtterance(audio: FloatArray): PipelineResult` |
-| `engine/DualZipformerRecognizer.kt` | Two sherpa-onnx `OfflineRecognizer` (VI 30M int8 2026-02-09 + EN small 2023-06-26), `numThreads=4`, provider `cpu`; returns per-recognizer text + mean log-prob | `fun transcribe(audio: FloatArray): Pair<Hyp, Hyp>` |
+| `engine/DualZipformerRecognizer.kt` | Two sherpa-onnx `OfflineRecognizer` (VI 30M int8 2026-02-09 + EN small 2023-06-26), `numThreads=3` per `.kavi.yaml` (3+3 total, 2 cores headroom — see ADR-012), provider `cpu`; returns per-recognizer text + mean log-prob | `fun transcribe(audio: FloatArray): Pair<Hyp, Hyp>` |
 | `engine/LanguageSelector.kt` | Confidence argmax over `(ys_log_probs/ys_probs)`; confidence < 0.6 ⇒ UNAMBIGUOUS=false (→ PTT manual direction) | `fun select(vi: Hyp, en: Hyp): LanguageDecision` |
 | `engine/Denoiser.kt` | GTCRN via sherpa-onnx (523 KB); toggle per utterance (ADR-007 D7; Phase-6 gate: Wiener adopted on host, GTCRN-vs-Wiener still open → Risk R1) | `fun denoise(audio: FloatArray): FloatArray` |
 | `engine/MtEncoder.kt` | Opus-MT encoder: QNN path via `QnnModelLoader` (NPU); per-encoder **CPU fallback** via ORT session (ONNX 186 MB fp32 → int8 later); implements `Encoder` interface | `fun encode(tokens: IntArray): FloatArray` |
@@ -123,7 +123,7 @@ New:
 
 ### 5.3 CMakeLists.txt changes
 
-- Multi-target: `qnn_loader_jni`, `ort_decoder_jni` (+ `spm_jni`); keep C++17; add `-O2 -ffast-math` is **not** used (fp determinism) — use `-O2` only; `ANDROID_STL=c++_shared` must **match** the sherpa-onnx prebuilt (`libsherpa-onnx-jni.so` links `libc++_shared.so`) — otherwise duplicate STL symbols at load.
+- Multi-target: `qnn_loader_jni`, `ort_decoder_jni` (+ `spm_jni`); **C++20** (required for `std::jthread` in ADR-012 thread pool); `-O2 -ffast-math` is **not** used (fp determinism) — use `-O2` only; `ANDROID_STL=c++_shared` must **match** the sherpa-onnx prebuilt (`libsherpa-onnx-jni.so` links `libc++_shared.so`) — otherwise duplicate STL symbols at load.
 - ORT: reuse sherpa's bundled `libonnxruntime.so` (one ORT copy) — **verify its version supports ALL_OPT for the decoder graph** (ADR-010 constraint; do NOT bundle a second ORT).
 - Link `log`, `dl`, and (for the decoder) `${CMAKE_SOURCE_DIR}/../jniLibs/arm64-v8a/libonnxruntime.so`-adjacent includes only if headers are vendored; otherwise declare the ORT C API via function pointers like the QNN bridge (dlsym) — keeps the build header-free, consistent with the QNN approach.
 
@@ -139,7 +139,7 @@ Replaces the stub `nativeExecute` with, per inference:
 
 ## 6. Data flow, threads, buffers
 
-- **Threads:** one dedicated audio thread (AudioRecord callback/loop) → utterance handoff into a `Channels.UNLIMITED`-backed coroutine chain on `Dispatchers.Default`; TTS/audio playback on a dedicated `AudioTrack` thread; QNN/ORT native calls run on `Dispatchers.Default` workers (machine code, no Android binder).
+- **Threads:** one dedicated audio thread (AudioRecord callback/loop) → utterance handoff into a `Channels.UNLIMITED`-backed coroutine chain on `Dispatchers.Default`; TTS/audio playback on a dedicated `AudioTrack` thread; QNN/ORT native calls run on a **dedicated `Dispatchers.IO` with limited parallelism** (not `Dispatchers.Default` — see ADR-012 Open Question #7: coroutines block-waiting on native pool share the same `Default` workers; running native calls on `Default` would starve the coroutine chain). Tune `kotlinx.coroutines.io.parallelism` to match the 3+3 thread budget.
 - **Formats:** mic 16 kHz mono `FloatArray`; ASR consumes 16k floats; TTS emits 44.1 kHz PCM → downmix/resample in `AudioSink` (sherpa TTS models output 44.1k; AudioTrack 44.1k).
 - **KV cache:** allocated once at service `onCreate` (~70 MB / 256 tokens, ADR-007 D3), passed by pointer to `ortDecoderDecode`; never freed until service teardown (D2 residency).
 - **Timing budget:** E2E turnaround (EOS→SA) < 2.0 s hard gate (Phase 4); per-stage latencies recorded by `SpeechPipeline` into `run_results_android.json` (`latency_ns`), WER/BLEU scored off-device per ADR-004.
@@ -149,12 +149,15 @@ Replaces the stub `nativeExecute` with, per inference:
 | Asset | Loader | Size (est.) |
 | --- | --- | --- |
 | Zipformer VI 30M int8 + EN small | `OfflineRecognizer` ×2 (sherpa) | ~2 × 30 MB (int8) |
-| GTCRN denoiser ONNX | sherpa `OfflineRecognizer`-adjacent | ~0.5 MB |
+| GTCRN denoiser ONNX | sherpa `OfflineRecognizer`-adjacent | ~50 MB (per `.kavi.yaml`; 523 KB model + runtime) |
 | Opus-MT encoder | QNN ctx binary (M3) **or** ORT CPU fallback | 186 MB fp32 → int8 (~4× smaller, planned) |
 | Opus-MT decoder | ORT (ort_decoder_jni) | 322 MB fp32 → int8 (~80 MB) |
 | KV cache (decoder) | pre-allocated | ~70 MB |
-| Supertonic TTS | sherpa OfflineTts | ~1 model (size TBD at vendoring) |
-| QAIRT jniLibs (trimmed set of 7) + sherpa libs + `c++_shared` | system | ~100–150 MB RSS |
+
+| QAIRT jniLibs (trimmed set of 8) + sherpa libs + `c++_shared` | system | ~120 MB RSS |
+| Supertonic TTS | sherpa OfflineTts | ~280 MB (per `.kavi.yaml`) |
+| **Subtotal** | | ~606 MB accounted |
+| **Unaccounted headroom** | deliberate margin for OS RSS, transient allocations, safety | ~454 MB |
 | **Total** | | ≤ 1.16 GB target; verify with `readPeakRssKb` VmPeak per stage |
 
 ADR-011 rule: every on-device asset ships with a `SHA256SUMS` entry in `kavi-android`; models downloaded via `android/scripts/fetch-models.sh` are **verified** by `ModelRegistry` at first run; host `prototype/models/qnn/*` outputs are never vendored.
@@ -181,7 +184,7 @@ ADR-011 rule: every on-device asset ships with a `SHA256SUMS` entry in `kavi-and
 
 | Build | Outcome | Depends on / effort |
 | --- | --- | --- |
-| **A. Build plumbing** | Vendor sherpa-onnx 1.13.4 jniLibs + kotlin-api AAR; trim QAIRT jniLibs 39→7 (ADR-007 D8 set incl. `libQnnGpu.so`); multi-target CMake; `ModelRegistry` + `fetch-models.sh` + `SHA256SUMS` (ADR-011); Kotlin 17 stays | ~4–6 h |
+| **A. Build plumbing** | Vendor sherpa-onnx 1.13.4 jniLibs + kotlin-api AAR; trim QAIRT jniLibs 39→8 (ADR-007 D8 set incl. `libQnnGpu.so`); multi-target CMake (C++20); `ModelRegistry` + `fetch-models.sh` + `SHA256SUMS` (ADR-011) | ~4–6 h |
 | **B. ASR + language** | `DualZipformerRecognizer`, `LanguageSelector`, unit tests; instrumented smoke (2 Zipformers on device) | A; ~6 h (+device time) |
 | **C. Service + audio + pipeline (CPU-first)** | `TranslationService`, `Recorder`/`Vad`, `AudioSink`, `SupertonicTts`, `MtDecoder` (ORT greedy), `SpeechPipeline` walkie-talkie loop — **encoder CPU fallback** first, QNN later; `MainActivity` UI | B; ~10–12 h |
 | **D. QNN encoder real exec** | `qnn_loader_jni` rewrite (graphs/tensors/ION), `QnnTensorFactory`, direct-Buffer zero-copy path, version-lock assert | C; **blocked until HTP v73 ctx binary generated** (SDK is installed at `~/Qualcomm/AIStack/QAIRT/2.31.0.250130/`); C++ can be written + unit-tested ahead w/ mock backend ~8 h |
@@ -193,7 +196,7 @@ M0 (A), M1 (B), M2 (C), M3 (D), M4 (E), M5–M6 (F).
 
 ## 11. Risks & open questions
 
-1. **QAIRT SDK + HTP v73 ctx binary** — the SDK is installed (2.31.0.250130) and ONNX + calibration data are prepared, but the HTP v73 context binary for the Opus-MT encoder does **not** exist yet. **Runbook:** `docs/ndk-conversion-runbook.md` (NDK r6c set-up, conversion command, delivery into `kavi-android`). The C++ layer can be written against the dlsym ABI and validated with a mock backend while the NDK person runs the conversion.
+1. **QAIRT SDK + HTP v73 ctx binary** — the SDK is installed (2.31.0.250130) and ONNX + calibration data are prepared, but the HTP v73 context binary for the Opus-MT encoder does **not** exist yet. **Runbook:** `docs/ndk-conversion-runbook.md` (NDK r26c set-up, conversion command, delivery into `kavi-android`). The C++ layer can be written against the dlsym ABI and validated with a mock backend while the NDK person runs the conversion.
 2. **ORT version match** — sherpa's bundled `libonnxruntime.so` version must satisfy the decoder graph's opset + `ALL_OPT`; if not, vendor a second ORT (size/roster impact) — decide in Build A.
 3. **STL policy** — `c++_shared` must match sherpa prebuilds; verify no `libc++` clash at runtime (`dlopen RTLD_LOCAL` for QNN already decided).
 4. **ION zero-copy** — needs QNN `QnnMem_register` + dma-buf heaps on SD8G2; feasibility to confirm on the physical device in Build D; fallback = one copy.
@@ -207,4 +210,5 @@ M0 (A), M1 (B), M2 (C), M3 (D), M4 (E), M5–M6 (F).
 - [x] Branch `docs/android-kotlin-cpp-implementation` off `main`
 - [x] This plan committed (Conventional Commits `docs:`), no code changes
 - [ ] Review against ADR-007…011 + PR #95 (owner: next planning turn or reviewer)
+- [ ] Cross-check against `.kavi.yaml` (PR #98) and ADR-012 (PR #100) — all numeric values (numThreads, jniLibs count, NDK version, C++ std, memory budget) must match
 - [ ] Gate: do **not** start Build A until plan approved here
