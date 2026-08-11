@@ -184,7 +184,7 @@ ADR-011 rule: every on-device asset ships with a `SHA256SUMS` entry in `kavi-and
 | **A. Build plumbing** | Vendor sherpa-onnx 1.13.4 jniLibs + kotlin-api AAR; trim QAIRT jniLibs 39→7 (ADR-007 D8 set incl. `libQnnGpu.so`); multi-target CMake; `ModelRegistry` + `fetch-models.sh` + `SHA256SUMS` (ADR-011); Kotlin 17 stays | ~4–6 h |
 | **B. ASR + language** | `DualZipformerRecognizer`, `LanguageSelector`, unit tests; instrumented smoke (2 Zipformers on device) | A; ~6 h (+device time) |
 | **C. Service + audio + pipeline (CPU-first)** | `TranslationService`, `Recorder`/`Vad`, `AudioSink`, `SupertonicTts`, `MtDecoder` (ORT greedy), `SpeechPipeline` walkie-talkie loop — **encoder CPU fallback** first, QNN later; `MainActivity` UI | B; ~10–12 h |
-| **D. QNN encoder real exec** | `qnn_loader_jni` rewrite (graphs/tensors/ION), `QnnTensorFactory`, direct-Buffer zero-copy path, version-lock assert | C; **blocked until QAIRT 2.31 SDK + HTP v73 ctx binary exist**; C++ can be written + unit-tested ahead w/ mock backend ~8 h |
+| **D. QNN encoder real exec** | `qnn_loader_jni` rewrite (graphs/tensors/ION), `QnnTensorFactory`, direct-Buffer zero-copy path, version-lock assert | C; **blocked until HTP v73 ctx binary generated** (SDK is installed at `~/Qualcomm/AIStack/QAIRT/2.31.0.250130/`); C++ can be written + unit-tested ahead w/ mock backend ~8 h |
 | **E. TTS polish + BLE** | Supertonic gen config tuning, Piper fallback wire, `PeerLink` BLE 5.2 + mode switch | C; ~6 h |
 | **F. Benchmark + gates** | `BenchmarkRunner` (ADR-006), hard gates (Dual Zipformer RTF ≤ 0.05, Supertonic RTF ≤ 0.5, ALL_OPT vs NO_OPT per session), WER/BLEU off-device scoring | A–E; ~6 h runner + ~4 h on-device verify |
 
