@@ -158,7 +158,7 @@ denoiser:
   toggleable: true # per-utterance
   wer_noisy: "49.82%" # smoke test: weighted avg, 2 utts × 5 conditions
   wer_raw: "51.23%"
-  on_device_default: "GTCRN" # ADR-007 D7 — 523 KB ONNX via sherpa-onnx
+  on_device_default: "GTCRN" # ADR-007 D7 — ~50 MB ONNX runtime (ADR-007 D5); model file is ~523 KB
   note: "Wiener is host-side benchmarking reference. On-device denoiser is GTCRN (ADR-007 D7); final pick gated on Phase-6 benchmarks (Risk R1)."
 
 # ── Memory budget (ADR-007/008 ≈ 1.16 GB) ───────────────────────────────────
