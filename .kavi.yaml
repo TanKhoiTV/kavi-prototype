@@ -13,7 +13,7 @@ metadata:
   description: "Kavi prototype — pinned configuration values"
   target_device: "Meizu 21 Note (Snapdragon 8 Gen 2 / SM8550 / Hexagon HTP v73)"
   target_android: 16 # API 36
-  last_updated: "2026-08-10"
+  last_updated: "2026-08-13" # PR #98 fix commits applied Aug 13
 
 # ── SDK & toolchain ──────────────────────────────────────────────────────────
 
@@ -60,7 +60,7 @@ asr:
       name: "csukuangfj/sherpa-onnx-zipformer-small-en-2023-06-26"
       size_mb: 28 # ~28 MB per sherpa-onnx model card
   gates:
-    rtf: 0.05 # hard gate on Meizu 21 Note (SD8G2)
+    rtf: 0.05 # lenient vs ASR (0.05): TTS has Piper VITS fallback; Phase 1 targets interactivity over raw speed
     rtf_desktop_benchmark: 0.011 # 1 thread, 3.74 s clip (sherpa-onnx bench)
   # ── Thread tuning (Build B validation required) ──────────────────────────
   # SD8G2 = 8 cores (1×X3 + 2×A715 + 2×A710 + 3×A510), no SMT.
@@ -97,7 +97,7 @@ mt:
     # Step-1 output (QAIRT converter): encoder/opus_mt_vi_en_encoder.bin (74 MB raw-weights tar)
     # Step-3 output (context binary): NOT YET PRODUCED — M3 deliverable (NDK-gated track)
   decoding:
-    method: "greedy" # beam=1; beam=4 deferred to Phase 5 (ADR-007 §MT)
+    method: "greedy" # beam=1; beam=4 deferred to Phase 5 (ADR-007 §MT). Note: sherpa-onnx ASR uses "greedy_search" - field naming differs by provider API.
     kv_cache_tokens: 256 # pre-allocated, never freed (D2 residency)
     kv_cache_mb: 70
   qnn_encoder:
@@ -113,14 +113,14 @@ tts:
   phase: 1
   provider: "sherpa-onnx"
   api_class: "OfflineTts"
-  num_threads: 4
+  num_threads: 4 # ASR+TTS never overlap in walkie-talkie pipeline; runs after ASR completes
   provider_name: "cpu"
   model_name: "supertonic"
   license: "OpenRAIL-M (weights) + MIT (code)"
   generation_config:
     sid: 0 # 0–9 maps to M1–M5, F1–F5
     speed: 1.0
-    num_steps: 8
+    num_steps: 8 # fast-sampling - verify audio quality on-device (Phase 1 target; Phase 2 will tune)
     lang_values: ["vi", "en"] # switched per utterance via extra={"lang": ...}
   sample_rate_hz: 44100
   gates:
@@ -156,8 +156,8 @@ denoiser:
   method: "wiener" # host-side benchmarking reference (noisereduce, prop_decrease=0.5)
   prop_decrease: 0.5
   toggleable: true # per-utterance
-  wer_noisy: "49.82%" # smoke test: weighted avg, 2 utts × 5 conditions
-  wer_raw: "51.23%"
+  wer_noisy: "49.82%" # smoke test: weighted avg, 2 utts × 5 conditions, SNR0+5 impulsive+steady; source: docs/denoising-gate-results.md
+  wer_raw: "51.23%" # same methodology; source: docs/denoising-gate-results.md
   on_device_default: "GTCRN" # ADR-007 D7 — ~50 MB ONNX runtime (ADR-007 D5); model file is ~523 KB
   note: "Wiener is host-side benchmarking reference. On-device denoiser is GTCRN (ADR-007 D7); final pick gated on Phase-6 benchmarks (Risk R1)."
 
@@ -183,7 +183,8 @@ timing:
   audio_record_hz: 16000 # mono PCM float
   audio_playback_hz: 44100 # from Supertonic
   vad_speech_timeout_ms: 500
-  cold_start_load_sec: "2-3" # mitigated by splash/progress bar
+  cold_start_load_sec_min: 2 # mitigated by splash/progress bar
+  cold_start_load_sec_max: 3
 
 # ── Fallback chain ──────────────────────────────────────────────────────────
 
@@ -203,7 +204,7 @@ paths:
   sha256_manifest: "android/app/src/main/assets/SHA256SUMS"
   note: "Never vendor from models/qnn/*. All on-device artifacts committed inside kavi-android with SHA-256 manifest."
 
-# ── Phase sequencing (android-kotlin-cpp-implementation-plan, PR #97) ──────
+# ── Phase sequencing (android-kotlin-cpp-implementation-plan, PR #97 pending review) ──────
 
 build_sequence:
   A_plumbing: "Vendor sherpa-onnx, trim jniLibs 39→8, multi-target CMake, ModelRegistry + SHA256SUMS"
