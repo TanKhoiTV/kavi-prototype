@@ -14,7 +14,7 @@ The Kavi on-device speech-to-speech pipeline runs two Zipformer ASR models concu
 
 - **8 cores, no SMT:** 1× Cortex-X3 (prime) @ 3.2 GHz + 2× Cortex-A715 (performance) @ 2.8 GHz + 2× Cortex-A710 (performance) @ 2.8 GHz + 3× Cortex-A510 (efficiency) @ 2.0 GHz
 - **Single DSU-110 cluster:** All 8 cores share one 8 MB L3 cache (DSU-110 L3 is shared across all cores within the cluster — this is SoC-wide, not per-cluster). Each core has private L1/L2. The 8 MB L3 figure is cited by all public SM8550 spec sheets as a single value for the whole chip, confirming a single scalable domain. EPSS L3 (Epoch Subsystem L3) is a DVFS/bandwidth-voting interconnect present as exactly one node per SoC — corroborating evidence, not direct proof of topology. The single-node DSU-110 architecture is the authoritative basis.
-- **~80% of CPU time** goes to ORT's internal intra-op thread pool (matmul-heavy inference). The custom sherpa-onnx outer `ThreadPool` owns feature extraction and decoder/joiner work (~15% of CPU). UI/AudioRecord/OS consume the remaining ~5%.
+- **Estimated CPU Distribution:** ~80% of CPU time goes to ORT's internal intra-op thread pool (matmul-heavy inference). The custom sherpa-onnx outer `ThreadPool` owns feature extraction and decoder/joiner work (~15% of CPU). UI/AudioRecord/OS consume the remaining ~5%. *(Note: These percentages are baseline estimates; actual thread tuning will be tied to on-device profiling.)*
 
 Three independent thread populations coexist during ASR inference:
 
@@ -57,7 +57,7 @@ Adopt a **two-build strategy** with a custom C++ thread pool abstraction for the
 - Custom thread pool with `Mode::kPriorityHint`
 - `ANDROID_PRIORITY_AUDIO` (-16) on outer pipeline inference threads — **not** `THREAD_PRIORITY_URGENT_AUDIO` (-19)
 - ORT sessions configured with `intra_op_num_threads = 3` per recognizer (matching `.kavi.yaml: asr.num_threads`)
-- 3+3 ORT threads + custom outer pipeline threads (6+6 total, leaving 2 cores for OS/UI/audio)
+- 2 ORT intra-op + 1 custom outer thread per recognizer = 3 per recognizer (6 total threads), leaving 2 cores free for OS/UI/Audio.
 
 **Priority choice rationale:** `THREAD_PRIORITY_URGENT_AUDIO = -19` is annotated `(uncommon)` in Android's `thread_defs.h` and the source comment states: *"A thread priority should be chosen inverse-proportionally to the amount of work the thread is expected to do."* Running 6 heavy inference threads at -19 risks starving the app-side `AudioRecord` reader thread (which runs at `SCHED_OTHER` in your process), causing buffer overruns and dropped audio frames. The actual audio capture path runs at `SCHED_FIFO` inside `system_server`'s AudioFlinger/HAL thread — you cannot starve that. The real risk is delaying the app-side reader.
 
@@ -67,7 +67,7 @@ Adopt a **two-build strategy** with a custom C++ thread pool abstraction for the
 
 - Trigger: Build B passes RTF ≤ 0.05 BUT shows unacceptable jitter traced to scheduler misplacement on efficiency cores
 - Switch to `Mode::kHardAffinity`, pin to A715+A710 performance cores
-- **Static 2+2 pinning** — one thread per dedicated core, 4 threads on 4 cores (1:1 ratio). This is the only hard-affinity configuration that delivers actual determinism.
+- **Static 2+2 pinning** — 1 ORT intra-op + 1 custom outer thread per recognizer = 2 per recognizer (4 total threads), providing 1:1 static pinning on the 4 performance cores (A715 + A710).
 - ORT `intra_op_num_threads` reduced to 2 per recognizer, and `SetCustomCreateThreadFn` used to inject affinity into ORT's intra-op threads as well as the custom pool's workers
 - Keep fallback to `kPriorityHint` if affinity fails (SELinux, core busy, thermal throttling)
 - Do NOT use Build F if Build B passes cleanly — the 2 free cores and thermal resilience of priority-hint are strictly better
@@ -116,12 +116,19 @@ session_options.intra_op_num_threads = config.num_threads;  // 3 for Build B, 2 
 // Build F only: inject affinity into ORT's intra-op (and inter-op) threads.
 // SetCustomCreateThreadFn applies to BOTH pools — cannot target intra-op only.
 if (mode == Mode::kHardAffinity) {
-    session_options.SetCustomCreateThreadFn([](std::thread* thread) {
-        cpu_set_t cpuset;
-        CPU_ZERO(&cpuset);
-        for (int core : kPreferredCores) CPU_SET(core, &cpuset);
-        sched_setaffinity(thread->native_handle(), sizeof(cpuset), &cpuset);
-        // Also set priority (ANDROID_PRIORITY_AUDIO) via setpriority()
+    session_options.SetCustomCreateThreadFn([](const OrtCustomCreateThreadFnOptions* options, OrtCustomThreadWorkerWorkerFn custom_worker, void* custom_worker_arg) {
+        return std::thread([custom_worker, custom_worker_arg]() {
+            // Self-pin inside worker entry using Linux TID
+            cpu_set_t cpuset;
+            CPU_ZERO(&cpuset);
+            for (int core : kPreferredCores) CPU_SET(core, &cpuset);
+            sched_setaffinity(gettid(), sizeof(cpuset), &cpuset);
+
+            setpriority(PRIO_PROCESS, gettid(), -16); // ANDROID_PRIORITY_AUDIO
+
+            // Execute ORT worker
+            custom_worker(custom_worker_arg);
+        }).detach();
     });
 }
 ```
@@ -160,7 +167,7 @@ Run 100 utterances per mode. For each utterance, log:
 - RTF (wall-clock inference time / audio duration)
 - `PowerManager.getCurrentThermalStatus()` (NONE / LIGHT / MODERATE / SEVERE / CRITICAL / EMERGENCY / SHUTDOWN)
 - Per-core temperature via `ThermalManager.getTemperature()` (API 30+) if available
-- **Audio overrun/drop counters** from `AudioRecord.getUnderrunCount()` / buffer state — catches priority starvation that RTF alone masks
+- **Audio overrun/drop counters:** Monitored via `AudioRecord.getTimestamp()` + frame-position delta tracking (calculating timestamp gaps against sample rates to detect input buffer overflows caused by CPU starvation).
 - **Memory bandwidth utilization** (read via `perf_event_open` with `PERF_COUNT_HW_CACHE_MISSES` if accessible, or Qualcomm PMU via sysfs if readable) — attributes Build F wins to clock speed vs. cache vs. preemption reduction
 - Optional: per-core `scaling_cur_freq` from sysfs if readable
 
