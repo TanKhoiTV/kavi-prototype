@@ -219,11 +219,13 @@ Run 100 utterances per mode. For each utterance, log:
 
 ### Positive
 
-- Build B (`ANDROID_PRIORITY_AUDIO` + `intra_op_num_threads=3`) is the production config unless proven otherwise — 2 free cores for OS/UI/audio + thermal resilience
+- Build B (`ANDROID_PRIORITY_AUDIO` + `intra_op_num_threads=2`) is the production config unless proven otherwise — 2 free cores for OS/UI/audio + thermal resilience
 - ORT session-level controls (`intra_op_num_threads`) and custom thread pool controls are clearly separated — each layer is independently tunable
 - Global coordinator enforces total thread budget across both recognizers — prevents accidental oversubscription
 - Build F escalation path preserves deterministic core placement as an option if empirical evidence justifies it
-- `sched_setaffinity()` available since API 14 — no dependency on API 36 or `pthread_setaffinity_np()`
+- `sched_setaffinity()` available since API 14 (used in WorkerLoop via gettid());
+Build F additionally uses pthread_setaffinity_np() on the ORT thread handle,
+which requires API 21+ (minimum supported API is Android 16 per ADR-002, so OK).
 - A/B logging captures audio overruns and memory bandwidth — prevents RTF-only blind spots and enables mechanism attribution
 
 ### Negative / risk
@@ -241,7 +243,7 @@ Run 100 utterances per mode. For each utterance, log:
 - ADR-008: v1 Android ASR Decision — Dual Zipformer (RTF 0.011 desktop benchmark, go/no-go gate at RTF > 0.05, streaming transducer architecture)
 - ADR-002: Target Platform — Snapdragon 8 Gen 2, Android 16
 - ADR-010: All-Opt Decoder Optimisation
-- `.kavi.yaml` — single source of truth for pinned config values (`rtf: 0.05`, `turnaround_gate_sec: 2.0`, `asr.num_threads: 3`)
+- `.kavi.yaml` — single source of truth for pinned config values (`rtf: 0.05`, `turnaround_gate_sec: 2.0`, `asr.num_threads: 2`)
 - PR #97 (Kotlin+C++ implementation plan) — winterSolstice25's hard affinity proposal
 - PR #98 (.kavi.yaml) — aFlyingSeal's review findings on config contradictions
 - PR #100 — winterSolstice25 and aFlyingSeal's technical review of this ADR (5 validated concerns incorporated)
