@@ -67,7 +67,7 @@ Adopt a **two-build strategy** with a custom C++ thread pool abstraction for the
 
 - Trigger: Build B passes RTF ≤ 0.05 BUT shows unacceptable jitter traced to scheduler misplacement on efficiency cores
 - Switch to `Mode::kHardAffinity`, pin to A715+A710 performance cores
-- **Static 2+2 pinning** — 1 ORT intra-op + 1 custom outer thread per recognizer = 2 per recognizer (4 total threads), providing 1:1 static pinning on the 4 performance cores (A715 + A710).
+- **Static 1+1 ORT + 1+1 custom pinning** — 1 ORT intra-op + 1 custom outer thread per recognizer = 2 per recognizer (4 total threads), providing 1:1 static pinning on the 4 performance cores (A715 + A710).
 - ORT `intra_op_num_threads` reduced to 1 per recognizer, and `SetCustomCreateThreadFn` used to inject affinity into ORT's intra-op threads as well as the custom pool's workers
 - Keep fallback to `kPriorityHint` if affinity fails (SELinux, core busy, thermal throttling)
 - Do NOT use Build F if Build B passes cleanly — the 2 free cores and thermal resilience of priority-hint are strictly better
