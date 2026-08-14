@@ -56,7 +56,7 @@ Adopt a **two-build strategy** with a custom C++ thread pool abstraction for the
 
 - Custom thread pool with `Mode::kPriorityHint`
 - `ANDROID_PRIORITY_AUDIO` (-16) on outer pipeline inference threads — **not** `THREAD_PRIORITY_URGENT_AUDIO` (-19)
-- ORT sessions configured with `intra_op_num_threads = 3` per recognizer (matching `.kavi.yaml: asr.num_threads`)
+- ORT sessions configured with `intra_op_num_threads = 2` per recognizer (matching `.kavi.yaml: asr.num_threads`)
 - 2 ORT intra-op + 1 custom outer thread per recognizer = 3 per recognizer (6 total threads), leaving 2 cores free for OS/UI/Audio.
 
 **Priority choice rationale:** `THREAD_PRIORITY_URGENT_AUDIO = -19` is annotated `(uncommon)` in Android's `thread_defs.h` and the source comment states: *"A thread priority should be chosen inverse-proportionally to the amount of work the thread is expected to do."* Running 6 heavy inference threads at -19 risks starving the app-side `AudioRecord` reader thread (which runs at `SCHED_OTHER` in your process), causing buffer overruns and dropped audio frames. The actual audio capture path runs at `SCHED_FIFO` inside `system_server`'s AudioFlinger/HAL thread — you cannot starve that. The real risk is delaying the app-side reader.
@@ -68,7 +68,7 @@ Adopt a **two-build strategy** with a custom C++ thread pool abstraction for the
 - Trigger: Build B passes RTF ≤ 0.05 BUT shows unacceptable jitter traced to scheduler misplacement on efficiency cores
 - Switch to `Mode::kHardAffinity`, pin to A715+A710 performance cores
 - **Static 2+2 pinning** — 1 ORT intra-op + 1 custom outer thread per recognizer = 2 per recognizer (4 total threads), providing 1:1 static pinning on the 4 performance cores (A715 + A710).
-- ORT `intra_op_num_threads` reduced to 2 per recognizer, and `SetCustomCreateThreadFn` used to inject affinity into ORT's intra-op threads as well as the custom pool's workers
+- ORT `intra_op_num_threads` reduced to 1 per recognizer, and `SetCustomCreateThreadFn` used to inject affinity into ORT's intra-op threads as well as the custom pool's workers
 - Keep fallback to `kPriorityHint` if affinity fails (SELinux, core busy, thermal throttling)
 - Do NOT use Build F if Build B passes cleanly — the 2 free cores and thermal resilience of priority-hint are strictly better
 
@@ -111,24 +111,19 @@ private:
 // ORT owns its own intra-op thread pool — the custom ThreadPool does NOT replace this.
 // intra_op_num_threads controls the ORT pool size; setting it manually disables
 // ORT's automatic per-core affortization.
-session_options.intra_op_num_threads = config.num_threads;  // 3 for Build B, 2 for Build F
+session_options.intra_op_num_threads = config.num_threads;  // 2 for Build B, 1 for Build F
 
 // Build F only: inject affinity into ORT's intra-op (and inter-op) threads.
 // SetCustomCreateThreadFn applies to BOTH pools — cannot target intra-op only.
 if (mode == Mode::kHardAffinity) {
-    session_options.SetCustomCreateThreadFn([](const OrtCustomCreateThreadFnOptions* options, OrtCustomThreadWorkerWorkerFn custom_worker, void* custom_worker_arg) {
-        return std::thread([custom_worker, custom_worker_arg]() {
-            // Self-pin inside worker entry using Linux TID
-            cpu_set_t cpuset;
-            CPU_ZERO(&cpuset);
-            for (int core : kPreferredCores) CPU_SET(core, &cpuset);
-            sched_setaffinity(gettid(), sizeof(cpuset), &cpuset);
-
-            setpriority(PRIO_PROCESS, gettid(), -16); // ANDROID_PRIORITY_AUDIO
-
-            // Execute ORT worker
-            custom_worker(custom_worker_arg);
-        }).detach();
+    session_options.SetCustomCreateThreadFn([](std::thread* thread) {
+        cpu_set_t cpuset;
+        CPU_ZERO(&cpuset);
+        for (int core : kPreferredCores) CPU_SET(core, &cpuset);
+        // pthread_setaffinity_np takes a pthread_t -> sets affinity on the *target* thread.
+        pthread_setaffinity_np(thread->native_handle(), sizeof(cpu_set_t), &cpuset);
+        // nice = -16 (ANDROID_PRIORITY_AUDIO). Note: setpriority needs a tid; if this
+        // callback fires on the creator thread, use pthread_setschedprio / attrs instead.
     });
 }
 ```
