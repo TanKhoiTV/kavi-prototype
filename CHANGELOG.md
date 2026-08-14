@@ -62,6 +62,7 @@
 - **qnn:** Add Whisper Small ONNX export script with fixed-shape encoder
 - **qnn:** Add Piper surgery script, calibration lists, and QNN adapter stubs
 - **qnn:** Whisper decoder patch + Opus-MT encoder conversion (#75)([#75](https://github.com/TanKhoiTV/kavi-prototype/pull/75))
+- Add .kavi.yaml — single source of truth for pinned config values (#98)([#98](https://github.com/TanKhoiTV/kavi-prototype/pull/98))
 
 ### Miscellaneous
 
