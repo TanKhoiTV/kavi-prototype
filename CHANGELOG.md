@@ -51,6 +51,7 @@
 - Add ADR-010 — ALL_OPT decoder optimisation analysis (#94)([#94](https://github.com/TanKhoiTV/kavi-prototype/pull/94))
 - Index NDK conversion runbook in docs/README
 - Reconcile plans with ADR-007-010; archive superseded docs to reference/ ([#95](https://github.com/TanKhoiTV/kavi-prototype/pull/95))
+- Add ADR-012 — ASR thread tuning strategy (Proposed) (#100)([#100](https://github.com/TanKhoiTV/kavi-prototype/pull/100))
 
 ### Features
 
