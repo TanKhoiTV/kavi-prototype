@@ -22,7 +22,8 @@ budget mapping, fallbacks, testing, and a build-by-build sequencing with effort.
 | Area | State | Gap |
 | --- | --- | --- |
 | Build | AGP 8.10.0, Gradle 8.11.1, Kotlin 2.0.21, NDK 26.1.10909125, CMake 3.22.1, compile/target 36, min 24, arm64-v8a only | No sherpa-onnx, no ORT, no jniLibs source sets beyond bundled QAIRT |
-| Native | `qnn_loader_jni.cpp`: dlopen `libQnnHtp.so` + dlsym C API ✓; backend create ✓; context-from-binary ✓ | **`nativeExecute` is a stub** (zero 64 KB out); provider struct offsets hardcoded; no graph enumeration, no `Qnn_Tensor_t` creation, no ION, no version-lock check |
+| Native | `qnn_loader_jni.cpp`: dlopen `libQnnHtp.so` + dlsym C API ✓; backend create ✓; context-from-binary ✓ | **`nativeExecute` is a stub** (zero 64 KB out); provider struct offsets hardcoded; no graph enumeration, no `Qnn_Tensor_t` creation; ION used but **no cache-invalidation between QNN output and CPU/ORT read** (cache-coherency hazard); no version-lock check |
+| C++ (post-Build-A) | `ort_decoder_jni.cpp` wraps sherpa's bundled `libonnxruntime.so` (one ORT copy) | **ORT op-coverage unvalidated** — sherpa-onnx's ORT is built for Zipformer+TTS ops only; must probe that the MT decoder graph resolves all operators (OpKernelNotFound risk) before locking the single-ORT constraint |
 | Kotlin | `QnnModelLoader.kt` (init/load/execute/shutdown, VmPeak timing), `ManifestReader.kt`, `NetworkMonitor.kt` (runner pkg) | No service, no audio, no pipeline, no TTS/ASR engines, no BLE |
 | UI | `MainActivity` scaffold ("Kavi — on-device speech-to-speech (scaffold)") | Full walkie-talkie UI |
 | Manifest | No permissions, single launcher activity | No `FOREGROUND_SERVICE`/`RECORD_AUDIO`/`POST_NOTIFICATIONS`/`BLUETOOTH_*`, no service |
@@ -111,10 +112,14 @@ Existing (keep signatures, change semantics):
 - `nativeExecute(handle, input, inputName, outputName): ByteArray` — **replaced internally**: real tensor enumeration, memHandle registration, `QnnGraph_execute`
 - `nativeShutdown(handle)` — plus ION buffer teardown
 
+**New — correctness-gate helpers:**
+- `verifyORTGraph(modelPath): jboolean` — on-device (Build A) probe that attempts `OrtCreateSession` on the MT decoder (and ASR/TTS) ONNX with the *bundled* `libonnxruntime.so`; returns false + `getLastError()` with the first `OpKernelNotFound` operator if sherpa's minimal ORT lacks an op. Gates the single-ORT decision.
+
 New:
 
 - `nativeLoadGraph(handle, netJsonPath): jlong graphHandle` — parse `_net.json`, create input/output tensor names + shapes
 - `nativeGetOutputDirectBuffer(handle, graphHandle, outputName): jobject` — returns a **direct ByteBuffer over the ION buffer** (zero-copy into ORT: `OrtSession` created with an external buffer backed by the same pointer → no memcpy, ADR-007 D4)
+- `nativeSyncCache(handle, graphHandle, outputIonFd): void` — **invalidate CPU cache on the ION/dma-buf output before any CPU/ORT read**; uses `DMA_BUF_IOCTL_SYNC`/`DMA_BUF_SYNC_READ` on the buffer fd (with a `QnnMemCacheInvalidate` fallback if the QAIRT 2.31 API exposes a token-based invalidation). Must be invoked after `QnnGraph_execute` and before the buffer is wrapped for ORT / returned to Kotlin.
 - *(no separate version function — version-lock lives in `nativeInit` via `QnnBackend_getApiVersion`, asserting HTP v73 / QAIRT 2.31)*
 - `ortDecoderCreate(modelPath, spmPath, kvCacheBytes, maxTokens): jlong`
 - `ortDecoderDecode(handle, srcTokens: IntArray): String`  (greedy, KV cache reused)
@@ -124,7 +129,8 @@ New:
 ### 5.3 CMakeLists.txt changes
 
 - Multi-target: `qnn_loader_jni`, `ort_decoder_jni` (+ `spm_jni`); **C++20** (required for `std::jthread` in ADR-012 thread pool); `-O2 -ffast-math` is **not** used (fp determinism) — use `-O2` only; `ANDROID_STL=c++_shared` must **match** the sherpa-onnx prebuilt (`libsherpa-onnx-jni.so` links `libc++_shared.so`) — otherwise duplicate STL symbols at load.
-- ORT: reuse sherpa's bundled `libonnxruntime.so` (one ORT copy) — **verify its version supports ALL_OPT for the decoder graph** (ADR-010 constraint; do NOT bundle a second ORT).
+- ORT: reuse sherpa's bundled `libonnxruntime.so` (one ORT copy) — **verify (Build A) that it resolves every operator in the MT decoder graph (and ASR/TTS graphs) via the `verifyORTGraph()` probe; do NOT bundle a second ORT unless an `OpKernelNotFound` is logged** (sherpa-1.13.4 builds ORT op-selectively for the sherpa model set; the MT decoder's Gather/Attention/LayerNormalization/Softmax ops are NOT guaranteed present).
+- CMake `configure_file`/`try_compile` shim that runs `verifyORTGraph()` against each staged ONNX and fails the build only if the probe can't even run (ABI mismatch); per-graph op-coverage failure is a *Build A decision*, not a compile error.
 - Link `log`, `dl`, and (for the decoder) `${CMAKE_SOURCE_DIR}/../jniLibs/arm64-v8a/libonnxruntime.so`-adjacent includes only if headers are vendored; otherwise declare the ORT C API via function pointers like the QNN bridge (dlsym) — keeps the build header-free, consistent with the QNN approach.
 
 ### 5.4 QNN real-execution design (the M3 core)
@@ -134,8 +140,10 @@ Replaces the stub `nativeExecute` with, per inference:
 1. `QnnContext_createFromBinary` (done) → `QnnContext_getAllGraphs` **by name** (parse `_net.json` for graph name) — no placeholder `graphHandle = contextHandle`.
 2. `QnnTensor_createGraphTensor` for I/O with rank/dims/type from `_net.json`.
 3. Input: register an ION buffer (`QnnMem_register`, alignment to 128/256 bytes, ion fd via dma-buf heap) → `QnnTensor_setMemHandle`.
-4. Output: same ION path; after `QnnGraph_execute` wrap the output pointer as a Java direct `ByteBuffer` (no copy).
-5. Zero-copy contract with MtDecoder: `QnnModelLoader` returns direct buffer over ION; `MtDecoder` builds the ORT `OrtValue` off the same pointer on the CPU fallback... (see §6 note — QNN and ORT cannot share one buffer trivially; the real zero-copy applies QNN-output → ORT-input *when both are on-device ION*, i.e. the encoder output feeding decoder input path — keep as design goal, fallback to a single copy until measured).
+4. Output: same ION path; **after `QnnGraph_execute`, call `nativeSyncCache(handle, graphHandle, outputIonFd)` to invalidate the CPU cache on the ION/dma-buf output** (DMA_BUF_IOCTL_SYNC with DMA_BUF_SYNC_READ, or QNN `QnnMemCacheInvalidate`) before the buffer is wrapped as a Java direct `ByteBuffer`.
+5. Zero-copy contract with MtDecoder: `QnnModelLoader` returns direct buffer over ION; `MtDecoder` builds the ORT `OrtValue` off the same pointer on the CPU fallback — **with the cache-invalidation above applied first** (see §6 note — QNN and ORT cannot share one buffer trivially; the real zero-copy applies QNN-output → ORT-input *when both are on-device ION*, i.e. the encoder output feeding decoder input path — keep as design goal, fallback to a single copy until measured).
+
+> **Debug assertion (debug build only):** after `nativeSyncCache`, read back the first N floats of the output buffer and assert they are not the stale zero-pattern produced by `memset` in the current stub — catches cache-invalidation regressions / missing syncs during development.
 
 ## 6. Data flow, threads, buffers
 
@@ -212,7 +220,9 @@ ADR-011 rule: every on-device asset ships with a `SHA256SUMS` entry in `kavi-and
 - **Denoiser:** toggle off per utterance (D7); if GTCRN load fails, pass-through clean audio.
 - **Language:** confidence < 0.6 → PTT manual direction (UNAMBIGUOUS=false).
 - **Service:** all model loads in `onCreate`; any failure → `PendingIntent`-styled notification "model load failed", service stays alive for retry; no crash (top-level try/catch + `Result`-typed engines).
-- **Native errors:** all JNI funcs return status codes; Kotlin maps to `sealed class` (`QnnError`/`OrtError`/`SpError`) carrying `getLastError()` message for `Logcat` + benchmark capture.
+- **Native errors:** all JNI funcs return status codes; Kotlin maps to `sealed class` (`QnnError`/`OrtError`/`SpError`/`CacheSyncError`) carrying `getLastError()` message for `Logcat` + benchmark capture.
+- **ORT op-coverage (Build A gate):** if `verifyORTGraph()` reports an `OpKernelNotFound` for the MT decoder under sherpa's bundled ORT, fall back to a full ORT build vendored alongside the decoder only (single-ORT constraint becomes a size/roster trade-off documented in Build A).
+- **ION cache-coherency (Build D gate):** if `sched_setaffinity`/`DMA_BUF_IOCTL_SYNC` is unavailable or `nativeSyncCache` returns an error, fall back to a single memcpy into a JVM heap buffer for the affected tensor — slower but correct; debug build asserts non-stale data before falling back.
 
 ## 9. Testing strategy
 
@@ -227,12 +237,13 @@ ADR-011 rule: every on-device asset ships with a `SHA256SUMS` entry in `kavi-and
 
 | Build | Outcome | Depends on / effort |
 | --- | --- | --- |
-| **A. Build plumbing** | Vendor sherpa-onnx 1.13.4 jniLibs + kotlin-api AAR; trim QAIRT jniLibs 39→8 (ADR-007 D8 set incl. `libQnnGpu.so`); multi-target CMake (C++20); `ModelRegistry` + `fetch-models.sh` + `SHA256SUMS` (ADR-011) | ~4–6 h |
+| **A. Build plumbing** | Vendor sherpa-onnx 1.13.4 jniLibs + kotlin-api AAR; trim QAIRT jniLibs 39→8 (ADR-007 D8 set incl. `libQnnGpu.so`); multi-target CMake (C++20); `ModelRegistry` + `fetch-models.sh` + `SHA256SUMS` (ADR-011); **A1. ORT op-coverage probe** — run `verifyORTGraph()` against staged MT decoder (and ASR/TTS) ONNX under sherpa's bundled ORT on the host or emulator; record which ops (Gather/Attention/LayerNorm/Softmax) resolve. **Decision point:** single-ORT if all ops resolve, else vendor full ORT for the MT decoder. | ~4–6 h |
 | **B. ASR + language** | `DualZipformerRecognizer`, `LanguageSelector`, unit tests; instrumented smoke (2 Zipformers on device) | A; ~6 h (+device time) |
 | **C. Service + audio + pipeline (CPU-first)** | `TranslationService`, `Recorder`/`Vad`, `AudioSink`, `SupertonicTts`, `MtDecoder` (ORT greedy), `SpeechPipeline` walkie-talkie loop — **encoder CPU fallback** first, QNN later; `MainActivity` UI | B; ~10–12 h |
-| **D. QNN encoder real exec** | `qnn_loader_jni` rewrite (graphs/tensors/ION), `QnnTensorFactory`, direct-Buffer zero-copy path, version-lock assert | C; **blocked until HTP v73 ctx binary generated** (SDK is installed at `~/Qualcomm/AIStack/QAIRT/2.31.0.250130/`); C++ can be written + unit-tested ahead w/ mock backend ~8 h |
+| **D. QNN encoder real exec** | `qnn_loader_jni` rewrite (graphs/tensors/ION), `QnnTensorFactory`, direct-Buffer zero-copy path, `nativeSyncCache` cache-invalidation, version-lock assert | C; **blocked until HTP v73 ctx binary generated** (SDK is installed at `~/Qualcomm/AIStack/QAIRT/2.31.0.250130/`); C++ can be written + unit-tested ahead w/ mock backend ~8 h |
+| **(D-extra) Cache-coherency validation** | `BenchmarkRunner` (ADR-006) extends `run_results_android.json` with a `cpu_readback_match` boolean: run the encoder once, read the ION output via the CPU path, and compare against the QNN-returned gold tensor (test wav with a non-zero output); assert equality (with int8 tolerance) — catches missing `nativeSyncCache` on-device. | D; +1 h instrumented verify |
 | **E. TTS polish + BLE** | Supertonic gen config tuning, Piper fallback wire, `PeerLink` BLE 5.2 + mode switch | C; ~6 h |
-| **F. Benchmark + gates** | `BenchmarkRunner` (ADR-006), hard gates (Dual Zipformer RTF ≤ 0.05, Supertonic RTF ≤ 0.5, ALL_OPT vs NO_OPT per session), WER/BLEU off-device scoring | A–E; ~6 h runner + ~4 h on-device verify |
+| **F. Benchmark + gates** | `BenchmarkRunner` (ADR-006), hard gates (Dual Zipformer RTF ≤ 0.05, Supertonic RTF ≤ 0.5, ALL_OPT vs NO_OPT per session, `cpu_readback_match = true` for the QNN→CPU zero-copy handoff), WER/BLEU off-device scoring | A–E; ~6 h runner + ~4 h on-device verify |
 
 Totals ≈ 44–50 h of implementation + device time. Maps to android-implementation-plan
 M0 (A), M1 (B), M2 (C), M3 (D), M4 (E), M5–M6 (F).
@@ -240,9 +251,9 @@ M0 (A), M1 (B), M2 (C), M3 (D), M4 (E), M5–M6 (F).
 ## 11. Risks & open questions
 
 1. **QAIRT SDK + HTP v73 ctx binary** — the SDK is installed (2.31.0.250130) and ONNX + calibration data are prepared, but the HTP v73 context binary for the Opus-MT encoder does **not** exist yet. **Runbook:** `docs/ndk-conversion-runbook.md` (NDK r26c set-up, conversion command, delivery into `kavi-android`). The C++ layer can be written against the dlsym ABI and validated with a mock backend while the NDK person runs the conversion.
-2. **ORT version match** — sherpa's bundled `libonnxruntime.so` version must satisfy the decoder graph's opset + `ALL_OPT`; if not, vendor a second ORT (size/roster impact) — decide in Build A.
+2. **ORT op-coverage (not just version)** — sherpa's bundled `libonnxruntime.so` 1.13.4 is an op-selective build sized for Zipformer + TTS; the MT decoder graph needs ops (Gather/Attention/LayerNorm/Softmax) not guaranteed present. Gate: `verifyORTGraph()` probe at Build A; only vendor a second/full ORT if an op is missing.
 3. **STL policy** — `c++_shared` must match sherpa prebuilds; verify no `libc++` clash at runtime (`dlopen RTLD_LOCAL` for QNN already decided).
-4. **ION zero-copy** — needs QNN `QnnMem_register` + dma-buf heaps on SD8G2; feasibility to confirm on the physical device in Build D; fallback = one copy.
+4. **ION cache-coherency (not just zero-copy)** — `QnnMem_register` + dma-buf heaps on SD8G2 must be paired with an explicit **CPU-cache invalidation (`DMA_BUF_IOCTL_SYNC`/`QnnMemCacheInvalidate`) on the NPU→CPU handoff**, otherwise the ORT/CPU reader gets stale L1/L2 lines (silent wrong output). Validated via `cpu_readback_match` in Build D.
 5. **Sherpa-onnx version pin** — 1.13.4 prebuilt tarball (no official Maven artifact); third-party com.bihe0832 AAR exists but not canonical.
 6. **Model availability for Build B/D smoke** — Zipformer assets downloadable via fetch script; encoder ctx binary is the only gating artifact.
 7. **Foreground-service policy (API 34+/36)** — needs `FOREGROUND_SERVICE` + `FOREGROUND_SERVICE_MICROPHONE` permissions and a mic-type service declaration; cold-start splash hides 2–3 s load per M4.
