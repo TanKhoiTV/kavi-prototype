@@ -24,6 +24,7 @@ budget mapping, fallbacks, testing, and a build-by-build sequencing with effort.
 | Build | AGP 8.10.0, Gradle 8.11.1, Kotlin 2.0.21, NDK 26.1.10909125, CMake 3.22.1, compile/target 36, min 24, arm64-v8a only | No sherpa-onnx, no ORT, no jniLibs source sets beyond bundled QAIRT |
 | Native | `qnn_loader_jni.cpp`: dlopen `libQnnHtp.so` + dlsym C API ✓; backend create ✓; context-from-binary ✓ | **`nativeExecute` is a stub** (zero 64 KB out); provider struct offsets hardcoded; no graph enumeration, no `Qnn_Tensor_t` creation; ION used but **no cache-invalidation between QNN output and CPU/ORT read** (cache-coherency hazard); no version-lock check |
 | C++ (post-Build-A) | `ort_decoder_jni.cpp` wraps sherpa's bundled `libonnxruntime.so` (one ORT copy) | **ORT op-coverage unvalidated** — sherpa-onnx's ORT is built for Zipformer+TTS ops only; must probe that the MT decoder graph resolves all operators (OpKernelNotFound risk) before locking the single-ORT constraint |
+| Note | `ort_decoder_jni` is marked **(new)** in §5.1 - it is not yet in the submodule (Build A creates it); the audit row above is target-scale-after-Build-A, not current state. Do not treat as an existing file to extend. |
 | Kotlin | `QnnModelLoader.kt` (init/load/execute/shutdown, VmPeak timing), `ManifestReader.kt`, `NetworkMonitor.kt` (runner pkg) | No service, no audio, no pipeline, no TTS/ASR engines, no BLE |
 | UI | `MainActivity` scaffold ("Kavi — on-device speech-to-speech (scaffold)") | Full walkie-talkie UI |
 | Manifest | No permissions, single launcher activity | No `FOREGROUND_SERVICE`/`RECORD_AUDIO`/`POST_NOTIFICATIONS`/`BLUETOOTH_*`, no service |
@@ -102,6 +103,7 @@ language badge, status text, latency readout.
 | `ort_decoder_jni` (new) | `ort_decoder_jni.cpp`, `ort_decoder.cpp/.h` | ONNX Runtime decoder session: load decoder ONNX from filesDir, greedy decode loop with `ALL_OPT` + `CPUArenaAllocator` + memory-pattern (ADR-007 D10/ADR-010), SentencePiece target decode |
 | `spm_jni` (new, optional) | `spm_jni.cpp` | SentencePiece encode of source text → IntArray for the MT encoder (if not folded into ort_decoder_jni) |
 | `qnn_dummy` (keep for now) | — | placeholder matching current API shape, replaced by `qnn_loader_jni` rewrite |
+| Note | `qnn_dummy` has no consumer and no source file in the current `app/src/main/cpp/CMakeLists.txt` (which defines only the `qnn_loader_jni` target). Remove it in build A to avoid a name/definition collision with the `qnn_loader_jni` rewrite - do not carry it forward as a second CMake target. |
 
 ### 5.2 JNI contract (stable ABI; error convention `jint status = 0 ok, <0 QNN/ORT error code`, plus `getLastError()` returning the message)
 
@@ -141,13 +143,13 @@ Replaces the stub `nativeExecute` with, per inference:
 2. `QnnTensor_createGraphTensor` for I/O with rank/dims/type from `_net.json`.
 3. Input: register an ION buffer (`QnnMem_register`, alignment to 128/256 bytes, ion fd via dma-buf heap) → `QnnTensor_setMemHandle`.
 4. Output: same ION path; **after `QnnGraph_execute`, call `nativeSyncCache(handle, graphHandle, outputIonFd)` to invalidate the CPU cache on the ION/dma-buf output** (DMA_BUF_IOCTL_SYNC with DMA_BUF_SYNC_READ, or QNN `QnnMemCacheInvalidate`) before the buffer is wrapped as a Java direct `ByteBuffer`.
-5. Zero-copy contract with MtDecoder: `QnnModelLoader` returns direct buffer over ION; `MtDecoder` builds the ORT `OrtValue` off the same pointer on the CPU fallback — **with the cache-invalidation above applied first** (see §6 note — QNN and ORT cannot share one buffer trivially; the real zero-copy applies QNN-output → ORT-input *when both are on-device ION*, i.e. the encoder output feeding decoder input path — keep as design goal, fallback to a single copy until measured).
+5. Zero-copy contract with MtDecoder: `QnnModelLoader` returns direct buffer over ION; `MtDecoder` (always CPU/ORT — there is no QNN decoder path for it to fall back from; only the **encoder** has a QNN→CPU fallback) builds the ORT `OrtValue` off the same ION pointer, **cache-invalidation above applied first**. (see §6 note — QNN and ORT cannot share one buffer trivially; the real zero-copy applies QNN-output → ORT-input *when both are on-device ION*, i.e. the encoder output feeding decoder input path — keep as design goal, fallback to a single copy until measured).
 
 > **Debug assertion (debug build only):** after `nativeSyncCache`, read back the first N floats of the output buffer and assert they are not the stale zero-pattern produced by `memset` in the current stub — catches cache-invalidation regressions / missing syncs during development.
 
 ## 6. Data flow, threads, buffers
 
-- **Threads:** one dedicated audio thread (AudioRecord callback/loop) → utterance handoff into a `Channels.UNLIMITED`-backed coroutine chain on `Dispatchers.Default`; TTS/audio playback on a dedicated `AudioTrack` thread; QNN/ORT native calls run on a **dedicated `Dispatchers.IO` with limited parallelism** (not `Dispatchers.Default` — see ADR-012 Open Question #7: coroutines block-waiting on native pool share the same `Default` workers; running native calls on `Default` would starve the coroutine chain). Tune `kotlinx.coroutines.io.parallelism` to match the 3+3 thread budget.
+- **Threads:** one dedicated audio thread (AudioRecord callback/loop) → utterance handoff into a `Channels.UNLIMITED`-backed coroutine chain on `Dispatchers.Default`; TTS/audio playback on a dedicated `AudioTrack` thread; QNN/ORT native calls run on a **dedicated `Dispatchers.IO` with limited parallelism** (not `Dispatchers.Default` — see ADR-012 Open Question #7: coroutines block-waiting on native pool share the same `Default` workers; running native calls on `Default` would starve the coroutine chain). Tune `kotlinx.coroutines.io.parallelism` **independently of the ASR 3+3 budget** - the 3+3 figure is per-recognizer `numThreads` for the CPU ASR stage only; the IO dispatcher carries QNN/ORT native calls, which must be capped separately so the SD8G2 keeps its planned 2-core headroom (see ADR-012, not thi §).
 - **Formats:** mic 16 kHz mono `FloatArray`; ASR consumes 16k floats; TTS emits 44.1 kHz PCM → downmix/resample in `AudioSink` (sherpa TTS models output 44.1k; AudioTrack 44.1k).
 - **KV cache:** allocated once at service `onCreate` (~70 MB / 256 tokens, ADR-007 D3), passed by pointer to `ortDecoderDecode`; never freed until service teardown (D2 residency).
 - **Timing budget:** E2E turnaround (EOS→SA) < 2.0 s hard gate (Phase 4); per-stage latencies recorded by `SpeechPipeline` into `run_results_android.json` (`latency_ns`), WER/BLEU scored off-device per ADR-004.
@@ -222,7 +224,7 @@ ADR-011 rule: every on-device asset ships with a `SHA256SUMS` entry in `kavi-and
 - **Service:** all model loads in `onCreate`; any failure → `PendingIntent`-styled notification "model load failed", service stays alive for retry; no crash (top-level try/catch + `Result`-typed engines).
 - **Native errors:** all JNI funcs return status codes; Kotlin maps to `sealed class` (`QnnError`/`OrtError`/`SpError`/`CacheSyncError`) carrying `getLastError()` message for `Logcat` + benchmark capture.
 - **ORT op-coverage (Build A gate):** if `verifyORTGraph()` reports an `OpKernelNotFound` for the MT decoder under sherpa's bundled ORT, fall back to a full ORT build vendored alongside the decoder only (single-ORT constraint becomes a size/roster trade-off documented in Build A).
-- **ION cache-coherency (Build D gate):** if `sched_setaffinity`/`DMA_BUF_IOCTL_SYNC` is unavailable or `nativeSyncCache` returns an error, fall back to a single memcpy into a JVM heap buffer for the affected tensor — slower but correct; debug build asserts non-stale data before falling back.
+- **ION cache-coherency (Build D gate):** if `DMA_BUF_IOCTL_SYNC`/`QnnMemCacheInvalidate` is unavailable or `nativeSyncCache` returns an error, fall back to a single memcpy into a JVM heap buffer for the affected tensor — slower but correct; debug build asserts non-stale data before falling back.
 
 ## 9. Testing strategy
 
