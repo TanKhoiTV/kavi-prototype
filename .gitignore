@@ -49,3 +49,6 @@ eval_manifest_v1.json
 
 # Per-machine env vars (contains absolute paths)
 .kavi.env
+
+# Android app lives in the private kavi-android repo; not vendored here.
+/android
