@@ -52,6 +52,7 @@
 - Index NDK conversion runbook in docs/README
 - Reconcile plans with ADR-007-010; archive superseded docs to reference/ ([#95](https://github.com/TanKhoiTV/kavi-prototype/pull/95))
 - Add ADR-012 — ASR thread tuning strategy (Proposed) (#100)([#100](https://github.com/TanKhoiTV/kavi-prototype/pull/100))
+- Plan Kotlin + C++ implementation for the android app (#97)([#97](https://github.com/TanKhoiTV/kavi-prototype/pull/97))
 
 ### Features
 
