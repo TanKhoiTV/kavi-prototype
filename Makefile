@@ -10,15 +10,18 @@
 #   - fmt MUTATES files: it reformats the tree and applies ruff autofixes.
 #     Do not run it blindly in CI.
 #
-# bench  vs  bench-data:
+# bench  vs  bench-data  vs  models:
 #   - bench runs a lightweight, OFFLINE --smoke pass by default and writes
 #     results to bench-results/. This matches the project's offline /
 #     on-device-at-runtime requirement (see AGENTS.md).
 #   - bench-data NEEDS NETWORK: it is the one-time Phase 1 step that builds
 #     the eval manifest (eval_data/eval_manifest_v1.json). Run it once, then `bench`
 #     runs fully offline.
+#   - models NEEDS NETWORK: it fetches the third-party Opus-MT weights and
+#     tokenizers (models/) that `bench` needs. Run it once per checkout; see
+#     NOTICE for attribution.
 
-.PHONY: install check fmt test bench bench-data
+.PHONY: install check fmt test bench bench-data models
 
 install: ## Install dependencies
 	uv sync
@@ -39,3 +42,6 @@ bench: ## Offline harness run (--smoke by default; writes bench-results/)
 
 bench-data: ## Phase 1: build eval manifest (NEEDS NETWORK, one-time)
 	uv run python -m bench.data_prep --out eval_data/eval_manifest_v1.json
+
+models: ## Phase 1: fetch pinned model artifacts (NEEDS NETWORK, one-time)
+	uv run python -m scripts.fetch_models --out models

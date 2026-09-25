@@ -1,0 +1,54 @@
+Kavi prototype — third-party notices
+====================================
+
+This repository's own source code is licensed under the MIT License (see
+LICENSE). It does NOT vendor the third-party model weights and evaluation
+audio used for benchmarking; those are fetched on demand (see "Fetching"
+below). Their licenses and required attribution are recorded here.
+
+-------------------------------------------------------------------------------
+Helsinki-NLP Opus-MT vi -> en (MarianMT)
+-------------------------------------------------------------------------------
+
+Artifact:       Helsinki-NLP/opus-mt-vi-en
+                converted to CTranslate2 int8 as models/opus-mt-vi-en-ct2/
+License:        Apache License, Version 2.0
+                https://www.apache.org/licenses/LICENSE-2.0
+Upstream:       https://huggingface.co/Helsinki-NLP/opus-mt-vi-en
+Pinned rev:     c8d2853e77f5fae31124d993e0b35176b1c8914e
+Source model:   Tatoeba-Challenge vie-eng (opus-2020-06-17)
+                https://github.com/Helsinki-NLP/Tatoeba-Challenge
+
+Copyright (c) the OPUS-MT / Helsinki-NLP authors. Distributed under the
+Apache License, Version 2.0. The upstream model card is fetched alongside the
+weights at models/opus-mt-vi-en-src/README.md.
+
+-------------------------------------------------------------------------------
+FLEURS evaluation audio (Vietnamese)
+-------------------------------------------------------------------------------
+
+Artifact:       google/fleurs, config vi_vn, test split
+                tests/fixtures/fleurs_vi_0.wav
+                tests/fixtures/ref_mel_fleurs_vi_vn_0.npy
+License:        Creative Commons Attribution 4.0 International (CC-BY 4.0)
+                https://creativecommons.org/licenses/by/4.0/
+Upstream:       https://huggingface.co/datasets/google/fleurs
+
+Derived from the FLEURS benchmark (Conneau et al., 2022, "FLEURS: Few-shot
+Learning Evaluation of Universal Representations of Speech").
+Copyright (c) Google LLC. Used under CC-BY 4.0.
+
+-------------------------------------------------------------------------------
+Fetching
+-------------------------------------------------------------------------------
+
+The artifacts above are intentionally not committed to this repository.
+
+  - Opus-MT weights + SentencePiece tokenizers ....... make models
+  - FLEURS-derived eval manifest ..................... make bench-data
+
+The FLEURS validation fixture is not redistributed; regenerate it from the
+FLEURS parquet files downloaded by `make bench-data`.
+
+If you redistribute any fetched artifact, you must carry the license terms and
+attribution recorded above.
