@@ -1,19 +1,20 @@
-# License Situation & Gate
+# ADR-029: Shipping license gate — adopt/avoid verdicts
 
-**Status:** Proposed — clean/avoid resolved; **Piper engine GPL split (fork #1)
-deferred** (MIT-era Piper is the clean option; GPL build not decided); **QAIRT
-runtime ADOPT (clean) — gate resolved** (AI Stack License §1(iv) + §1(v); runtime
-preinstalled on the 8 Gen 2, HTP v73, qnn-2.31; PKLA portal master agreement
-signed 2026-07-19 confirms — see #46); **Hy-MT
-ADOPT** (Vietnam contest, no blocked-region launch; 100M MAU = sky-high
-ceiling). All dataset/voice licenses closed via Claude lookup (see #3 / #4 / #7).
-This record **gates ADR-004 (architecture / tech-stack)**.
-**Date:** 2026-07-15 (QAIRT gate resolved 2026-07-19)
-**Author:** Project lead
+## Status
 
----
+Accepted — the gate is in force; one policy fork remains open
+([ADR-031](ADR-031-piper-engine-gpl-split.md))
+
+## Date
+
+2026-07-15 (QAIRT gate resolved 2026-07-19)
+
+## Deciders
+
+Project lead
 
 ## Context
+
 
 Kavi is a **commercial product** (OneVoice contest → product). We **ship a
 binary that bundles three independent license layers**, so all three must permit
@@ -36,9 +37,18 @@ Two nuances:
 + **Public parent must stay clean.** `aivoice-2026` (public) can host only
   CC0 / CC-BY / permissive content — never NC weights or data.
 
+> **Split note (2026-09-25):** this record was the unnumbered
+> `license-situation.md`, and held the whole license position in one file —
+> the gate, the verdict tables, the resolved lookups, **and** two substantive
+> determinations plus a deferred fork. It is now numbered and split:
+> [ADR-030](ADR-030-qairt-runtime-redistribution.md) records the QAIRT runtime
+> redistribution determination (with its PKLA confirmation), and
+> [ADR-031](ADR-031-piper-engine-gpl-split.md) records the still-open Piper engine
+> GPL fork. The resolved **lookups** remain here as reference tables — they are
+> licence facts, not decisions.
+
 ## Decision
 
-### Resolved now — no further action
 
 **Adopt (commercial-safe):**
 
@@ -74,24 +84,15 @@ Two nuances:
 | Voice | Piper `25hours_single` (VI) | **License: Unknown** — voice MODEL_CARD (verified 2026-07-18); trained on "InfoRe Technology 1" (InfoRe-derived) | AVOID — no license grant; do not ship |
 | Data | InfoRe (vietTTS corpus) | no formal license; canonical `VINAI/InfoRe` is **gated** (HF HTTP 401, no published terms — verified 2026-07-18) | AVOID — no commercial grant; taints any voice trained on it |
 
-### Open — policy forks (fork #1 requires a decision; fork #2 resolved)
+**Fork #2 — Hy-MT1.5 regional carve-out: ADOPT (resolved).** The contest is in
+**Vietnam**; no launch is planned for the excluded regions (EU / UK / South
+Korea). The HY Community License therefore **permits commercial use** of
+Hy-MT1.5. The **100M MAU** threshold is noted as a **sky-high ceiling** (not a
+current concern) — approaching it would require a separate Tencent license.
+Outputs must not train non-Hunyuan models. Hy-MT is a usable MT candidate
+alongside Opus-MT / M2M-100.
 
-1. **Piper engine — GPL split deferred.** MIT-era `rhasspy/piper` (frozen,
-   archived Oct 2025) is a **licensed-clean option** (MIT) and can run via
-   **subprocess isolation** so the GPL `espeak-ng`/engine never links into our
-   binary. The GPL build `OHF-Voice/piper1-gpl` (GPL-3.0) is **deferred** — not
-   decided now. **No tech-stack decision yet:** Piper (MIT-era) is one TTS
-   *option* alongside MeloTTS (MIT) / Kokoro (Apache-2.0); the final pick waits
-   for the benchmark harness. Shapes *all* TTS.
-2. **Hy-MT1.5 regional carve-out — RESOLVED: ADOPT.** Contest is in
-   **Vietnam**; no launch planned for the excluded regions (EU / UK / South
-   Korea). The HY Community License therefore **permits commercial use** of
-   Hy-MT1.5. The **100M MAU** threshold is noted as a **sky-high ceiling** (not
-   a current concern) — if we ever approach it, a separate Tencent license is
-   required. Outputs must not train non-Hunyuan models. Hy-MT is a usable MT
-   candidate alongside Opus-MT / M2M-100.
-
-### Open — verification lookups (facts pending, no judgment)
+### Verification lookups (licence facts, resolved)
 
 | # | Item | Status |
 | --- | --- | --- |
@@ -103,86 +104,38 @@ Two nuances:
 | 8 | Whisper exact license | RESOLVED — **MIT** (plan's 'Apache-2.0' note was wrong). |
 | 9 | PKLA (portal master agreement, signed 2026-07-19) vs AI Stack License | RESOLVED — PKLA does **not** reopen the QAIRT ADOPT (clean) gate; §2.1(b) confirms object-code bundling, conditional fee sections (§2.3(a)/§2.5/§2.6) don't apply to the royalty-free AI Stack kit, §3.6/§3.10 satisfied. See "PKLA (portal master agreement, signed 2026-07-19)". Tracking #46. |
 
-### Resolved — QAIRT runtime redistribution (2026-07-19)
+### Open policy fork
 
-The "escalate to Qualcomm" blocker is **closed**. The operative license is the
-**AI Stack License (QTI)** shipped in the SDK install (`LICENSE.pdf`):
-
-+ **§1(iv)** grants a royalty-free, non-exclusive license to **distribute and
-  sublicense the Software (the QNN runtime) in object code, as incorporated in
-  Your software application** — i.e. we may bundle `libQnn*.so` in the Kavi APK.
-  Standalone redistribution is not permitted (we don't do that).
-+ **§1(v)** explicitly permits **benchmarking** — covers the whole harness.
-+ **Export (§10(f))**: Vietnam is not embargoed/restricted; Kavi is not a
-  military/supercomputer/semiconductor end-use. **Export-clear.**
-+ **Use-case (§2(d)/(e))**: Kavi (assistive speech translation) is not an
-  unacceptable- or high-risk application. **Clear.**
-+ **Third-party (§10(h), `QNN_NOTICE.txt`)**: stack is permissive (Apache-2.0,
-  MIT, BSD, Boost, zlib, LLVM-exception, Unlicense) + **MPL-2.0**; the only
-  copyleft is **Eigen LGPL-2.1**, confined to the **host build tools** (header
-  lib used by the converters), **not** the on-device runtime. No GPL anywhere.
-
-**Device verification (Meizu 21 Note, 2026-07-19):** the runtime is
-**preinstalled** on the target — `/system/lib64/libQnnHtp.so`,
-`libQnnHtpV73.so`, and a full `/system/lib64/qnn/qnn-2.31/` tree (Cpu, Dsp, Gpu,
-HTP v73, Ir, Lpai, ModelDlc, System). `qnn-2.31` matches our locally-installed
-QAIRT **2.31.0.250130**, and `libQnnHtpV73.so` confirms **HTP v73** (ADR-002).
-Because `libQnn*.so` is **not** listed in `/vendor/etc/public.libraries.txt` or
-`/system/etc/public.libraries.txt`, a third-party app cannot `dlopen` the
-device runtime directly (linker-namespace/SELinux) — so we **bundle** the runtime
-`.so` in the APK, which §1(iv) permits. `libadsprpc.so`/`libcdsprpc.so` (FastRPC
-transport to the DSP) **are** public, so the HTP path is reachable.
-
-**Verdict:** QAIRT → **ADOPT (clean)**. No Qualcomm escalation required. The
-runtime is both preinstalled (version-matched) and freely redistributable in
-object code within the app.
-
-### PKLA (portal master agreement, signed 2026-07-19) — confirms the gate
-
-The PKLA (Product Kit License Agreement) was signed when installing the Linux
-QAIRT 2.31.0.250130 SDK via QPM. It is the **portal master agreement** that sits
-above the AI Stack License (`LICENSE.pdf`) shipped in the SDK. It does **not**
-reopen the ADOPT (clean) gate — it affirms the bundling right and adds only
-*conditional* obligations that do not apply to the AI Stack:
-
-+ **§2.1(b) License Grant** — *"distribute and sublicense … the Object Code of
-  Licensed Software as bundled … into LICENSEE Products"* — confirms the AI
-  Stack License §1(iv) bundling right (we may ship `libQnn*.so` in the APK).
-+ **§2.3(a) Software License Fee / §2.5 fee-bearing kits / §2.6 Revenue Share**
-  are **conditional** ("if a PKLA Product Kit includes … fee-bearing Licensed
-  Software"). They apply only to fee-bearing / revenue-share kits. The AI Stack
-  is represented as **royalty-free** (its own `LICENSE.pdf`), so they should not
-  apply to Kavi. **Verify the kit is non-fee-bearing before commercial launch.**
-+ **§3.6 Open Source Prohibition** — do not contribute the Licensed Software to
-  an OSS project; ship the `Notice File`; this Agreement controls on conflict.
-  Does **not** forbid shipping a product that also contains MIT/Apache code.
-  Satisfied: we bundle unmodified object code and never upstream it.
-+ **§3.10 / §3.11 Unacceptable / High-Risk** — biometric ID, social scoring,
-  etc. Kavi (speech-to-speech translation, **not** biometric ID, no consequential
-  decision) is **not** high / unacceptable-risk.
-+ **Export (§13.3)** — Vietnam not restricted (consistent with prior finding).
-+ Grant is **revocable** (at-will 30-day termination, §7) — already captured.
-
-The PKLA text is **Confidential** and is kept local (not committed), per project
-rule. Tracking issue: #46.
+**Piper engine — GPL split.** Deferred to
+**[ADR-031](ADR-031-piper-engine-gpl-split.md)**. This fork shapes all of TTS; a
+late resolution is the main route to a forced TTS swap.
 
 ## Consequences
 
 ### Positive
+
 
 + De-risks ADR-004 **before** the benchmark harness runs — most candidates
   are already license-decided.
 + The adopt/avoid lists let us wire candidates into the harness with no legal
   ambiguity.
 
+- The QAIRT runtime gate is resolved (see
+  [ADR-030](ADR-030-qairt-runtime-redistribution.md)), which unblocks the NPU path
+  ([ADR-003](ADR-003-hexagon-runtime.md)).
+
 ### Negative / risk
+
 
 + The two policy forks can force a **late TTS/MT swap** if resolved against the
   current picks.
 + Eval-only NC datasets are easy to **accidentally bundle** — enforce in the
   harness data-prep step.
+- The open Piper fork can force a **late TTS swap** if resolved against the
+  current picks ([ADR-031](ADR-031-piper-engine-gpl-split.md)).
 
-## Open items → ADR-004
+## Open items
+
 
 ADR-004 (architecture / tech-stack) records the licensed-clean candidate set
 but **defers the final tech-stack pick** until the v0 benchmark harness runs.
@@ -192,7 +145,13 @@ The **QAIRT runtime gate is RESOLVED** (ADOPT, clean — see above). Lookups #3�
 are closed or advanced. Candidate shortlist in `docs/reference/benchmarking-plan.md` §4
 stands, with the avoid-list already dropped.
 
+
+**Updated (2026-09-25):** the QAIRT runtime gate is resolved in
+[ADR-030](ADR-030-qairt-runtime-redistribution.md); the Piper engine fork is
+[ADR-031](ADR-031-piper-engine-gpl-split.md).
+
 ## References
+
 
 + `docs/reference/benchmarking-plan.md` §3.6 (license watch-outs), §4.4 (MT), §4.5 (TTS).
 + `docs/onboarding.md` (commercial-clean vs avoid rule).

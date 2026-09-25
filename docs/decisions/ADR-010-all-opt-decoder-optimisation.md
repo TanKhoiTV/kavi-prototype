@@ -1,15 +1,29 @@
-# ADR-010: `ALL_OPT` Decoder Optimisation — Why Kavi Can Use Full ONNX Runtime Optimisation
+# ADR-010: `ALL_OPT` is safe — no custom ONNX operators in the pipeline
 
-**Status:** Proposed
-**Date:** 2026-07-30
-**Deciders:** Kavi team
-**Relates to:** ADR-007 (baseline ORT session config — Decision 10), ADR-008 (Dual Zipformer ASR — no custom ops in pipeline), ADR-009 (TTS Phase 1 — Supertonic via sherpa-onnx), ADR-004 (tech-stack deferred decisions)
+## Status
+
+Proposed
+
+## Date
+
+2026-07-30
+
+## Deciders
+
+Kavi team
+
+## Relates to
+
+[ADR-021](ADR-021-ort-cpu-decoder-session-options.md) (the baseline ORT session
+config this record expands), [ADR-008](ADR-008-dual-zipformer-asr.md) (Dual
+Zipformer ASR — no custom ops in the pipeline),
+[ADR-009](ADR-009-supertonic-tts-v1.md) (TTS Phase 1 — Supertonic via sherpa-onnx)
 
 ---
 
 ## Context
 
-ADR-007 Decision 10 specifies that all CPU-side ONNX Runtime decoder sessions should use `GraphOptimizationLevel.ORT_ENABLE_ALL` (hereafter `ALL_OPT`), alongside `CPUArenaAllocator(true)` and `MemoryPatternOptimization(true)`. The `ALL_OPT` setting was chosen to maximise decoder throughput — an uncontroversial choice given that Kavi's pipeline uses only standard ONNX operators.
+ADR-021 specifies that all CPU-side ONNX Runtime decoder sessions should use `GraphOptimizationLevel.ORT_ENABLE_ALL` (hereafter `ALL_OPT`), alongside `CPUArenaAllocator(true)` and `MemoryPatternOptimization(true)`. The `ALL_OPT` setting was chosen to maximise decoder throughput — an uncontroversial choice given that Kavi's pipeline uses only standard ONNX operators.
 
 However, the RTranslator reference architecture (§3.11 and §4.2.5 of the ADR-007 vs RTranslator comparison doc) is forced to use `NO_OPT` on every ORT session despite being an otherwise similar offline speech-translation pipeline. Understanding *why* RTranslator cannot use `ALL_OPT` — and why Kavi can — is important for:
 
@@ -127,7 +141,7 @@ The cost is effectively **zero** beyond the one-time graph compilation overhead 
 
 | Cost | Detail | Impact |
 | --- | --- | --- |
-| **Session init time** | `ALL_OPT` graph compilation adds ~100–500 ms per session during `InferenceSession::Initialize()` | Absorbed into the already-budgeted 2–3 s cold-start window (ADR-007 Decision 2); happens once, before any utterance |
+| **Session init time** | `ALL_OPT` graph compilation adds ~100–500 ms per session during `InferenceSession::Initialize()` | Absorbed into the already-budgeted 2–3 s cold-start window (ADR-013); happens once, before any utterance |
 | **Additional peak RAM at init** | Graph transformation allocates temporary memory during compilation | Released after session creation; does not affect steady-state peak budget |
 | **APK size** | No change — `ALL_OPT` is a runtime option, not a model format | None |
 
@@ -179,9 +193,9 @@ None involve writing raw ORT sessions from scratch.
 
 ---
 
-## Cross-reference to ADR-007 Decision 10
+## Cross-reference to ADR-021
 
-This ADR supersedes the brief motivation in ADR-007 Decision 10 with a full analysis. The three ORT session options from Decision 10 remain unchanged:
+This ADR supersedes the brief motivation in ADR-021 with a full analysis. The three ORT session options from Decision 10 remain unchanged:
 
 | Option | Purpose | Status |
 | --- | --- | --- |
@@ -213,7 +227,7 @@ The additional insight from this ADR is the **architectural invariant** that mak
 
 ## References
 
-- **ADR-007 Decision 10:** ONNX Runtime CPU decoder optimisations (`ALL_OPT`, arena allocator, memory pattern optimisation)
+- **ADR-021:** ONNX Runtime CPU decoder optimisations (`ALL_OPT`, arena allocator, memory pattern optimisation)
 - **ADR-007 vs RTranslator comparison, §3.11:** ONNX Runtime usage — RTranslator's `NO_OPT` vs Kavi's `ALL_OPT`
 - **ADR-007 vs RTranslator comparison, §4.2.5:** Pain point: `NO_OPT` on all sessions is a red flag — validate `ALL_OPT` per-session
 - **ADR-007 vs RTranslator comparison, fn [7]:** Custom-op persistence regardless of encoder runtime
