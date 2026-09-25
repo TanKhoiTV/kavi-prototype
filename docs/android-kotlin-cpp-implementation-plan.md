@@ -56,7 +56,7 @@ denoiser (optional) → DualZipformer offline ASR (VI+EN in parallel) → Langua
 (confidence argmax; < 0.6 ⇒ push-to-talk manual) → MT encoder (QNN; per-encoder CPU
 fallback) → MT decoder (ORT greedy, ALL_OPT, KV-cache pre-alloc) → Supertonic offline
 TTS (44.1 kHz) → AudioSink (44.1k → AudioTrack).` PeerToPeer mode: after TTS input text is produced, ship
-the translated *text* over BLE; the peer synthesises locally (ADR-007 Decision 2).
+the translated *text* over BLE; the peer synthesises locally (ADR-013).
 
 ## 4. Kotlin file plan (`app/src/main/java/com/kavi/app/`)
 
@@ -69,21 +69,21 @@ New/modified files (all under `com.kavi.app`):
 | --- | --- | --- |
 | `AppContainer.kt` | Manual DI: builds engines once, holds model paths (ADR-011 registry), owns the app-lifetime scope | `val container: AppContainer` via `Application` subclass |
 | `KaviApplication.kt` | `Application` subclass wiring `AppContainer` (created **before** `TranslationService.onCreate`) | — |
-| `service/TranslationService.kt` | Two-mode foreground service (ADR-007 D1/D6): owns `WakeLock`, notification, `CoroutineScope(SupervisorJob + Dispatchers.Default)`; loads all models in `onCreate` (persistent residency, D2); exposes `OneDevice` / `PeerToPeer` control | `onStartCommand` intents; state `@Stateflow` |
-| `audio/Recorder.kt` | `AudioRecord` 16 kHz mono float, ring of read buffers; VAD-gated; ~500 ms speech timeout (end-of-utterance) (ADR-007 D5) | `fun collectUtterance(): Result<float[]>` |
+| `service/TranslationService.kt` | Two-mode foreground service (ADR-007/ADR-017): owns `WakeLock`, notification, `CoroutineScope(SupervisorJob + Dispatchers.Default)`; loads all models in `onCreate` (persistent residency, ADR-013); exposes `OneDevice` / `PeerToPeer` control | `onStartCommand` intents; state `@Stateflow` |
+| `audio/Recorder.kt` | `AudioRecord` 16 kHz mono float, ring of read buffers; VAD-gated; ~500 ms speech timeout (end-of-utterance) (ADR-022) | `fun collectUtterance(): Result<float[]>` |
 | `audio/Vad.kt` | Energy-threshold VAD state machine (start/stop/holdoff/turnaround timing) — pure Kotlin, unit-testable | `fun feed(frameRms: Float): VadState` |
 | `audio/AudioSink.kt` | `AudioTrack` 44.1 kHz stereo->mono correct, blocking write; underrun stats | `fun play(pcm: ShortArray)` |
 | `engine/SpeechPipeline.kt` | Coroutine chain: listen→denoise→dual ASR→select→MT encoder→MT decoder→TTS→play; keeps per-utterance telemetry (stage latencies) in a `PipelineStepTimings` data class | `fun processOneUtterance(audio: FloatArray): PipelineResult` |
 | `engine/DualZipformerRecognizer.kt` | Two sherpa-onnx `OfflineRecognizer` (VI 30M int8 2026-02-09 + EN small 2023-06-26), `numThreads=3` per `.kavi.yaml` (3+3 total, 2 cores headroom — see ADR-012), provider `cpu`; returns per-recognizer text + mean log-prob | `fun transcribe(audio: FloatArray): Pair<Hyp, Hyp>` |
 | `engine/LanguageSelector.kt` | Confidence argmax over `(ys_log_probs/ys_probs)`; confidence < 0.6 ⇒ UNAMBIGUOUS=false (→ PTT manual direction) | `fun select(vi: Hyp, en: Hyp): LanguageDecision` |
-| `engine/Denoiser.kt` | GTCRN via sherpa-onnx (523 KB); toggle per utterance (ADR-007 D7; Phase-6 gate: Wiener adopted on host, GTCRN-vs-Wiener still open → Risk R1) | `fun denoise(audio: FloatArray): FloatArray` |
+| `engine/Denoiser.kt` | GTCRN via sherpa-onnx (523 KB); toggle per utterance (ADR-018; Phase-6 gate: Wiener adopted on host, GTCRN-vs-Wiener still open → Risk R1) | `fun denoise(audio: FloatArray): FloatArray` |
 | `engine/MtEncoder.kt` | Opus-MT encoder: QNN path via `QnnModelLoader` (NPU); per-encoder **CPU fallback** via ORT session (ONNX 186 MB fp32 → int8 later); implements `Encoder` interface | `fun encode(tokens: IntArray): FloatArray` |
-| `engine/MtDecoder.kt` | Opus-MT decoder via `ort_decoder_jni` (greedy, `ALL_OPT`, SentencePiece target), KV-cache pre-allocated (per ADR-007 D3/D10, ADR-010) | `fun decode(context: IntArray): String` |
+| `engine/MtDecoder.kt` | Opus-MT decoder via `ort_decoder_jni` (greedy, `ALL_OPT`, SentencePiece target), KV-cache pre-allocated (per ADR-014/ADR-021, ADR-010) | `fun decode(context: IntArray): String` |
 | `engine/KvCache.kt` | Pre-allocated max-size KV cache (decoder ~70 MB / 256 tokens); ownership passed to native decoder | — |
 | `engine/SupertonicTts.kt` | sherpa-onnx `OfflineTts`, `GenerationConfig(sid, speed=1.0f, numSteps=8, lang)` (ADR-009); Piper-VITS fallback hook | `fun speak(text: String): Result<ShortArray>` |
 | `qnn/QnnModelLoader.kt` | **Extend** (not replace): real tensor enumeration, ION-backed zero-copy output exposure (return direct `ByteBuffer` over ION + `OrtValue` same pointer), QAIRT version-lock assert (2.31/HTP v73), latency+RSS retained | add `loadGraphFromJson(netJsonAsset)`; `runInference(...): QnnInferenceResult` (ByteBuffer) |
 | `qnn/QnnTensorFactory.kt` | Parse `*_net.json` → tensor descriptors (name/rank/dims/dtype) for graph I/O | — |
-| `ble/PeerLink.kt` | BLE 5.2: `BluetoothLeAdvertiser`/`BluetoothGattServer` advert; sends translated *text*; onReceive → local TTS (ADR-007 D2) | `fun sendText(t: String)`; `callback { incomingText }` |
+| `ble/PeerLink.kt` | BLE 5.2: `BluetoothLeAdvertiser`/`BluetoothGattServer` advert; sends translated *text*; onReceive → local TTS (ADR-013) | `fun sendText(t: String)`; `callback { incomingText }` |
 | `ui/WalkieController.kt` | UI state holder: PTT button state, auto-VAD toggle, language indicator, stage-spinner, error surface | — |
 | `util/ModelRegistry.kt` | **ADR-011**: read `SHA256SUMS` from assets, verify + extract models to `filesDir` (adb-push sideload path), load `fetch-models.sh`-provided assets; never trust `models/qnn/*` host outputs | `fun ensure(model: ModelSpec): File` |
 | `runner/BenchmarkRunner.kt` (androidTest) | ADR-006 runner: single push/pull, `am instrument -w`, writes `run_results_android.json` (`latency_ns`/`peak_rss_bytes`), `NetworkMonitor` flight-mode assert | instrumentation `onStart` |
@@ -100,7 +100,7 @@ language badge, status text, latency readout.
 | Target | File(s) | Purpose |
 | --- | --- | --- |
 | `qnn_loader_jni` (rewrite) | `qnn_loader_jni.cpp`, `qnn_graph.cpp`, `qnn_graph.h`, `ion_buffer.cpp`, `ion_buffer.h` | Real graph execution: parse provider struct properly (no hardcoded offsets), enumerate graphs/tensors by name from `_net.json`, create `Qnn_Tensor_t` (rank/dims/type), ION-backed memHandles, `QnnGraph_execute`, `QnnTensor_getData` |
-| `ort_decoder_jni` (new) | `ort_decoder_jni.cpp`, `ort_decoder.cpp/.h` | ONNX Runtime decoder session: load decoder ONNX from filesDir, greedy decode loop with `ALL_OPT` + `CPUArenaAllocator` + memory-pattern (ADR-007 D10/ADR-010), SentencePiece target decode |
+| `ort_decoder_jni` (new) | `ort_decoder_jni.cpp`, `ort_decoder.cpp/.h` | ONNX Runtime decoder session: load decoder ONNX from filesDir, greedy decode loop with `ALL_OPT` + `CPUArenaAllocator` + memory-pattern (ADR-021/ADR-010), SentencePiece target decode |
 | `spm_jni` (new, optional) | `spm_jni.cpp` | SentencePiece encode of source text → IntArray for the MT encoder (if not folded into ort_decoder_jni) |
 | `qnn_dummy` (remove in Build A) | — | placeholder matching current API shape; no consumer, no source file — see Note below |
 | Note | `qnn_dummy` has no consumer and no source file in the current `app/src/main/cpp/CMakeLists.txt` (which defines only the `qnn_loader_jni` target). Remove it in build A to avoid a name/definition collision with the `qnn_loader_jni` rewrite - do not carry it forward as a second CMake target. |
@@ -120,7 +120,7 @@ Existing (keep signatures, change semantics):
 New:
 
 - `nativeLoadGraph(handle, netJsonPath): jlong graphHandle` — parse `_net.json`, create input/output tensor names + shapes
-- `nativeGetOutputDirectBuffer(handle, graphHandle, outputName): jobject` — returns a **direct ByteBuffer over the ION buffer** (zero-copy into ORT: `OrtSession` created with an external buffer backed by the same pointer → no memcpy, ADR-007 D4)
+- `nativeGetOutputDirectBuffer(handle, graphHandle, outputName): jobject` — returns a **direct ByteBuffer over the ION buffer** (zero-copy into ORT: `OrtSession` created with an external buffer backed by the same pointer → no memcpy, ADR-015)
 - `nativeSyncCache(handle, graphHandle, outputIonFd): void` — **invalidate CPU cache on the ION/dma-buf output before any CPU/ORT read**; uses `DMA_BUF_IOCTL_SYNC`/`DMA_BUF_SYNC_READ` on the buffer fd (with a `QnnMemCacheInvalidate` fallback if the QAIRT 2.31 API exposes a token-based invalidation). Must be invoked after `QnnGraph_execute` and before the buffer is wrapped for ORT / returned to Kotlin.
 - *(no separate version function — version-lock lives in `nativeInit` via `QnnBackend_getApiVersion`, asserting HTP v73 / QAIRT 2.31)*
 - `ortDecoderCreate(modelPath, spmPath, kvCacheBytes, maxTokens): jlong`
@@ -151,8 +151,8 @@ Replaces the stub `nativeExecute` with, per inference:
 
 - **Threads:** one dedicated audio thread (AudioRecord callback/loop) → utterance handoff into a `Channels.UNLIMITED`-backed coroutine chain on `Dispatchers.Default`; TTS/audio playback on a dedicated `AudioTrack` thread; QNN/ORT native calls run on a **dedicated `Dispatchers.IO` with limited parallelism** (not `Dispatchers.Default` — see ADR-012 Open Question #7: coroutines block-waiting on native pool share the same `Default` workers; running native calls on `Default` would starve the coroutine chain). Tune `kotlinx.coroutines.io.parallelism` **independently of the ASR 3+3 budget** - the 3+3 figure is per-recognizer `numThreads` for the CPU ASR stage only; the IO dispatcher carries QNN/ORT native calls, which must be capped separately so the SD8G2 keeps its planned 2-core headroom (see ADR-012, not this §).
 - **Formats:** mic 16 kHz mono `FloatArray`; ASR consumes 16k floats; TTS emits 44.1 kHz PCM → downmix/resample in `AudioSink` (sherpa TTS models output 44.1k; AudioTrack 44.1k).
-- **KV cache:** allocated once at service `onCreate` (~70 MB / 256 tokens, ADR-007 D3), passed by pointer to `ortDecoderDecode`; never freed until service teardown (D2 residency).
-- **Timing budget:** E2E turnaround (EOS→SA) < 2.0 s hard gate (Phase 4); per-stage latencies recorded by `SpeechPipeline` into `run_results_android.json` (`latency_ns`), WER/BLEU scored off-device per ADR-004.
+- **KV cache:** allocated once at service `onCreate` (~70 MB / 256 tokens, ADR-014), passed by pointer to `ortDecoderDecode`; never freed until service teardown (ADR-013 residency).
+- **Timing budget:** E2E turnaround (EOS→SA) < 2.0 s hard gate (Phase 4); per-stage latencies recorded by `SpeechPipeline` into `run_results_android.json` (`latency_ns`), WER/BLEU scored off-device per the benchmark plan.
 
 ## 6.1 Config consumption — how `.kavi.yaml` values reach code
 
@@ -219,7 +219,7 @@ ADR-011 rule: every on-device asset ships with a `SHA256SUMS` entry in `kavi-and
 
 - **Encoder:** QNN unavailable/fails → ORT CPU session per encoder (automatic, logged, counted for Phase-4 per-stage decision rule).
 - **TTS:** Supertonic fails → Piper VITS fallback (MIT-era pinned snapshot, per ADR-009).
-- **Denoiser:** toggle off per utterance (D7); if GTCRN load fails, pass-through clean audio.
+- **Denoiser:** toggle off per utterance (ADR-018); if GTCRN load fails, pass-through clean audio.
 - **Language:** confidence < 0.6 → PTT manual direction (UNAMBIGUOUS=false).
 - **Service:** all model loads in `onCreate`; any failure → `PendingIntent`-styled notification "model load failed", service stays alive for retry; no crash (top-level try/catch + `Result`-typed engines).
 - **Native errors:** all JNI funcs return status codes; Kotlin maps to `sealed class` (`QnnError`/`OrtError`/`SpError`/`CacheSyncError`) carrying `getLastError()` message for `Logcat` + benchmark capture.
@@ -239,7 +239,7 @@ ADR-011 rule: every on-device asset ships with a `SHA256SUMS` entry in `kavi-and
 
 | Build | Outcome | Depends on / effort |
 | --- | --- | --- |
-| **A. Build plumbing** | Vendor sherpa-onnx 1.13.4 jniLibs + kotlin-api AAR; trim QAIRT jniLibs 39→8 (ADR-007 D8 set incl. `libQnnGpu.so`); multi-target CMake (C++20); `ModelRegistry` + `fetch-models.sh` + `SHA256SUMS` (ADR-011); **A1. ORT op-coverage probe** — run `verifyORTGraph()` against staged MT decoder (and ASR/TTS) ONNX under sherpa's bundled ORT on the host or emulator; record which ops (Gather/Attention/LayerNorm/Softmax) resolve. **Decision point:** single-ORT if all ops resolve, else vendor full ORT for the MT decoder. | ~4–6 h |
+| **A. Build plumbing** | Vendor sherpa-onnx 1.13.4 jniLibs + kotlin-api AAR; trim QAIRT jniLibs 39→8 (ADR-019 set incl. `libQnnGpu.so`); multi-target CMake (C++20); `ModelRegistry` + `fetch-models.sh` + `SHA256SUMS` (ADR-011); **A1. ORT op-coverage probe** — run `verifyORTGraph()` against staged MT decoder (and ASR/TTS) ONNX under sherpa's bundled ORT on the host or emulator; record which ops (Gather/Attention/LayerNorm/Softmax) resolve. **Decision point:** single-ORT if all ops resolve, else vendor full ORT for the MT decoder. | ~4–6 h |
 | **B. ASR + language** | `DualZipformerRecognizer`, `LanguageSelector`, unit tests; instrumented smoke (2 Zipformers on device) | A; ~6 h (+device time) |
 | **C. Service + audio + pipeline (CPU-first)** | `TranslationService`, `Recorder`/`Vad`, `AudioSink`, `SupertonicTts`, `MtDecoder` (ORT greedy), `SpeechPipeline` walkie-talkie loop — **encoder CPU fallback** first, QNN later; `MainActivity` UI | B; ~10–12 h |
 | **D. QNN encoder real exec** | `qnn_loader_jni` rewrite (graphs/tensors/ION), `QnnTensorFactory`, direct-Buffer zero-copy path, `nativeSyncCache` cache-invalidation, version-lock assert | C; **blocked until HTP v73 ctx binary generated** (SDK is installed at `~/Qualcomm/AIStack/QAIRT/2.31.0.250130/`); C++ can be written + unit-tested ahead w/ mock backend ~8 h |

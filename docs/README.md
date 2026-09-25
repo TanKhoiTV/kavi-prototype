@@ -18,9 +18,10 @@ parent repo `aivoice-2026/docs/` (the prototype copy is deprecated — see
 
 ## Hot reference — source of truth
 
-- `decisions/` — Architecture Decision Records (ADR-001 … ADR-011) +
-  `license-situation.md`. Immutable by convention; status changes are recorded
-  in the ADR header.
+- `decisions/` — Architecture Decision Records, one decision per record
+  (`ADR-001` … `ADR-031`). Start at `decisions/README.md` — the index with the
+  supersession graph and the open parameters. Immutable by convention; status
+  changes are recorded in the ADR header.
 
 ## Cold reference — superseded / deprecated
 

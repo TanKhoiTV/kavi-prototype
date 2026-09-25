@@ -2,7 +2,7 @@
 (ADR-009): v1 TTS is Supertonic Phase 1 via sherpa-onnx `OfflineTts`; Piper VITS
 is demoted to fallback. Retained for the record.
 
-ADR-005 Decision 3: Piper stays on CPU. QNN conversion is skipped because
+ADR-024: Piper stays on CPU. QNN conversion is skipped because
 Piper ONNX has a cyclic graph that QAIRT cannot handle, and the model is
 already fast on CPU (RTF 0.06–0.22 from baseline). TTS is not the pipeline
 bottleneck.
@@ -25,7 +25,7 @@ from ..schema import EvalItem
 
 
 class QnnPiperTTSCandidate(Candidate):
-    """Piper TTS candidate (CPU-only, per ADR-005 Decision 3).
+    """Piper TTS candidate (CPU-only, per ADR-024).
 
     Parameters
     ----------
