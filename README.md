@@ -5,16 +5,20 @@ Kavi is a fully **offline, on-device** speech-to-speech translation system for
 **OneVoice AI Challenge** (Saigon AI Hub × Qualcomm, May–Nov 2026) and targeting
 a Snapdragon 8 Gen 2 Android phone.
 
-This repository is the **private implementation** submodule of
-[`aivoice-2026`](https://github.com/TanKhoiTV/aivoice-2026) — the public parent
-that hosts documentation and CI. Code, model weights, and internal docs live
-here.
+This repository is the **implementation** submodule of
+[`aivoice-2026`](https://github.com/TanKhoiTV/aivoice-2026) — the umbrella repo
+that hosts the public-facing documentation and CI. Code and internal docs live
+here; the third-party model weights are fetched on demand with `make models`
+rather than committed (see [`NOTICE`](NOTICE)).
+
+> The Android application lives in a separate private repository and is not
+> publicly available.
 
 ## Repository layout
 
 | Path | Purpose |
 | ------ | --------- |
-| `models/` | MT weights kept at the repo root for immediate reuse (Opus-MT VI→EN). |
+| `models/` | CTranslate2 Opus-MT VI→EN weights + SentencePiece tokenizers (fetch with `make models`; not committed). |
 | `voices/` | Piper TTS voice models (e.g. `en_US-lessac-medium`). |
 | `bench/` | v0 benchmark harness: candidate adapters, scorer, eval-manifest schema, data prep. |
 | `docs/` | Internal documentation (onboarding, benchmarking plan, ADRs). |
@@ -37,6 +41,7 @@ ASR → MT → TTS candidate stack. It runs today on CPU-default, license-clean
 candidates:
 
 ```bash
+make models       # fetch pinned Opus-MT weights/tokenizers (one-time, needs network)
 make bench-data   # build the lean eval set -> eval_data/eval_manifest_v1.json
 make bench        # run the harness (offline smoke: Opus-MT vi->en + Piper EN TTS)
 make test         # run the pytest suite (manifest round-trip, scorer, FLEURS id-merge)
@@ -46,8 +51,8 @@ ASR items use real VI/EN speech from FLEURS parquets. Real-noise clips
 (MUSAN/RIRS_NOISES) can be swapped in via `build_lean_manifest(real_noise_dir=...)`.
 See `docs/reference/benchmarking-plan.md` and `docs/reference/benchmarking-todo.md`.
 
-> Public contest documentation (contest-info, registration checklist, Luma
-> answers, pitch deck) lives in the parent repo `aivoice-2026/docs/`.
+> Public contest documentation (contest info, specifications) lives in the
+> parent repo `aivoice-2026/docs/`.
 
 ## Standards & tooling
 
