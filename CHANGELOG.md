@@ -114,6 +114,8 @@
 - **deps:** Bump actions/checkout from 7.0.0 to 7.0.1 (#87)
 - **deps:** Bump astral-sh/setup-uv from 8.3.2 to 9.0.0 (#86)
 - Pin third-party assets and add fetch/verify tooling
+- **deps:** Bump orhun/git-cliff-action from 4.8.0 to 4.9.0([#104](https://github.com/TanKhoiTV/kavi-prototype/pull/104))
+- **deps:** Bump astral-sh/setup-uv from 9.0.0 to 10.2.0([#105](https://github.com/TanKhoiTV/kavi-prototype/pull/105))
 
 ### Ci
 
