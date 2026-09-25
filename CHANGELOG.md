@@ -127,5 +127,6 @@
 - Pin astral-sh/setup-uv to v8.3.2 (resolvable tag)
 - Pin GitHub Action tags to full commit SHAs
 - Stop recursing into the private kavi-android submodule
+- **changelog:** Serialise changelog runs and rebase before pushing([#108](https://github.com/TanKhoiTV/kavi-prototype/pull/108))
 [unreleased]: https://github.com/TanKhoiTV/kavi-prototype/compare/v0.1.0...HEAD
 
