@@ -59,8 +59,8 @@
 - Document public setup, pinned assets and Windows
 - **adr:** Split multi-decision ADRs into one decision per record
 - **adr:** Add the ADR index, withdraw ADR-004, move the comparison doc
-- **adr:** Repoint ADR cross-references after the split([#106](https://github.com/TanKhoiTV/kavi-prototype/pull/106))
-- Tag code-fence languages in repo markdown([#107](https://github.com/TanKhoiTV/kavi-prototype/pull/107))
+- **adr:** Repoint ADR cross-references after the split
+- Tag code-fence languages in repo markdown
 
 ### Features
 
@@ -118,8 +118,8 @@
 - **deps:** Bump actions/checkout from 7.0.0 to 7.0.1 (#87)
 - **deps:** Bump astral-sh/setup-uv from 8.3.2 to 9.0.0 (#86)
 - Pin third-party assets and add fetch/verify tooling
-- **deps:** Bump orhun/git-cliff-action from 4.8.0 to 4.9.0([#104](https://github.com/TanKhoiTV/kavi-prototype/pull/104))
-- **deps:** Bump astral-sh/setup-uv from 9.0.0 to 10.2.0([#105](https://github.com/TanKhoiTV/kavi-prototype/pull/105))
+- **deps:** Bump orhun/git-cliff-action from 4.8.0 to 4.9.0
+- **deps:** Bump astral-sh/setup-uv from 9.0.0 to 10.2.0
 
 ### Ci
 
@@ -131,6 +131,6 @@
 - Pin astral-sh/setup-uv to v8.3.2 (resolvable tag)
 - Pin GitHub Action tags to full commit SHAs
 - Stop recursing into the private kavi-android submodule
-- **changelog:** Serialise changelog runs and rebase before pushing([#108](https://github.com/TanKhoiTV/kavi-prototype/pull/108))
+- **changelog:** Serialise changelog runs and rebase before pushing
 [unreleased]: https://github.com/TanKhoiTV/kavi-prototype/compare/v0.1.0...HEAD
 
