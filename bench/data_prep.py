@@ -1,11 +1,11 @@
 """Phase 1 data prep: build the lean eval set + noise/SNR variants -> manifest.
 
 The eval set is built from locally-available FLEURS parquets when present
-(download them with `download_fleurs()` / `make bench-data --download-fleurs`
-once Hugging Face large-file downloads work in your environment). When they are
-not present, a runnable **offline fallback** set is emitted instead: an authored
-VI<->EN factory/logistics gold set scored as MT (vi->en) + TTS items, using
-synthetic noise for the SNR recipe.
+(fetch them once with `make data`, which pins the dataset revision and verifies
+digests against `assets.lock.toml`). When they are not present, a runnable
+**offline fallback** set is emitted instead: an authored VI<->EN
+factory/logistics gold set scored as MT (vi->en) + TTS items, using synthetic
+noise for the SNR recipe.
 
 Speech corpora (FLEURS `vi_vn`/`en_us`, CC BY 4.0) give:
   - VI ASR + EN ASR items (real speech, transcript references)
@@ -166,52 +166,6 @@ def mix_noise(clean_wav: str, noise_wav: str, snr_db: float, out_path: str) -> N
         noise = torchaudio.functional.resample(noise, nsr, sr)
     mixed = _mix(clean, noise, snr_db)
     sf.write(out_path, mixed.transpose(0, 1).numpy(), sr)
-
-
-def download_fleurs(
-    workdir: str,
-    max_retries: int = 20,
-    langs: tuple[str, ...] = ("vi_vn", "en_us"),
-) -> None:
-    """Fetch FLEURS parquets via curl (needs working HF access).
-
-    Uses `-C -` (resume) + `--retry-all-errors` so a dropped connection
-    continues from the downloaded offset instead of restarting -- required
-    because the proxy here drops large (~690 MB) parquet downloads.
-    """
-    import subprocess
-
-    wd = Path(workdir)
-    (wd / "raw").mkdir(parents=True, exist_ok=True)
-    base = "https://huggingface.co/datasets/google/fleurs/resolve/main/parquet-data"
-    for lang in langs:
-        url = f"{base}/{lang}/test-00000-of-00001.parquet"
-        out = wd / "raw" / f"fleurs_{lang}_test.parquet"
-        for attempt in range(1, max_retries + 1):
-            print(f"downloading {lang} (attempt {attempt}/{max_retries})...")
-            rc = subprocess.run(
-                [
-                    "curl",
-                    "-sSL",
-                    "--retry",
-                    "20",
-                    "--retry-delay",
-                    "2",
-                    "--retry-all-errors",
-                    "--max-time",
-                    "600",
-                    "-C",
-                    "-",
-                    "-o",
-                    str(out),
-                    url,
-                ],
-                check=False,
-            ).returncode
-            if rc == 0 and out.exists() and out.stat().st_size > 1_000_000:
-                print(f"  ok: {out} ({out.stat().st_size} bytes)")
-                break
-            print(f"  incomplete (rc={rc}); resuming")
 
 
 def _load_fleurs(path: str, n: int, sample_rate: int, seed: int = 42):
@@ -452,16 +406,6 @@ def main() -> None:
     ap.add_argument("--workdir", default="eval_data")
     ap.add_argument("--n-per-lang", type=int, default=30)
     ap.add_argument(
-        "--download-fleurs",
-        action="store_true",
-        help="curl FLEURS parquets first (needs working HF access)",
-    )
-    ap.add_argument(
-        "--lang",
-        action="append",
-        help="limit FLEURS download to these langs (repeatable)",
-    )
-    ap.add_argument(
         "--no-fleurs",
         action="store_true",
         help="skip FLEURS even if present (offline fallback only)",
@@ -471,9 +415,6 @@ def main() -> None:
         help="dir with {steady,impulsive}/*.wav real noise clips (else synthetic)",
     )
     args = ap.parse_args()
-    if args.download_fleurs:
-        langs = tuple(args.lang) if args.lang else ("vi_vn", "en_us")
-        download_fleurs(args.workdir, langs=langs)
     build_lean_manifest(
         args.out,
         workdir=args.workdir,

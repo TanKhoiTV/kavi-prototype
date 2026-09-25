@@ -1,0 +1,41 @@
+# Pinned third-party assets and their SHA-256 digests.
+#
+# These artifacts are deliberately NOT committed (see NOTICE). Fetch them with:
+#   make models    # Opus-MT vi->en weights + tokenizers  -> models/
+#   make data      # FLEURS vi_vn/en_us test parquets      -> eval_data/raw/
+#
+# Verify whatever is on disk with:
+#   make verify-assets
+#
+# To bump an artifact: change `revision`, re-run the fetch, then update the
+# digest values reported by `make verify-assets`.
+
+[models.opus_mt_vi_en]
+repo = "Helsinki-NLP/opus-mt-vi-en"
+revision = "c8d2853e77f5fae31124d993e0b35176b1c8914e"
+# Upstream PyTorch checkpoint (downloaded to <out>/opus-mt-vi-en-src/).
+source_path = "opus-mt-vi-en-src/pytorch_model.bin"
+source_sha256 = "b824e712e1668a5387d897cdd55f58ef45431bd61b14298d0426650cda4de58d"
+source_size = 288977385
+# CTranslate2 int8 conversion (written to <out>/opus-mt-vi-en-ct2/).
+ct2_path = "opus-mt-vi-en-ct2/model.bin"
+ct2_sha256 = "5e2c12db02a70df47266bda2bec237a05cbbadc02e636d59603647d05b5ec379"
+ct2_size = 73711395
+
+[data.fleurs]
+dataset = "google/fleurs"
+revision = "70bb2e84b976b7e960aa89f1c648e09c59f894dd"
+base_url = "https://huggingface.co/datasets/google/fleurs/resolve/{revision}"
+
+# Test split only (the manifest pairs VI/EN utterances by FLEURS sentence id).
+[data.fleurs.parquets.vi_vn]
+path = "parquet-data/vi_vn/test-00000-of-00001.parquet"
+local_name = "fleurs_vi_vn_test.parquet"
+sha256 = "65325be18bef84bb97b5bad1145958ae752919bb0b6696e7cfa8409ef5c46c77"
+size = 691128728
+
+[data.fleurs.parquets.en_us]
+path = "parquet-data/en_us/test-00000-of-00001.parquet"
+local_name = "fleurs_en_us_test.parquet"
+sha256 = "6428a4d04d3aac29e16b45e039bb1470a8bd7aa334cf92f7984c9c520d1f234d"
+size = 401722686
