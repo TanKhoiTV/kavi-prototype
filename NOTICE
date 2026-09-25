@@ -45,10 +45,12 @@ Fetching
 The artifacts above are intentionally not committed to this repository.
 
   - Opus-MT weights + SentencePiece tokenizers ....... make models
-  - FLEURS-derived eval manifest ..................... make bench-data
+  - FLEURS test parquets (vi_vn, en_us) .............. make data
+  - Eval manifest built from those parquets .......... make bench-data
 
-The FLEURS validation fixture is not redistributed; regenerate it from the
-FLEURS parquet files downloaded by `make bench-data`.
+All fetches are pinned to the revisions and SHA-256 digests recorded in
+`assets.lock.toml`. The FLEURS validation fixture under `tests/fixtures/` is not
+redistributed and is not currently used by the test suite.
 
 If you redistribute any fetched artifact, you must carry the license terms and
 attribution recorded above.

@@ -9,7 +9,7 @@
 
 You probably arrived at the **public parent repo** (`aivoice-2026`). That repo
 only holds the *story and public docs*; the **real code and internal docs live
-in the private submodule** (`kavi-prototype`, under `prototype/`). Read in this
+in the submodule** (`kavi-prototype`, under `prototype/`). Read in this
 order — each step builds the mental model you need for the next.
 
 ```
@@ -18,7 +18,7 @@ aivoice-2026/                 (PUBLIC parent — what we tell the world)
 └─ docs/
    ├─ contest-info.md         ②  the contest + how we're graded
    └─ specifications.md       ③  our concrete targets + glossary
-kavi-prototype/               (PRIVATE submodule — the real repo)
+kavi-prototype/               (submodule — the real repo; also public)
 ├─ README.md                  ④  pipeline + layout + how to run
 ├─ CONTRIBUTING.md            ⑤  cloning + tooling
 └─ docs/
@@ -37,7 +37,7 @@ kavi-prototype/               (PRIVATE submodule — the real repo)
 
 **What to conclude from each:**
 
-1. **Parent `README.md`** → the public landing page; the code is in the private
+1. **Parent `README.md`** → the public landing page; the code is in the
    `prototype/` submodule; public docs are just the contest brief + our spec.
 2. **`docs/reference/contest-info.md`** → Kavi is an entry to the **OneVoice AI Challenge**
    (Saigon AI Hub × Qualcomm, May–Nov 2026); an offline VI↔EN speech-to-speech
@@ -47,8 +47,9 @@ kavi-prototype/               (PRIVATE submodule — the real repo)
    acronym glossary. This is the scoreboard "good" is measured against.
 4. **Submodule `README.md`** → the pipeline is **ASR → MT → TTS**, fully offline,
    VI↔EN; repo layout + how to run.
-5. **Submodule `CONTRIBUTING.md`** (Cloning) → clone with `--recurse-submodules`;
-   a plain parent clone skips the private submodule. Tooling: ruff + commitlint +
+5. **Submodule `CONTRIBUTING.md`** (Cloning, Setup) → clone with
+   `--recurse-submodules`; a plain parent clone skips the submodule. Then
+   `make setup` for deps + pinned models/data. Tooling: ruff + commitlint +
    pre-commit.
 6. **`docs/onboarding.md`** (this file) → plain-language walkthrough of the three
    architecture decisions, so the ADRs below make sense without prior context.
@@ -231,18 +232,20 @@ and hard gates pass (see `.pi/PLAN.md` §8).
 
 ## How to get running & next steps
 
-1. **Clone** (see `CONTRIBUTING.md` → Cloning — it's a private submodule):
+1. **Clone** (see `CONTRIBUTING.md` → Cloning):
 
    ```bash
    git clone --recurse-submodules git@github.com:TanKhoiTV/aivoice-2026.git
    cd aivoice-2026/prototype && git checkout main
    ```
 
-2. **Install & check:**
+2. **Bootstrap & check** (`make setup` fetches the pinned model weights and
+   FLEURS data; `make setup-min` is the offline path):
 
    ```bash
-   uv sync
+   make setup
    make check
+   make test
    ```
 
 3. **Read in order** — see **Start here** (top of this guide): parent
@@ -251,6 +254,7 @@ and hard gates pass (see `.pi/PLAN.md` §8).
 4. **The v0 harness is built** (`bench/`) — build the eval set and run it:
 
    ```bash
+   make models       # pinned Opus-MT weights (already fetched by `make setup`)
    make bench-data   # -> eval_data/eval_manifest_v1.json
    make bench        # run the harness (offline smoke: Opus-MT vi->en + Piper EN TTS)
    make test         # run the pytest suite

@@ -195,7 +195,8 @@ RIRS_NOISES = public-safe.
 - [x] Download lean eval set: `build_lean_manifest` emits an **offline fallback**
       (authored VI↔EN factory/logistics gold set as MT + TTS) and uses FLEURS
       parquets **when present** (real VI/EN ASR + VI→EN MT via shared IDs). Actual
-      FLEURS parquets are available via `download_fleurs` (PR #28, with resume support).
+      FLEURS parquets are fetched by `make data` (`scripts/fetch_data.py`:
+      pinned revision + digest verification, with resume support).
 - [x] Noise bank: synthetic steady/impulsive noise via `torchaudio.add_noise`
       (default); **real-noise hook added** — `_load_real_noise` + `real_noise_dir`
       swaps in MUSAN/RIRS_NOISES clips (PR #36). Assets not yet fetched.

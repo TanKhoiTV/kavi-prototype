@@ -19,6 +19,8 @@ rather than committed (see [`NOTICE`](NOTICE)).
 | Path | Purpose |
 | ------ | --------- |
 | `models/` | CTranslate2 Opus-MT VI→EN weights + SentencePiece tokenizers (fetch with `make models`; not committed). |
+| `scripts/` | Asset fetchers/verifiers (`make models` / `make data` / `make verify-assets`) + QAIRT env helpers. |
+| `assets.lock.toml` | Pinned third-party asset revisions + SHA-256 digests. |
 | `voices/` | Piper TTS voice models (e.g. `en_US-lessac-medium`). |
 | `bench/` | v0 benchmark harness: candidate adapters, scorer, eval-manifest schema, data prep. |
 | `docs/` | Internal documentation (onboarding, benchmarking plan, ADRs). |
@@ -30,9 +32,15 @@ rather than committed (see [`NOTICE`](NOTICE)).
 ## Quickstart
 
 ```bash
-uv sync            # install dependencies
-uv run ruff check .   # lint
+make setup         # deps + pinned model weights + FLEURS data + eval manifest
+make check         # lint + format check
+make test          # pytest
 ```
+
+`make setup` needs network access and ~1.5 GB of downloads; `make setup-min` is
+the offline path (fallback eval set). See [`CONTRIBUTING.md`](CONTRIBUTING.md)
+for prerequisites, the Windows notes, and the individual `make models` /
+`make data` / `make verify-assets` steps.
 
 ## Benchmark harness (v0)
 
@@ -41,10 +49,11 @@ ASR → MT → TTS candidate stack. It runs today on CPU-default, license-clean
 candidates:
 
 ```bash
-make models       # fetch pinned Opus-MT weights/tokenizers (one-time, needs network)
+make models       # fetch pinned Opus-MT weights/tokenizers (~289 MB, one-time)
+make data         # fetch pinned FLEURS vi_vn/en_us test parquets (~1.1 GB, resumable)
 make bench-data   # build the lean eval set -> eval_data/eval_manifest_v1.json
 make bench        # run the harness (offline smoke: Opus-MT vi->en + Piper EN TTS)
-make test         # run the pytest suite (manifest round-trip, scorer, FLEURS id-merge)
+make verify-assets  # check downloaded digests against assets.lock.toml
 ```
 
 ASR items use real VI/EN speech from FLEURS parquets. Real-noise clips
