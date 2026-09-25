@@ -1,0 +1,32 @@
+# yamllint configuration for this repository.
+#
+# The stock yamllint defaults assume hand-written YAML documents. This repo's
+# YAML is machine-oriented — GitHub Actions workflows and `.kavi.yaml`, a pinned
+# configuration file whose values carry trailing provenance comments. Those
+# comments are load-bearing: `.github/dependabot.yml` requires the version
+# comment to stay next to each pinned SHA, which makes some lines long by
+# design. The rules below align the linter with the repository's actual
+# conventions instead of the defaults.
+extends: default
+
+rules:
+  # Long lines are intentional, so this must not block. The repository's only
+  # line-length convention is ruff's 88 (Python-only, pyproject.toml); the same
+  # number is kept here as a non-blocking advisory so drift is still visible.
+  # Strictly enforcing it would flag 19 existing, deliberate lines — including
+  # every pinned action SHA carrying its required version comment.
+  line-length:
+    max: 88
+    level: warning
+
+  # House style is a single space before a trailing comment.
+  comments:
+    min-spaces-from-content: 1
+
+  # Workflows and config files do not use a document start marker.
+  document-start: disable
+
+  # GitHub Actions uses `on:` as a key, which is not the YAML 1.1 boolean the
+  # truthy rule is written to catch.
+  truthy:
+    check-keys: false
