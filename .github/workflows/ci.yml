@@ -16,10 +16,12 @@ jobs:
         with:
           node-version: "lts/*"
       - name: Install uv
-        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9
       - name: Set up Python
         run: uv python install
       - name: Install dependencies
         run: uv sync
       - name: make check (ruff lint + format)
         run: make check
+      - name: make test (pytest)
+        run: make test
