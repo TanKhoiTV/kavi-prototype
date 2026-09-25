@@ -36,9 +36,9 @@
 **Key concepts**
 
 - `OrtEnvironment` (singleton) vs `OrtSession` (per-model). Sessions hold the compiled graph and weights.
-- `OnnxTensor` — the currency of inference. How to wrap a Java `FloatBuffer` into a tensor, run the session, and read outputs. The zero-copy ION handoff (ADR-007 Decision 4) is an optimisation on top of this same I/O pattern.
+- `OnnxTensor` — the currency of inference. How to wrap a Java `FloatBuffer` into a tensor, run the session, and read outputs. The zero-copy ION handoff (ADR-015) is an optimisation on top of this same I/O pattern.
 - Session options: optimisation level (`ORT_ENABLE_ALL`), CPU arena (`CpuArenaAllocator`), memory pattern (`MemoryPatternOptimization`). Each is a latency-vs-RAM trade-off you may need to tune per-model (as RTranslator did per-device).
-- Running multiple sessions concurrently vs sequentially — the pipeline design in ADR-007 chains them sequentially, but the KV cache pre-allocation (Decision 3) means the same tensors are reused across decode iterations within one utterance.
+- Running multiple sessions concurrently vs sequentially — the pipeline design in ADR-007 chains them sequentially, but the KV cache pre-allocation (ADR-014) means the same tensors are reused across decode iterations within one utterance.
 
 **Resources**
 
@@ -58,7 +58,7 @@
 
 - **Mel spectrogram:** The encoder doesn't process raw audio. It takes a 2D time-frequency image (80 mel bands × 3000 time frames for a 30-second window). Understand the pipeline: raw PCM → windowed FFT → mel-filterbank → log-magnitude → normalise. Kavi's `Recorder` captures raw PCM; the mel conversion happens inside the Whisper encoder (now on NPU, so opaque to the CPU side).
 - **Encoder/decoder split:** The encoder runs once per utterance and produces a cross-attention representation. The decoder then iterates token-by-token, attending to those encoder outputs plus its own previously generated tokens (via KV cache). In Kavi, the encoder is on NPU; the decoder stays on CPU because its autoregressive loop doesn't map well to QNN (ADR-005).
-- **Autoregressive decoding and KV cache:** At each step the decoder predicts the next token. The KV cache stores the key-value pairs from previous steps so they don't need to be recomputed. ADR-007 Decision 3 pre-allocates the maximum KV cache size at startup so the decode loop allocates zero additional memory.
+- **Autoregressive decoding and KV cache:** At each step the decoder predicts the next token. The KV cache stores the key-value pairs from previous steps so they don't need to be recomputed. ADR-014 pre-allocates the maximum KV cache size at startup so the decode loop allocates zero additional memory.
 - **Byte-level BPE tokenizer:** Whisper doesn't use SentencePiece. It uses byte-level BPE (like GPT-2) with **51,865 tokens** in the multilingual vocabulary (50,257 base BPE + ~1,608 special/language/task/timestamp tokens). This is relevant if you ever need to implement or debug the detokenizer on the CPU side.
 
 **Resources**
@@ -98,15 +98,15 @@
 **Key concepts**
 
 - **QNN vs ONNX Runtime:** QNN is Qualcomm's inference SDK for Hexagon NPU. It takes an ONNX file and compiles it to a **context binary** (`.bin`) that runs on the HTP (Hexagon Tensor Processor). The CPU side never sees the model graph — only the compiled binary.
-- **Context binary:** A self-contained bundle of compiled compute graphs for the NPU. Kavi ships two of these in `assets/` (not in `jniLibs/` — see Decision 8's file roster): `whisper_encoder_v73.bin` (~80 MB) and `opusmt_encoder_v73.bin` (~80 MB). They are loaded via `QnnModelLoader`, not via ONNX Runtime. The `.so` runtime libraries (libQnnHtp.so, etc.) live in `jniLibs/arm64-v8a/`.
-- **ION shared memory:** The zero-copy handoff (Decision 4). The NPU writes encoder output directly to an ION buffer (a Linux DMA-buf). The CPU reads from the same physical memory — no memcpy. A cache-coherency fence (~1–3 ms for a ~5 MB transfer) synchronises the two sides.
-- **QAIRT SDK version lock:** Kavi pins `qnn-2.31.0.250130` (Decision 8). The context binaries are compiled with a specific QAIRT version and will not load with a different runtime library. This is why the `jniLibs` roster is precise and versioned.
+- **Context binary:** A self-contained bundle of compiled compute graphs for the NPU. Kavi ships two of these in `assets/` (not in `jniLibs/` — see ADR-019's file roster): `whisper_encoder_v73.bin` (~80 MB) and `opusmt_encoder_v73.bin` (~80 MB). They are loaded via `QnnModelLoader`, not via ONNX Runtime. The `.so` runtime libraries (libQnnHtp.so, etc.) live in `jniLibs/arm64-v8a/`.
+- **ION shared memory:** The zero-copy handoff (ADR-015). The NPU writes encoder output directly to an ION buffer (a Linux DMA-buf). The CPU reads from the same physical memory — no memcpy. A cache-coherency fence (~1–3 ms for a ~5 MB transfer) synchronises the two sides.
+- **QAIRT SDK version lock:** Kavi pins `qnn-2.31.0.250130` (ADR-019). The context binaries are compiled with a specific QAIRT version and will not load with a different runtime library. This is why the `jniLibs` roster is precise and versioned.
 
 **Resources**
 
 - [Qualcomm AI Hub Documentation](https://aihub.qualcomm.com/docs/) — start with the "Deploy on Device" section to understand the workflow. You don't need to run it; just understand the QNN→ONNX→context-binary pipeline.
 - [Snapdragon Neural Processing Engine SDK Overview](https://developer.qualcomm.com/sites/default/files/docs/snpe/overview.html) — the predecessor to QAIRT. The concepts (DLC files instead of context binaries, ION buffers, HTP loading) are the same.
-- **In our codebase:** `docs/decisions/ADR-005-qnn-conversion-workarounds.md` for the concrete conversion-failure story; `models/qnn/` for the actual context binaries.
+- **In our codebase:** `docs/decisions/ADR-005-qnn-isnan-workaround.md` for the concrete conversion-failure story; `models/qnn/` for the actual context binaries.
 
 **You're done when:** You can draw the data flow from PCM audio → NPU encoder context binary → ION buffer → CPU decoder session, and explain why the QAIRT version matters for the `jniLibs` roster.
 
@@ -114,14 +114,14 @@
 
 ## 6. Voice Activity Detection & Audio Fundamentals
 
-**Why this matters:** The pipeline starts and ends with audio. VAD determines utterance boundaries — get it wrong and the system either cuts off speech or never stops listening. The energy-based VAD in ADR-007 Decision 11 is deliberately simple for v1, so expect to work on this.
+**Why this matters:** The pipeline starts and ends with audio. VAD determines utterance boundaries — get it wrong and the system either cuts off speech or never stops listening. The energy-based VAD in ADR-022 is deliberately simple for v1, so expect to work on this.
 
 **Key concepts**
 
-- **PCM audio on Android:** `AudioRecord` captures raw PCM float samples at 16 kHz mono. Understand sample rate (16,000 Hz = 16,000 floats per second), bit depth (32-bit float), and how a circular buffer stores the last ~30 seconds of audio (ADR-007 Decision 5, memory budget table: ~5 MB buffer).
+- **PCM audio on Android:** `AudioRecord` captures raw PCM float samples at 16 kHz mono. Understand sample rate (16,000 Hz = 16,000 floats per second), bit depth (32-bit float), and how a circular buffer stores the last ~30 seconds of audio (ADR-016, memory budget table: ~5 MB buffer).
 - **Energy-based VAD:** Compute RMS of a short window (e.g. 30 ms). If RMS > threshold, "speech." If RMS < threshold for N consecutive windows, "silence." RTranslator uses N=15 with a configurable threshold of 2000 in PCM16 units (≈ 0.061 in PCM float — see the comparison doc §3.8 fn. 5 for the unit-conversion trap). Kavi's v1 is the same pattern, simpler (single threshold, no margin).
 - **Pipeline ordering (important):** The pipeline is VAD → denoising → ASR. The VAD first detects speech onset (using the raw audio's energy), then the denoiser (GTCRN) cleans the captured audio, then ASR runs on the denoised signal. VAD does **not** run on denoised audio — the energy threshold operates on raw mic input, and denoising is a separate stage that prepares audio for the ASR model.
-- **Amplitude vs SNR:** Energy VAD fails when background noise has as much energy as speech. This is why Kavi adds a denoising stage after VAD and reserves a model-based VAD slot (Silero, Decision 11) for a later phase — a neural VAD can distinguish speech from noise by acoustic features rather than raw energy.
+- **Amplitude vs SNR:** Energy VAD fails when background noise has as much energy as speech. This is why Kavi adds a denoising stage after VAD and reserves a model-based VAD slot (Silero, ADR-022) for a later phase — a neural VAD can distinguish speech from noise by acoustic features rather than raw energy.
 - **Pre-voice buffer:** VAD can't detect speech until the speaker has started. A circular buffer with a pre-roll (RTranslator uses 1300 ms default) captures the utterance onset. Kavi's `Recorder` already implements this.
 
 **Resources**
@@ -136,7 +136,7 @@
 
 ## 7. BLE Peer-to-Peer Communication
 
-**Why this matters:** PeerToPeer mode (ADR-007 Decision 1) enables two phones to exchange translations over BLE. This is the second most complex subsystem after the inference pipeline.
+**Why this matters:** PeerToPeer mode (ADR-007) enables two phones to exchange translations over BLE. This is the second most complex subsystem after the inference pipeline.
 
 **Key concepts**
 
@@ -159,9 +159,9 @@
 
 Once you've covered the sections above (even just skimming the last few), read the following in order:
 
-1. **ADR-007** (`docs/decisions/ADR-007-production-inference-architecture.md`) — all 11 decisions. You now have the vocabulary for every term in the document.
-2. **ADR-007 vs RTranslator comparison** (`docs/decisions/ADR-007-vs-RTranslator-comparison.md`) — the dimension-by-dimension comparison reinforces each concept and shows where Kavi's design differs from a real shipping product.
-3. **ADR-005** (`docs/decisions/ADR-005-qnn-conversion-workarounds.md`) — the concrete story of why the decoder stayed on CPU and how that shapes the NPU/CPU boundary.
+1. **ADR-007** (`docs/decisions/ADR-007-translation-service.md`) — all 11 decisions. You now have the vocabulary for every term in the document.
+2. **ADR-007 vs RTranslator comparison** (`docs/reference/rtranslator-comparison.md`) — the dimension-by-dimension comparison reinforces each concept and shows where Kavi's design differs from a real shipping product.
+3. **ADR-005** (`docs/decisions/ADR-005-qnn-isnan-workaround.md`) — the concrete story of why the decoder stayed on CPU and how that shapes the NPU/CPU boundary.
 4. **The code itself:** Start with `TranslationService.kt`, trace one utterance end-to-end, then drill into the component you're assigned to.
 
 **You're ready to contribute when:** You can look at any table row or code comment in the Kavi codebase and identify which ADR decision it implements, which model it touches, and whether the compute goes through ONNX Runtime or QNN.

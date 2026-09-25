@@ -21,16 +21,16 @@ speech-to-speech translator meeting the 2.0 s turnaround budget on a Snapdragon 
 
 | ADR decision | Required | Current `android/` | Gap |
 | --- | --- | --- | --- |
-| D1: Two-mode `TranslationService` foreground service | Full pipeline service | None (bare `MainActivity`) | **Build from scratch** |
-| D2: Persistent model residency | Load all models in `onCreate`, never release | — | **Build** |
-| D3 (modified): MT KV-cache pre-allocation (256 tok) | Opus-MT decoder | — | **Build** |
-| D4: NPU→CPU zero-copy via ION | Real QNN graph execution | `qnn_loader_jni.cpp` is a **stub** (`nativeExecute` copies input→output; no graph enumeration, hardcoded provider offsets) | **Complete JNI** |
-| D5 (revised): Memory budget ~1.16 GB | Model set sized | — | Verify on-device |
-| D7: Tiered denoising (ADSP → GTCRN) | Denoiser stage | Phase-6 gate adopted **Wiener**, not GTCRN — needs resolution (see Risk R1) | **Decision + port** |
-| D8: jniLibs roster + version lock | Minimal QNN roster | 39 `.so` incl. V68/V69/V75/V79, GPU/DSP/HTA/LPAI/GenAi extras | **Trim roster** |
-| D9: Structured concurrency (coroutines) | Suspend-stage pipeline | — | **Build** |
-| D10 / ADR-010: `ALL_OPT` + arena + mem-pattern | All ORT sessions | — | Verify sherpa-onnx; benchmark per-session |
-| D11: Energy VAD + speech timeout | `Recorder` | — | **Build** |
+| ADR-007: Two-mode `TranslationService` foreground service | Full pipeline service | None (bare `MainActivity`) | **Build from scratch** |
+| ADR-013: Persistent model residency | Load all models in `onCreate`, never release | — | **Build** |
+| ADR-014 (modified): MT KV-cache pre-allocation (256 tok) | Opus-MT decoder | — | **Build** |
+| ADR-015: NPU→CPU zero-copy via ION | Real QNN graph execution | `qnn_loader_jni.cpp` is a **stub** (`nativeExecute` copies input→output; no graph enumeration, hardcoded provider offsets) | **Complete JNI** |
+| ADR-016 (revised): Memory budget ~1.16 GB | Model set sized | — | Verify on-device |
+| ADR-018: Tiered denoising (ADSP → GTCRN) | Denoiser stage | Phase-6 gate adopted **Wiener**, not GTCRN — needs resolution (see Risk R1) | **Decision + port** |
+| ADR-019: jniLibs roster + version lock | Minimal QNN roster | 39 `.so` incl. V68/V69/V75/V79, GPU/DSP/HTA/LPAI/GenAi extras | **Trim roster** |
+| ADR-020: Structured concurrency (coroutines) | Suspend-stage pipeline | — | **Build** |
+| ADR-021 / ADR-010: `ALL_OPT` + arena + mem-pattern | All ORT sessions | — | Verify sherpa-onnx; benchmark per-session |
+| ADR-022: Energy VAD + speech timeout | `Recorder` | — | **Build** |
 | ADR-008: Dual Zipformer ASR | sherpa-onnx, 2× `OfflineRecognizer`, confidence-based lang-ID | No sherpa-onnx libs; `assets/` empty | **Vendor libs + models** |
 | ADR-009: Supertonic Phase-1 TTS | `OfflineTts` + `GenerationConfig` lang switch | — | **Vendor models + integrate** |
 | ADR-006: Instrumented benchmark runner | `androidTest/` batch runner | `ManifestReader`/`NetworkMonitor` exist; no test code | **Build** |
@@ -75,10 +75,10 @@ speech-to-speech translator meeting the 2.0 s turnaround budget on a Snapdragon 
      `app/src/main/java/com/k2fsa/...`.
    - No official Maven Central artifact exists — the AAR/jniLibs path is canonical
      (verified 2026-08-03).
-3. **Trim QNN roster to ADR-007 D8**
+3. **Trim QNN roster to ADR-019**
    - Keep: `libQnnHtp.so`, `libQnnHtpV73Stub.so`, `libQnnHtpV73CalculatorStub.so`,
      `libQnnHtpPrepare.so`, `libQnnSystem.so`, `libQnnCpu.so`, `libqnn_loader_jni.so`.
-   - ADR-007 D8 also lists `libQnnGpu.so` (future-proofing; v1 fallback chain is NPU→CPU only) — keep it to stay ADR-faithful.
+   - ADR-019 also lists `libQnnGpu.so` (future-proofing; v1 fallback chain is NPU→CPU only) — keep it to stay ADR-faithful.
    - Delete ~25 extras: V68/V69/V75/V79 stubs, GPU, DSP, HTA, LPAI, GenAi,
      TFLite delegate, profiling readers. Keeps HTP v73 firmware matched to the
      QAIRT 2.31 pin; shrinks APK.
@@ -117,20 +117,20 @@ speech-to-speech translator meeting the 2.0 s turnaround budget on a Snapdragon 
 
 ### Milestone 2 — TranslationService + pipeline
 
-1. **`service/TranslationService.kt`** (D1, D2)
+1. **`service/TranslationService.kt`** (ADR-007, ADR-013)
    - `startForegroundService`, type `microphone`, `PowerManager.WakeLock`.
    - Load **everything** in `onCreate`: 2 recognizers, Opus-MT encoder (QNN),
-     Opus-MT decoder (ORT), TTS, denoiser; pre-allocate MT KV cache (D3);
+     Opus-MT decoder (ORT), TTS, denoiser; pre-allocate MT KV cache (ADR-014);
      never release.
-2. **`audio/Recorder.kt`** (D11)
+2. **`audio/Recorder.kt`** (ADR-022)
    - `AudioRecord` 16 kHz mono PCM float, circular buffer, energy VAD +
      ~500 ms speech timeout.
 3. **`audio/AudioPlayer.kt`**
    - `AudioTrack` write (44.1 kHz from Supertonic; resample if A2DP requires).
-4. **Pipeline** (`service/SpeechPipeline.kt`, D9 + ADR-008 concurrency model)
+4. **Pipeline** (`service/SpeechPipeline.kt`, ADR-020 + ADR-008 concurrency model)
 
    ```kotlin
-   val cleaned = denoiser.apply(audio)                       // toggleable (D7)
+   val cleaned = denoiser.apply(audio)                       // toggleable (ADR-018)
    val (vi, en) = coroutineScope {
        async { viTranscribe(cleaned) } to async { enTranscribe(cleaned) }
    }
@@ -140,11 +140,11 @@ speech-to-speech translator meeting the 2.0 s turnaround budget on a Snapdragon 
    val audio = tts.synthesize(translated, lang)
    ```
 
-   - Per-encoder fallback (D9): QNN failure → ONNX CPU encoder; degrade, don't crash.
+   - Per-encoder fallback (ADR-020): QNN failure → ONNX CPU encoder; degrade, don't crash.
 5. **Denoiser stage**
    - Decide GTCRN (sherpa-onnx `OfflineDenoise` — fits the JNI pipeline) vs.
      porting the Phase-6 Wiener (Risk R1).
-   - Toggleable per-utterance (D7); pre-allocated buffers.
+   - Toggleable per-utterance (ADR-018); pre-allocated buffers.
 
 ### Milestone 3 — Real QNN NPU path (Opus-MT encoder)
 
@@ -154,18 +154,18 @@ speech-to-speech translator meeting the 2.0 s turnaround budget on a Snapdragon 
      `_net.json`); bind ION-backed input/output buffers (tensor `memHandle`);
      call `QnnGraph_execute`; read output via `QnnTensor_getData`.
    - Retire the hardcoded provider-offset hack (parse the provider struct).
-2. **ION zero-copy (D4)**
+2. **ION zero-copy (ADR-015)**
    - `QnnModelLoader` returns a direct `ByteBuffer` over ION memory; ORT
      `OrtValue` created from the same pointer for the decoder input — no memcpy.
 3. **Wire CPU fallback**
    - Opus-MT encoder ONNX (186 MB) via ORT on CPU when QNN init/execute throws
-     (D9 pattern).
-4. **Version-lock check (D8)**
+     (ADR-020 pattern).
+4. **Version-lock check (ADR-019)**
    - Verify the **HTP v73 context binary** (not the weight-tar) was produced
      with QAIRT 2.31.0.250130 for HTP v73 — mismatch = silent inference
      failure. Re-convert via `bench/qnn/convert_to_qnn.sh` if needed.
 
-### Milestone 4 — UI + modes (D1)
+### Milestone 4 — UI + modes (ADR-007)
 
 1. **Mode A — OneDevice (WalkieTalkie)**
    - PTT button or auto-VAD segmentation; single record/play; conversation UI
@@ -174,7 +174,7 @@ speech-to-speech translator meeting the 2.0 s turnaround budget on a Snapdragon 
    - BLE 5.2+ peripheral/central pairing (`BluetoothGatt` / `BluetoothLeAdvertiser`);
      send **translated text** to peer; peer synthesises locally.
 3. **Cold-start UX**
-   - Splash / progress bar for the 2–3 s load (D2 trade-off mitigation).
+   - Splash / progress bar for the 2–3 s load (ADR-013 trade-off mitigation).
 
 ### Milestone 5 — Instrumented benchmark runner (ADR-006)
 
@@ -208,7 +208,7 @@ speech-to-speech translator meeting the 2.0 s turnaround budget on a Snapdragon 
 
 | # | Risk | Detail | Mitigation / recommendation |
 | --- | --- | --- | --- |
-| R1 | **Denoiser conflict** | ADR-007 says GTCRN (sherpa-onnx `OfflineDenoise`); Phase-6 gate adopted Python Wiener (`prop_decrease=0.5`) | Quick on-device GTCRN-vs-Wiener WER check, then pick; keep the D7 toggle |
+| R1 | **Denoiser conflict** | ADR-007 says GTCRN (sherpa-onnx `OfflineDenoise`); Phase-6 gate adopted Python Wiener (`prop_decrease=0.5`) | Quick on-device GTCRN-vs-Wiener WER check, then pick; keep the ADR-018 toggle |
 | R2 | **Model size** | ~800 MB total ⇒ PAD/OBB required | Install-time PAD plus `adb push` → `filesDir` sideload path for contest |
 | R3 | **Opus-MT decoder is 322 MB fp32** | CPU decoder too large | int8-quantise for the CPU decoder before shipping (fits `ALL_OPT` + arena; ~4× smaller) |
 | R4 | **Native lib clash** | sherpa-onnx + our loader both in-process | Ensure no `libQnnHtp` symbol clash; keep QNN `dlopen` local (RTLD_LOCAL) |
@@ -226,16 +226,16 @@ M5 (bench runner + hard gates) ──→ M6 (packaging + release)
 ```
 
 M1 and M3 can proceed in parallel after M0. M5's hard gates must pass before
-ADR-004 closure (per `.pi/PLAN.md` §8 acceptance criteria).
+Tech-stack closure (per `.pi/PLAN.md` §8 acceptance criteria).
 
 ---
 
 ## 6. Related documents
 
-- ADR-007 — Production Inference Architecture & Service Layer (parent; D6 superseded)
-- ADR-008 — v1 Android ASR Decision: Dual Zipformer (revises D3/D5/D6)
+- ADR-007 — Production Inference Architecture & Service Layer (parent; ADR-017 superseded)
+- ADR-008 — v1 Android ASR Decision: Dual Zipformer (revises ADR-014/ADR-016/ADR-017)
 - ADR-009 — v1 Android TTS Decision (Supertonic Phase 1 → VieNeu-TTS Phase 2)
-- ADR-010 — `ALL_OPT` Decoder Optimisation (confirms D10)
+- ADR-010 — `ALL_OPT` Decoder Optimisation (confirms ADR-021)
 - ADR-006 — Android Runner Architecture (benchmark runner design)
 - `.pi/PLAN.md` — Phases 4–7 task breakdown (QNN conversion, RTranslator, COMET/MOS)
 - `docs/reference/phase-4-qnn-plan.md` — executable QNN conversion spec

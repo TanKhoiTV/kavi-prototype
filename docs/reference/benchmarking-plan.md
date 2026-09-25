@@ -2,7 +2,7 @@
 
 > **Status:** Draft (planning). This document captures *what we will measure and on
 > what data* — it deliberately does **not** pick the ASR / MT / TTS tech stack.
-> Those choices are deferred to **ADR-004 (architecture)**, which this plan gates.
+> Those choices are deferred to the **[open-parameters register](../decisions/README.md#open-parameters)**, which this plan feeds.
 >
 > **Sources:** synthesized from an external analysis pass (Claude) on datasets,
 > the RTranslator baseline, and harness design, cross-checked with Context7 for the
@@ -15,7 +15,7 @@
 
 We run experiments **before** settling the tech stack (per the agreed sequencing).
 This plan is the first deliverable: a **model-agnostic testing & benchmarking
-suite** plus a **dataset decision**. The numbers it produces are what ADR-004 will
+suite** plus a **dataset decision**. The numbers it produces are what the register will
 record as the architecture choice.
 
 The suite must be **pluggable**: we swap ASR / MT / TTS candidates in and out and
@@ -31,7 +31,7 @@ into harness code.
 | **ADR-003** Hexagon runtime (Proposed) | QAIRT/QNN primary, ORT-XNNPACK CPU fallback, w8a16, fixed shapes | Determination method = **CPU baseline first, then on-device benchmark** (§6, §8) |
 | `docs/specifications.md` | The six objective metrics + hard thresholds | §7 restates them as harness outputs |
 
-> **Out of scope here:** which models/frameworks we ship. That is ADR-004, fed by
+> **Out of scope here:** which models/frameworks we ship. That is the [open-parameters register](../decisions/README.md#open-parameters), fed by
 > the v0 results in §8.
 
 ---
@@ -170,13 +170,13 @@ mode you have.
 
 ## 4. Model candidate landscape (ASR, MT, TTS)
 
-> **Input to ADR-004, not a decision here.** Candidate-model comparisons for the ASR,
+> **Input to the [open-parameters register](../decisions/README.md#open-parameters), not a decision here.** Candidate-model comparisons for the ASR,
 > MT, and TTS stages. ASR (§4.1–4.3) is sourced from one external analysis pass; MT and
 > TTS (§4.4–4.5) were synthesized from the repo's archived docs (architecture.md,
 > ADR-001) + Context7 library docs (CTranslate2, Piper, Transformers), then
 > **reconciled with a second external MT/TTS analysis pass** (Claude). It refines the
 > v0 candidate set (§8) and the per-stage list (§9); the final picks stay with
-> ADR-004.
+> the register.
 
 Four VI/EN ASR candidates were compared on accuracy, latency (Snapdragon 8 Gen 2
 estimates), memory, licensing, and Qualcomm AI Hub availability.
@@ -514,7 +514,7 @@ slice is marginal, that's a cheap, legitimate signal to reconsider effort alloca
 ### Pre-ASR denoising — status & open gate
 
 > Sourced from a scouting pass over `archive/` (the old implementation). **Not a
-> decision here** — it is an open pipeline question that ADR-004 should record, and
+> decision here** — it is an open pipeline question the register should record, and
 > this harness (§6/§8) is the vehicle to close it.
 
 - **Current state:** `pipeline.py` has **Silero VAD but no denoising stage**.
@@ -537,7 +537,7 @@ slice is marginal, that's a cheap, legitimate signal to reconsider effort alloca
   (`noisereduce`, `prop_decrease=0.5`): weighted avg WER **49.82%** vs raw
   **51.23%**; RNNoise REJECTED (64.36%). Smoke test only (2 utts × 5
   conditions); adaptive threshold on clean/high-SNR input is an open tune.
-  Feeds ADR-007 D7's GTCRN-vs-Wiener choice (android plan Risk R1).
+  Feeds ADR-018's GTCRN-vs-Wiener choice (android plan Risk R1).
 - **DeepFilterNet dropped** (unresolved `torchaudio 2.x` PyPI bug; fix only on
   GitHub main). The old `architecture.md` "tonal-preservation" Anchor-2 rested on
   that now-dropped model + the flawed run → **treat as obsolete** unless
@@ -546,15 +546,15 @@ slice is marginal, that's a cheap, legitimate signal to reconsider effort alloca
   fixed-factors comparison in the §8 v0 lean slice (clean / +5 dB / 0 dB, both
   languages). Keep the mixing method consistent with §3.5 (`torchaudio.add_noise`),
   *not* the archived script's custom RMS mix, so the historical "noisy 20.23%"
-  ceiling stays comparable. Outcome feeds the ADR-004 gate directly.
+  ceiling stays comparable. Outcome feeds the register directly.
 
 ---
 
-## 9. Open questions / deferred decisions (→ ADR-004)
+## 9. Open questions / deferred decisions (→ [open-parameters register](../decisions/README.md#open-parameters))
 
 - **Final dataset set** — VSS (MIT), PhoST (research-only), and **InfoRe** licenses now resolved: VSS/PhoST as
   noted; **InfoRe confirmed AVOID** (no published terms, 401-gated) and `25hours_single` also **AVOID** (license
-  unknown, InfoRe-derived) — see `docs/decisions/license-situation.md` + PR #35.
+  unknown, InfoRe-derived) — see `docs/decisions/ADR-029-license-gate.md` + PR #35.
 - **VI→EN ST corpus** — adopt FLEURS ID-alignment, the bespoke gold set, or both?
 - **RTranslator snapshot** — which version/commit tested + dated in writeup; APK-eval
   task owner & timeline.
@@ -563,7 +563,7 @@ slice is marginal, that's a cheap, legitimate signal to reconsider effort alloca
   contingent on ADR-003 runtime availability (QAIRT Community Edition access).
 - **Pre-ASR denoising gate — gate decision made (Wiener ADOPTED); full lean-slice
   eval still pending** — see `denoising-gate-results.md`; the on-device
-  GTCRN-vs-Wiener pick (ADR-007 D7) remains → android plan R1.
+  GTCRN-vs-Wiener pick (ADR-018) remains → android plan R1.
 - **Architecture — decided in ADR-007/008/009/010** (Dual Zipformer ASR, Opus-MT
-  MT, Supertonic Phase-1 TTS, sherpa-onnx + ORT, coroutines pipeline). **ADR-004
+  MT, Supertonic Phase-1 TTS, sherpa-onnx + ORT, coroutines pipeline). **The register
   remains Draft** pending the Phase-4/5/7 gates.

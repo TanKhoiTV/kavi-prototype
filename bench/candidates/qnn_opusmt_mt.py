@@ -32,7 +32,7 @@ from ..schema import EvalItem
 class QnnOpusMTMTCandidate(Candidate):
     """QNN Opus-MT vi<->en candidate (encoder on HTP v73, decoder on CPU/CT2).
 
-    ADR-005 Decision 2: encoder on NPU, decoder on CPU.
+    ADR-023: encoder on NPU, decoder on CPU.
 
     Parameters
     ----------

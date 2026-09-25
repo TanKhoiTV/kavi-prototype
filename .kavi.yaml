@@ -86,7 +86,7 @@ asr:
     thread_priority: "THREAD_PRIORITY_URGENT_AUDIO"
     avoid_cpu_affinity_pin: true # risky on big.LITTLE — let scheduler balance
 
-# ── MT (Opus-MT, ADR-007 Decision 3) ────────────────────────────────────────
+# ── MT (Opus-MT, ADR-014) ────────────────────────────────────────
 
 mt:
   model: "Helsinki-NLP/opus-mt-vi-en"
@@ -98,7 +98,7 @@ mt:
     # Step-3 output (context binary): NOT YET PRODUCED — M3 deliverable (NDK-gated track)
   decoding:
     method: "greedy" # beam=1; beam=4 deferred to Phase 5 (ADR-007 §MT). Note: sherpa-onnx ASR uses "greedy_search" - field naming differs by provider API.
-    kv_cache_tokens: 256 # pre-allocated, never freed (D2 residency)
+    kv_cache_tokens: 256 # pre-allocated, never freed (ADR-013 residency)
     kv_cache_mb: 70
   qnn_encoder:
     context_binary: "opus_mt_vi_en_encoder_v73.bin"
@@ -135,10 +135,10 @@ onnxruntime:
   single_copy: true # reuse sherpa's bundled libonnxruntime.so
   note: "Kavi avoids RTranslator's NO_OPT limitation — no custom ONNX operators in pipeline."
 
-# ── QNN / jniLibs (ADR-007 Decision 8) ─────────────────────────────────────
+# ── QNN / jniLibs (ADR-019) ─────────────────────────────────────
 
 qnn:
-  jni_libs_trimmed: 8 # 39 → 8 per ADR-007 D8
+  jni_libs_trimmed: 8 # 39 → 8 per ADR-019
   keep_libs:
     - "libQnnHtp.so"
     - "libQnnHtpV73Stub.so"
@@ -146,11 +146,11 @@ qnn:
     - "libQnnHtpPrepare.so"
     - "libQnnSystem.so"
     - "libQnnCpu.so"
-    - "libQnnGpu.so" # GPU fallback backend — future-proofing per ADR-007 D8
+    - "libQnnGpu.so" # GPU fallback backend — future-proofing per ADR-019
     - "libqnn_loader_jni.so"
   version_lock: "QAIRT 2.31.0.250130 = device qnn-2.31 / HTP v73"
 
-# ── Denoiser (ADR-007 Decision 7, Phase-6 gate) ─────────────────────────────
+# ── Denoiser (ADR-018, Phase-6 gate) ─────────────────────────────
 
 denoiser:
   method: "wiener" # host-side benchmarking reference (noisereduce, prop_decrease=0.5)
@@ -158,8 +158,8 @@ denoiser:
   toggleable: true # per-utterance
   wer_noisy: "49.82%" # smoke test: weighted avg, 2 utts × 5 conditions, SNR0+5 impulsive+steady; source: docs/denoising-gate-results.md
   wer_raw: "51.23%" # same methodology; source: docs/denoising-gate-results.md
-  on_device_default: "GTCRN" # ADR-007 D7 — ~50 MB ONNX runtime (ADR-007 D5); model file is ~523 KB
-  note: "Wiener is host-side benchmarking reference. On-device denoiser is GTCRN (ADR-007 D7); final pick gated on Phase-6 benchmarks (Risk R1)."
+  on_device_default: "GTCRN" # ADR-018 — ~50 MB ONNX runtime (ADR-016); model file is ~523 KB
+  note: "Wiener is host-side benchmarking reference. On-device denoiser is GTCRN (ADR-018); final pick gated on Phase-6 benchmarks (Risk R1)."
 
 # ── Memory budget (ADR-007/008 ≈ 1.16 GB) ───────────────────────────────────
 
@@ -167,7 +167,7 @@ memory:
   budget_mb: 1160
   breakdown:
     asr_dual_zipformer_mb: 60 # 2 × ~30 MB (int8)
-    denoiser_mb: 50 # GTCRN ONNX — ADR-007 D5 (~50 MB); Wiener is host-side only (near-zero on-device)
+    denoiser_mb: 50 # GTCRN ONNX — ADR-016 (~50 MB); Wiener is host-side only (near-zero on-device)
     mt_encoder_mb: 46 # 186 MB fp32 → int8 (~4× smaller, planned)
     mt_decoder_mb: 80 # 322 MB fp32 → int8 (~80 MB)
     kv_cache_mb: 70 # pre-allocated, 256 tokens

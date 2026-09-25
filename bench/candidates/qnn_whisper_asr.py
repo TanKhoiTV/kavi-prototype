@@ -33,7 +33,7 @@ from ..schema import EvalItem
 class QnnWhisperASRCandidate(Candidate):
     """QNN Whisper Small ASR candidate (encoder on HTP v73, decoder on CPU).
 
-    ADR-005 Decision 2: encoder on NPU, decoder on CPU.
+    ADR-023: encoder on NPU, decoder on CPU.
 
     Parameters
     ----------
