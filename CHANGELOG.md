@@ -60,6 +60,7 @@
 - **adr:** Split multi-decision ADRs into one decision per record
 - **adr:** Add the ADR index, withdraw ADR-004, move the comparison doc
 - **adr:** Repoint ADR cross-references after the split([#106](https://github.com/TanKhoiTV/kavi-prototype/pull/106))
+- Tag code-fence languages in repo markdown([#107](https://github.com/TanKhoiTV/kavi-prototype/pull/107))
 
 ### Features
 
