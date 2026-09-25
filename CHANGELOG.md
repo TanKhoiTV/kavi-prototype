@@ -56,6 +56,7 @@
 - **repo:** Document that the android app is not vendored here
 - Correct kavi-android repo structure after untracking
 - Correct README for public publication
+- Document public setup, pinned assets and Windows
 
 ### Features
 
@@ -94,6 +95,8 @@
 - **repo:** Ignore the unvendored android path
 - **ci:** Drop the submodule opt-out from checkout
 - Stop tracking third-party artifacts and personal docs
+- Normalize line endings and make local checks deterministic
+- **env:** Make the QAIRT helper portable and add a Windows one
 
 ### Refactoring
 
@@ -110,6 +113,7 @@
 - Bump kavi-android to AGP 8.10.0 / Gradle 8.11.1 (API 36)
 - **deps:** Bump actions/checkout from 7.0.0 to 7.0.1 (#87)
 - **deps:** Bump astral-sh/setup-uv from 8.3.2 to 9.0.0 (#86)
+- Pin third-party assets and add fetch/verify tooling
 
 ### Ci
 
