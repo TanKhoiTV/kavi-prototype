@@ -1,106 +1,81 @@
-# ADR-004: Speech-to-Speech Architecture / Tech-Stack
+# ADR-004: Speech-to-Speech Architecture / Tech-Stack *(withdrawn)*
 
-**Status:** Draft — **tech stack NOT yet decided.** This record captures the
-license-gated parameters that are already settled and lists the open parameters
-the v0 benchmark harness must close. It deliberately makes **no final pick**
-of ASR / MT / TTS models or runtime.
-**Date:** 2026-07-15
-**Author:** Project lead
-**Supersedes / relates to:** ADR-001 (offline-first), ADR-002 (target platform),
-ADR-003 (Hexagon runtime strategy), `docs/decisions/license-situation.md`.
+## Status
 
----
+Withdrawn — superseded by [ADR-008](ADR-008-dual-zipformer-asr.md) (ASR),
+[ADR-009](ADR-009-supertonic-tts-v1.md) (TTS) and
+[ADR-030](ADR-030-qairt-runtime-redistribution.md) (QAIRT runtime licence).
+The **MT model choice remains unrecorded** — see
+[Open parameters #1](README.md#open-parameters).
+
+## Date
+
+2026-07-15
+
+## Deciders
+
+Project lead
 
 ## Context
 
-Kavi is a **commercial, fully-offline on-device** Vietnamese ↔ English
-speech-to-speech translator for a **Snapdragon 8 Gen 2** (Hexagon HTP v73),
-Android. ADR-001/002/003 fixed the *shape* of the system (offline-first, phone
-form factor, CPU baseline with NPU deferred to on-device results). The actual
-**model + runtime choices** were deferred to benchmarking, gated by licensing.
+This record was created as the umbrella **tech-stack** ADR while individual model
+and runtime choices were still blocked on licensing and benchmarking. It never
+made a decision — deliberately. Its own text stated:
 
-`docs/decisions/license-situation.md` has now cleared the candidate set:
-most components are license-clean, and the remaining unknowns are few. This ADR
-records what is **settled** and what stays **open** until the v0 harness
-(`docs/reference/benchmarking-plan.md` §8) produces on-device numbers.
+> **No architecture / tech-stack decision is recorded yet.**
 
-> **No tech-stack decision is made here.** The final ASR/MT/TTS/runtime pick
-> follows the harness results. Anything below marked *option* / *open* is a
-> parameter, not a decision.
+Instead it tracked four "settled parameters" (license-gated options) and four
+"open parameters" to be closed by the v0 benchmark harness. As those parameters
+closed, their decisions were recorded in the records that actually made them —
+which left this file holding no decision at all, and a parameter table that was
+better served by an index.
 
-## Parameters settled (license-gated)
+## Decision
 
-### MT — Hy-MT1.5 is ADOPT-able
+**Withdrawn.** There is no decision to record here.
 
-- HY Community License excludes only EU / UK / South Korea; **Vietnam (contest
-  location) is in territory**, and no launch is planned for the excluded regions.
-- **100M MAU** threshold noted as a **sky-high ceiling** (not a current concern);
-  a separate Tencent license is required only if we approach it.
-- `Opus-MT` (Apache-2.0) remains the current prototype + a clean alternative.
-- Both are license-clean MT *candidates*.
+The parameter register it maintained has been superseded:
 
-### TTS — MIT-era Piper is a clean *option*; GPL build deferred
+- **Settled parameters** — the license-gated candidate set — are now the verdict
+  tables in [ADR-029](ADR-029-license-gate.md).
+- **Open parameters** — the four items this record tracked — are now
+  [Open parameters](README.md#open-parameters) in the index, where each is owned
+  by the record that can close it.
+- **The choices that closed** were recorded elsewhere:
+  - ASR → [ADR-008](ADR-008-dual-zipformer-asr.md) (dual Zipformer) and
+    [ADR-027](ADR-027-asr-cpu-only.md) (CPU-only)
+  - TTS → [ADR-009](ADR-009-supertonic-tts-v1.md) / [ADR-028](ADR-028-vieneu-tts-migration.md)
+  - Runtime licence gate → [ADR-030](ADR-030-qairt-runtime-redistribution.md)
+  - Piper licence fork → [ADR-031](ADR-031-piper-engine-gpl-split.md) (still open)
 
-- `rhasspy/piper` (MIT, archived Oct 2025) is a **licensed-clean option**, run
-  via **subprocess isolation** so the GPL `espeak-ng`/engine never links into
-  our binary.
-- The GPL build `OHF-Voice/piper1-gpl` (GPL-3.0) is **deferred** — not decided.
-- `vais1000` is a clean **CC BY 4.0** Vietnamese voice (attribution required).
-- `MeloTTS` (MIT) / `Kokoro` (Apache-2.0) are alternatives (no off-the-shelf
-  VI voice). **No final TTS pick yet.**
+### What this record never closed
 
-### ASR — leading candidates are license-clean
-
-- `Whisper Small` (MIT, confirmed EN+VI) and `PhoWhisper Small` (BSD-3,
-  VI-accuracy winner) are the leading candidates; `Zipformer-30M` / `Moonshine`
-  are VI-only. All permissive. **No final ASR pick yet.**
-
-### Runtime — CPU baseline is license-clean; NPU pending Qualcomm
-
-- Per ADR-003, **CPU / XNNPACK int8 is the license-clean baseline** and can ship
-  today.
-- The **NPU / QAIRT path is now unblocked** — the Qualcomm runtime gate is
-  resolved (ADOPT, clean; see `license-situation.md`).
-
-## Open parameters (closed by the v0 harness + remaining lookups)
-
-| # | Open parameter | Closes when |
-| --- | --- | --- |
-| 1 | **Final ASR / MT / TTS models** | v0 harness WER / BLEU / RTF / peak-RAM on the CPU-default stack. **Initial slate already chosen in `bench/`:** faster-whisper Small int8 (ASR), CTranslate2 Opus-MT vi→en int8 (MT), Piper EN (TTS). Closes when on-device QNN numbers exist (Phase 4, QAIRT gate resolved). |
-| 2 | **Piper engine GPL split** | resolved as MIT-era subprocess (default option) or alternative; GPL build stays deferred |
-| 3 | **QAIRT runtime EULA** (Qualcomm) | **RESOLVED — ADOPT (clean)** (see `license-situation.md`) |
-| 4 | **Pre-ASR denoising gate** | v0 harness Wiener/RNNoise toggle result (benchmarking-plan §8) |
-
-## Decision (deferred)
-
-**No architecture / tech-stack decision is recorded yet.** Once parameters
-
-# 1–#4 close, ADR-004 will be promoted from *Draft* to *Accepted* with the
-
-concrete model + runtime matrix. Until then, development proceeds on the
-**license-clean CPU-default stack** (faster-whisper / Opus-MT / MIT-era Piper or
-MeloTTS) so the harness can run. The v0 host-side harness is implemented in
-`bench/` (PR #28/#36) and has already chosen this initial candidate slate.
+The **MT model**. Opus-MT is the current prototype and is pinned in `.kavi.yaml`,
+but no ADR records the choice, and the Harve/MT candidate comparison in
+`docs/reference/benchmarking-plan.md` §4.4 was never resolved into a decision.
+That gap is tracked as
+[Open parameters #1](README.md#open-parameters) and is expected to be closed by a
+dedicated MT decision record.
 
 ## Consequences
 
 ### Positive
 
-- Licensing no longer blocks standing up the v0 harness — a clean default stack
-  exists for every stage.
-- The candidate set is narrowed to license-clean options, removing legal risk
-  from the benchmark.
+- The register that supersedes this file is generated from the actual records, so
+  it cannot drift out of date the way a hand-maintained parameter table does.
+- The status no longer implies a decision exists where none does.
 
 ### Negative / risk
 
-- The final model pick may still shift after harness numbers (e.g., if a
-  license-clean model misses the RTranslator quality bar).
-- **Qualcomm QAIRT EULA (#3) is resolved** (ADOPT, clean). The NPU path is
-  unblocked; CPU fallback (ADR-003) remains available.
+- Historical references to "ADR-004" (there were eight tracked files) now point at
+  a withdrawn record; they must be repointed to the specific decision they meant
+  (this was done in the same change).
 
 ## References
 
-- ADR-001 / 002 / 003.
-- `docs/decisions/license-situation.md` (license gate).
-- `docs/reference/benchmarking-plan.md` §4 (candidate landscape), §8 (v0 harness).
-- `docs/onboarding.md` (architecture decoded for newcomers).
+- [ADR-008](ADR-008-dual-zipformer-asr.md) — v1 Android ASR (closed the ASR parameter)
+- [ADR-009](ADR-009-supertonic-tts-v1.md) — v1 Android TTS (closed the TTS parameter)
+- [ADR-029](ADR-029-license-gate.md) — Shipping license gate (holds the candidate verdicts)
+- [ADR-030](ADR-030-qairt-runtime-redistribution.md) — QAIRT runtime redistribution (closed the runtime-licence parameter)
+- [ADR-031](ADR-031-piper-engine-gpl-split.md) — Piper engine GPL split (the remaining licence fork)
+- [Open parameters](README.md#open-parameters) — where the tracked items now live
