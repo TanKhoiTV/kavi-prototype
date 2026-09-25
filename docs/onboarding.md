@@ -12,7 +12,7 @@ only holds the *story and public docs*; the **real code and internal docs live
 in the submodule** (`kavi-prototype`, under `prototype/`). Read in this
 order — each step builds the mental model you need for the next.
 
-```
+```text
 aivoice-2026/                 (PUBLIC parent — what we tell the world)
 ├─ README.md                  ①  landing page
 └─ docs/
@@ -98,7 +98,7 @@ translation fails.
 
 The pipeline is a single local chain:
 
-```
+```text
 [mic] → VAD → denoise → ASR → MT → TTS → [speaker]
 ```
 

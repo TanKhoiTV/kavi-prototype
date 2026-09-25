@@ -35,7 +35,7 @@ budget mapping, fallbacks, testing, and a build-by-build sequencing with effort.
 
 Five layers, dependency direction strictly downward (Kotlin layers → JNI boundary → C++).
 
-```
+```text
 ┌─ L0 UI (Kotlin)            MainActivity / WalkieController, PeerToPeer BLE surface
 ├─ L1 Service (Kotlin)       TranslationService (foreground, OneDevice + PeerToPeer)
 │                            ├─ WakeLock, NotificationChannel, coroutine SuperScope
@@ -166,7 +166,7 @@ Replaces the stub `nativeExecute` with, per inference:
 
 **Example — ASR thread count:**
 
-```
+```text
 .kavi.yaml                AppContainer                  DualZipformerRecognizer
 ┌──────────────────┐      ┌───────────────────────┐      ┌──────────────────────────┐
 │ asr:             │      │ val asrNumThreads =   │      │ class DualZipformer      │

@@ -219,7 +219,7 @@ For the initial v1 release, use **SupertonicTTS 3** as the single-model TTS engi
 
 ### Integration architecture (Phase 1 — Supertonic)
 
-```
+```text
 TranslationService pipeline (from ADR-007 Decision 1)
     ↓ (translated text from Opus-MT decoder)
 ┌────────────────────────────────────────────────────────────┐

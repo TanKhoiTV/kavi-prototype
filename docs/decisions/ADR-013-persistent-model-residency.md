@@ -35,7 +35,7 @@ model state.
 
 ### Load sequence (cold start, ~2–3 s)
 
-```
+```text
 TranslationService.onCreate()
 ├── Load Whisper tokenizer (byte-level BPE/GPT-2)  → permanent
 ├── Load Opus-MT tokenizer (SentencePiece)          → permanent

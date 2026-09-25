@@ -218,7 +218,7 @@ speech-to-speech translator meeting the 2.0 s turnaround budget on a Snapdragon 
 
 ## 5. Execution order
 
-```
+```text
 M0 (roster trim + sherpa-onnx vendor + assets) ──┬──→ M1 (ASR + TTS engines, standalone-testable)
                                                  └──→ M3 (QNN NPU path)         [parallel after M0]
 M1 ──→ M2 (TranslationService + pipeline) ──→ M4 (UI + modes)

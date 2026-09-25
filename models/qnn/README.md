@@ -37,7 +37,7 @@ They are **not pinned** and may change with new releases.
 
 **Whisper-Small-Quantized (w8a16, 8 Gen 3 — for reference only):**
 
-```
+```text
 https://qaihub-public-assets.s3.us-west-2.amazonaws.com/qai-hub-models/models/whisper_small_quantized/releases/v0.58.0/whisper_small_quantized-qnn_context_binary-w8a16-qualcomm_snapdragon_8gen3.zip
 ```
 

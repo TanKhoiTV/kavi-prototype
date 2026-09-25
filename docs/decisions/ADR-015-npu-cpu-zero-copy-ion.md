@@ -33,7 +33,7 @@ through a pointer, synchronised by a cache-coherency barrier only (~1–3 ms for
 
 ### Pipeline handoff
 
-```
+```text
 NPU (QNN context binary)            CPU (ONNX Runtime)
 ┌──────────────────────┐           ┌──────────────────────┐
 │ Whisper encoder      │   ION     │ Whisper decoder       │
