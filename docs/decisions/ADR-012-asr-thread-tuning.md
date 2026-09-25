@@ -8,6 +8,10 @@ Proposed
 
 2026-08-10
 
+## Deciders
+
+Kavi team
+
 ## Context
 
 The Kavi on-device speech-to-speech pipeline runs two Zipformer ASR models concurrently via Kotlin `async` on `Dispatchers.Default`. Each `OfflineRecognizer` spawns a native C++ thread pool for ONNX Runtime inference. On the target device (Meizu 21 Note, Snapdragon 8 Gen 2 / SM8550):

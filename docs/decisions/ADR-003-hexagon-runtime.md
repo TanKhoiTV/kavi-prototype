@@ -8,6 +8,10 @@ Proposed
 
 2026-07-14
 
+## Deciders
+
+Kavi team
+
 ## Context
 
 ADR-001 establishes offline-first, on-device execution. ADR-002 fixes the target
@@ -93,7 +97,7 @@ The detailed, step-by-step spec lives in `docs/reference/phase-4-qnn-plan.md`. I
    **turnaround < 2.0 s**, **zero network**) **and** beats the CPU baseline on RTF /
    turnaround without accuracy regression; else keep CPU for that stage.
 
-This comparison **closes this ADR** (→ *Accepted*) and feeds ADR-004's tech-stack
+This comparison **closes this ADR** (→ *Accepted*) and feeds the [open-parameters register](README.md#open-parameters) tech-stack
 picks. **Status remains *Proposed* until the on-device numbers exist.**
 
 ## Alternatives Considered

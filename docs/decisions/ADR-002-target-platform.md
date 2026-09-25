@@ -8,6 +8,10 @@ Accepted
 
 2026-07-14
 
+## Deciders
+
+Kavi team
+
 ## Context
 
 ADR-001 establishes that Kavi runs 100% on-device, offline-first. This ADR
