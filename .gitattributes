@@ -1,0 +1,54 @@
+# Line-ending + binary normalization.
+#
+# Windows contributors: with the Git-for-Windows default (core.autocrlf=true)
+# Git checks text files out as CRLF. That breaks the shebang in shell scripts
+# and can confuse `make`. The rules below force LF for the files that must have
+# it and mark binary assets so Git never rewrites them.
+#
+# After a deliberate change here, re-normalize with:
+#   git add --renormalize .
+
+* text=auto
+
+# Must be LF everywhere.
+*.sh               text eol=lf
+*.ps1              text eol=lf
+*.bash             text eol=lf
+Makefile           text eol=lf
+*.mk               text eol=lf
+.gitattributes     text eol=lf
+.gitignore         text eol=lf
+.gitmodules        text eol=lf
+
+# Source, config, docs.
+*.py               text eol=lf
+*.pyi              text eol=lf
+*.toml             text eol=lf
+*.cfg              text eol=lf
+*.ini              text eol=lf
+*.json             text eol=lf
+*.yaml             text eol=lf
+*.yml              text eol=lf
+*.md               text eol=lf
+*.txt              text eol=lf
+
+# Binary assets - never touch.
+*.wav              binary
+*.flac             binary
+*.mp3              binary
+*.npy              binary
+*.npz              binary
+*.bin              binary
+*.onnx             binary
+*.parquet          binary
+*.spm              binary
+*.so               binary
+*.dll              binary
+*.dylib            binary
+*.exe              binary
+*.zip              binary
+*.png              binary
+*.jpg              binary
+*.jpeg             binary
+*.pdf              binary
+*.pptx             binary
