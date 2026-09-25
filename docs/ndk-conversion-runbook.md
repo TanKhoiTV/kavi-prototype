@@ -179,10 +179,10 @@ ls -lh models/qnn/opus-mt-vi-en/ctx/*_ctx/*.bin
 ## 6. Deliver into kavi-android (ADR-011)
 
 Per ADR-011, the context binary and model `.so` are committed **inside the
-`kavi-android` submodule**, never in `prototype/models/qnn/*` (which is gitignored).
+`kavi-android` repo**, never in `prototype/models/qnn/*` (which is gitignored).
 
 ```bash
-cd android  # kavi-android submodule
+cd android  # your local kavi-android checkout
 
 # Copy artifacts into assets
 mkdir -p app/src/main/assets/models/opus-mt-vi-en-encoder

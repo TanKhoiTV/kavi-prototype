@@ -3,7 +3,7 @@
 > **Status:** Draft — planning only (no code changes yet)
 > **Date:** 2026-08-05
 > **Branch:** `docs/android-kotlin-cpp-implementation` (off `main`)
-> **Target repo:** `android/` = **kavi-android** submodule (`github.com:TanKhoiTV/kavi-android.git`)
+> **Target repo:** `android/` = **kavi-android** standalone private repo (`github.com:TanKhoiTV/kavi-android.git`)
 > **Supersedes/relates to:** `docs/android-implementation-plan.md` (Milestones 0–6, **PR #95**) — this doc is the *technical blueprint* underneath those milestones; ADR-007 (service/architecture), ADR-008 (Dual Zipformer ASR), ADR-009 (Supertonic TTS), ADR-010 (`ALL_OPT`), ADR-011 (asset provenance, **PR #95**)
 > **Scope guard:** planning only — no `android/` or `app/` code changes on this branch.
 

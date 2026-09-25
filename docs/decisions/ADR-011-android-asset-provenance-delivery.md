@@ -3,6 +3,11 @@
 **Status:** Accepted
 **Date:** 2026-08-05
 **Deciders:** Kavi team
+> **Note (2026-08-14):** The decision below stands unchanged. One contextual
+> detail is now stale: `kavi-android` is **no longer a submodule** of
+> `kavi-prototype` — it was unregistered so the public prototype repo does not
+> carry a gitlink to a private repository. `kavi-android` remains the sole owner
+> of on-device artifacts, exactly as decided here.
 **Relates to:** ADR-002 (target platform), ADR-006 (Android runner), ADR-007
 Decision 8 (QNN bundling), ADR-008 (ASR assets), ADR-009 (TTS assets),
 `prototype/.gitignore` (`models/qnn/*`)
