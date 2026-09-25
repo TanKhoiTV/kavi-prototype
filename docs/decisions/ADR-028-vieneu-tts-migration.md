@@ -56,7 +56,7 @@ Build the `VieNeu-TTS.cpp` NDK/JNI bridge and switch to VieNeu-TTS v3 Turbo as t
 
 ### Integration architecture (Phase 2 — VieNeu-TTS)
 
-```
+```text
 TranslationService pipeline (from ADR-007 Decision 1)
     ↓ (translated text from Opus-MT decoder)
 ┌───────────────────────────────────────────────────────────────┐

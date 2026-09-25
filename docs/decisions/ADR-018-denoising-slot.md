@@ -31,7 +31,7 @@ settled before the denoiser model itself is chosen.
 Add a **three-tier denoising stage**, applied in order of availability, with the
 model tier toggleable per utterance.
 
-```
+```text
 AudioRecord (mic, 16 kHz PCM float)
     ↓
 [Tier 1: ADSP AI-ECNS]    — if available on the device's DSP, free hardware-accelerated echo/noise suppression

@@ -17,7 +17,7 @@ Kavi team
 Converting ONNX models to QNN context binaries for Snapdragon 8 Gen 2 (HTP v73)
 with QAIRT SDK 2.31.0.250130, the Whisper decoder failed outright:
 
-```
+```text
 KeyError: 'No translation registered for op type onnx_isnan.'
 ```
 

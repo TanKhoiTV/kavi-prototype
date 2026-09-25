@@ -39,7 +39,7 @@ across every decode invocation, rather than growing it per utterance.
 
 ### Allocation
 
-```
+```java
 float[] kvCache = new float[MAX_TOKENS × layers × heads × dim];
 // Allocated once, zero allocations during decode loop
 ```

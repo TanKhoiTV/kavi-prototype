@@ -17,7 +17,7 @@ Kavi team
 Alongside the Whisper decoder (see [ADR-005](ADR-005-qnn-isnan-workaround.md)),
 the Piper TTS graph failed QNN conversion:
 
-```
+```text
 KeyError: 'ERROR_WEIGHTS_MISSING_KEY: Expected a static initializer for value scales'
 ```
 

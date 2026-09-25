@@ -45,7 +45,7 @@
 
 ### RTranslator pipeline (WalkieTalkie)
 
-```
+```text
 AudioRecord (PCM float, 16 kHz mono)
     ↓
 Recorder (circular buffer, energy VAD, 15-threshold margin)
@@ -72,7 +72,7 @@ AudioTrack playback
 
 ### Kavi pipeline (ADR-007, OneDevice mode)
 
-```
+```text
 AudioRecord (PCM float, 16 kHz mono)
     ↓
 Recorder (circular buffer, energy VAD)
