@@ -57,6 +57,9 @@
 - Correct kavi-android repo structure after untracking
 - Correct README for public publication
 - Document public setup, pinned assets and Windows
+- **adr:** Split multi-decision ADRs into one decision per record
+- **adr:** Add the ADR index, withdraw ADR-004, move the comparison doc
+- **adr:** Repoint ADR cross-references after the split([#106](https://github.com/TanKhoiTV/kavi-prototype/pull/106))
 
 ### Features
 
