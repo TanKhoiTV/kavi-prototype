@@ -12,6 +12,13 @@ permissions:
 jobs:
   update-changelog:
     runs-on: ubuntu-latest
+    # Serialise runs so two pushes to main can't regenerate CHANGELOG.md
+    # concurrently and race to push. cancel-in-progress is false so a queued
+    # run still executes (and regenerates from the newest tip) instead of
+    # being dropped.
+    concurrency:
+      group: changelog-${{ github.ref }}
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -38,4 +45,10 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add CHANGELOG.md
           git commit -m "chore: update CHANGELOG" || echo "no changes"
+          # Another push may have landed while this job ran (e.g. a direct
+          # push, which the concurrency group above can't serialise against).
+          # Rebase before pushing so we don't fail on a non-fast-forward.
+          # A conflict here means a newer run already wrote a fuller CHANGELOG;
+          # fail loudly rather than silently dropping entries.
+          git pull --rebase
           git push
