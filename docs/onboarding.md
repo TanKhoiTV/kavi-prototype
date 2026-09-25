@@ -23,16 +23,17 @@ kavi-prototype/               (submodule — the real repo; also public)
 ├─ CONTRIBUTING.md            ⑤  cloning + tooling
 └─ docs/
    ├─ onboarding.md           ⑥  this file — architecture, decoded
-   ├─ android-implementation-plan.md  ⑪  the active plan (ADR-007 → ADR-010)
+   ├─ android-implementation-plan.md  ⑪  the active plan (ADR-007 · ADR-013–022 · ADR-008/009)
    ├─ reference/              ⑫  superseded / deprecated docs (benchmarking-plan, phase-4-qnn-plan, …)
    └─ decisions/
+      ├─ README.md            ⑩  the ADR index — one decision per record (start here)
       ├─ ADR-001 …            ⑦  100% offline, forever
       ├─ ADR-002 …            ⑧  one phone: Snapdragon 8 Gen 2
       ├─ ADR-003 …            ⑨  CPU now, NPU later
-      ├─ ADR-004 …            ⑩  tech stack decided (ADR-007–010); Draft until gates pass
-      ├─ ADR-005 …            ⑭  QNN conversion workarounds (Accepted)
-      ├─ ADR-006 …            ⑮  Android runner architecture (Accepted)
-      └─ license-situation …  ⑬  license gate
+      ├─ ADR-004 …            —  withdrawn (was the deferred tech-stack register)
+      ├─ ADR-005 …            ⑭  QNN conversion workarounds
+      ├─ ADR-006 …            ⑮  Android runner architecture
+      └─ ADR-029 …            ⑬  license gate
 ```
 
 **What to conclude from each:**
@@ -60,11 +61,14 @@ kavi-prototype/               (submodule — the real repo; also public)
 9. **`ADR-003` (Hexagon runtime)** → start on **CPU (ORT-XNNPACK int8)** —
    license-clean, ships today; add **NPU / QAIRT later** after on-device
    benchmarks. NNAPI rejected.
-10. **`ADR-004` (architecture, draft)** → the **tech stack is decided** — ADR-007
-    (production architecture), ADR-008 (Dual Zipformer ASR, CPU-only), ADR-009
-    (Supertonic Phase-1 TTS), ADR-010 (`ALL_OPT`). ADR-004 itself stays Draft
-    until the Phase-4/5/7 on-device gates pass.
-11. **`docs/decisions/license-situation.md`** → most candidates are license-clean;
+10. **`docs/decisions/README.md` (the ADR index)** → **one decision per record.**
+    Start here rather than reading ADRs in number order: it lists every record with
+    its status, the supersession graph, and the parameters still open. The tech-stack
+    choices are spread across records — ADR-007 (service) with ADR-013–022 (pipeline),
+    ADR-008 (Dual Zipformer ASR, CPU-only per ADR-027), ADR-009 (Supertonic Phase-1
+    TTS), ADR-010 (`ALL_OPT`). **ADR-004 is withdrawn** — it was the deferred
+    tech-stack register, which the index has replaced.
+11. **`docs/decisions/ADR-029-license-gate.md`** → most candidates are license-clean;
     this gate is *why* we can pick safely. TTS licensing is **resolved for v1**
     (ADR-009: Supertonic); the **Piper GPL split** matters only if the fallback is
     exercised — pin the MIT-era `rhasspy/piper` snapshot then.
@@ -73,11 +77,12 @@ kavi-prototype/               (submodule — the real repo; also public)
 13. **`docs/reference/benchmarking-todo.md`** → the **execution checklist** (phases 0–7,
     checkboxes) to produce those numbers — what you'd actually pick up and work on.
 14. **`ADR-005` (QNN conversion workarounds)** → when the QAIRT converter rejected
-    ops (IsNaN, cyclic graphs), these are the workarounds: strip IsNaN from the
-    Whisper decoder, run decoders on CPU, keep Piper on CPU.
+    ops (`IsNaN`, cyclic graphs), these are the workarounds: strip `IsNaN` from the
+    decoder (ADR-005), run decoders on CPU (ADR-023), keep TTS on CPU (ADR-024).
 15. **`ADR-006` (Android runner architecture)** → native on-device instrumented
     test (no ADB bridge), single push/pull, internal timing, zero-network
-    assertion.
+    assertion; with the fixed-shape padding rule in ADR-025 and real-data-only
+    calibration in ADR-026.
 
 > **Skip for now:** `archive/` (historical, superseded) and `docs/README.md`
 > (just an index).
@@ -198,7 +203,7 @@ under `archive/` for reference.
 | `models/` | Checked-in model weights. Today: **Opus-MT vi-en** (CTranslate2 + SentencePiece) — our current MT. |
 | `voices/` | TTS voice model(s) (Piper). Usually gitignored / downloaded at runtime. |
 | `docs/` | Internal docs (this file's siblings). |
-| `docs/decisions/` | The ADRs (001–006) + `license-situation.md`. Source of truth for architecture + licensing. |
+| `docs/decisions/` | The ADRs — start at `README.md` (the index). Source of truth for architecture + licensing. |
 | `docs/android-implementation-plan.md` | The active implementation plan (ADR-007 → ADR-010). **Read this next.** |
 | `docs/reference/` | Superseded / deprecated docs (benchmarking-plan, phase-4-qnn-plan, …). |
 | `.pi/AGENTS.md`, `CONTRIBUTING.md`, `README.md` | Project / agent guidance, how we work, quickstart. |
@@ -223,12 +228,14 @@ Full detail is in `docs/reference/benchmarking-plan.md` §4.4–§4.5.
 - **Caution (verify):** **Hy-MT** (HY Community License — commercial-permitted
   *per old ADR-001*, but a regional carve-out is flagged by our current stance).
 
-## Where the architecture is going (ADR-004)
+## Where the architecture is going
 
-The **tech stack is decided**: ADR-007 (production architecture), ADR-008 (Dual
-Zipformer ASR, CPU-only), ADR-009 (Supertonic Phase-1 TTS), ADR-010 (`ALL_OPT`).
-**ADR-004 remains Draft** — it closes only after the Phase-4/5/7 on-device numbers
-and hard gates pass (see `.pi/PLAN.md` §8).
+The **tech stack is decided** across several records: ADR-007 (service) with
+ADR-013–022 (pipeline), ADR-008 (Dual Zipformer ASR, CPU-only per ADR-027),
+ADR-009 (Supertonic Phase-1 TTS), ADR-010 (`ALL_OPT`). **ADR-004 is withdrawn** —
+the parameter table it maintained is now the
+[open-parameters register](decisions/README.md#open-parameters), which closes as
+the Phase-4/5/7 on-device numbers and hard gates land (see `.pi/PLAN.md` §8).
 
 ## How to get running & next steps
 
@@ -260,10 +267,10 @@ and hard gates pass (see `.pi/PLAN.md` §8).
    make test         # run the pytest suite
    ```
 
-   Feed the numbers into ADR-004.
+   Feed the numbers into the [open-parameters register](decisions/README.md#open-parameters).
 
 > **If you remember nothing else:** Kavi is a fully-offline phone translator
 > (VI↔EN); we target **one chip** (Snapdragon 8 Gen 2 / Hexagon HTP v73); the
 > runtime path is **QAIRT / QNN via ONNX Runtime, CPU-first**; models must be
 > **commercial-licensed** and **small enough for < 2 s**; and the **exact model
-> choices are still TBD** behind ADR-004 + the benchmark harness.
+> choices are still TBD** behind the open-parameters register + the benchmark harness.

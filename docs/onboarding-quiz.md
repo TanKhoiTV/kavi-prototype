@@ -10,20 +10,20 @@
 
 ## Questions
 
-**Q1 — Scenario (licensing + offline).** *Source: ADR-001, license-situation.*
+**Q1 — Scenario (licensing + offline).** *Source: ADR-001, ADR-029.*
 OneVoice grades on a hidden benchmark with **no internet allowed at runtime**, and
 the contest can lead to **commercialization**. A teammate proposes swapping our MT
 to **NLLB-200-distilled-600M** because it scores highest on FLORES-200. What is
 wrong with this proposal, and what would you suggest instead?
 
-**Q2 — Classification (decided vs deferred vs open).** *Source: ADR-001/002/003/004, license-situation.*
+**Q2 — Classification (decided vs deferred vs open).** *Source: ADR-001/002/003, ADR-029, `decisions/README.md`.*
 Classify each as **DECIDED**, **DEFERRED**, or **OPEN**:
 (a) Kavi runs fully offline · (b) target device is Snapdragon 8 Gen 2 · (c) the
 NPU runtime is QAIRT/QNN · (d) the exact ASR model · (e) Hy-MT is commercially
 usable · (f) Piper's distribution model (subprocess vs bundled) · (g) the Qualcomm
 runtime EULA for shipping QNN model artifacts (model `.so` + context binary).
 
-**Q3 — Short answer (benchmark method).** *Source: ADR-004, reference/benchmarking-plan §8.*
+**Q3 — Short answer (benchmark method).** *Source: `decisions/README.md` (open parameters), reference/benchmarking-plan §8.*
 Why do we stand up a benchmark harness **before** finalizing the ASR/MT/TTS stack?
 What is the **single question the v0 harness must answer**, and name **one thing v0
 deliberately leaves out**?
@@ -59,9 +59,9 @@ EOS→SA turnaround · no-internet-at-runtime · MT BLEU + COMET · TTS MOS · s
 **Q10 — Short answer (denoising gate).** *Source: `reference/denoising-gate-results.md`.*
 The Phase-6 denoising gate ran a smoke test (2 utterances × 5 conditions) on
 faster-whisper Small int8. What was **ADOPTED** and at what weighted-average WER,
-and what caveat does the results file flag before ADR-004 finalization?
+and what caveat does the results file flag before the on-device denoiser pick closes?
 
-**Q11 — Scenario (TTS voice licensing).** *Source: `license-situation.md`, ADR-009.*
+**Q11 — Scenario (TTS voice licensing).** *Source: ADR-029, ADR-009.*
 A member picks the Piper **`vivos`** Vietnamese voice because it is a real VI
 voice and easy to find. What is wrong, and what is the **v1 TTS plan** that
 supersedes the Piper voice question?
@@ -82,13 +82,14 @@ commercial product; it is **reference-only**. Suggest **Opus-MT (Apache-2.0)**,
 the killer + names ≥1 clean alternative.*
 
 **Q2.** (a) DECIDED (ADR-001) · (b) DECIDED (ADR-002) · (c) DEFERRED / provisional
-(ADR-003 = CPU-first, NPU later) · (d) DEFERRED (ADR-004 tech stack not chosen) ·
-(e) DECIDED (license-situation: Hy-MT ADOPT for Vietnam; 100M MAU noted as a
-sky-high ceiling) · (f) OPEN / deferred (Piper GPL split) · (g) OPEN (escalate to
-Qualcomm). *Rubric: all 7 correct = pass; (c)/(d)/(f)/(g) are the common mistakes.*
+(ADR-003 = CPU-first, NPU later) · (d) DECIDED (ADR-008 Dual Zipformer ASR, ADR-009 Supertonic TTS; the MT choice remains open) ·
+(e) DECIDED (ADR-029: Hy-MT ADOPT for Vietnam; 100M MAU noted as a
+sky-high ceiling) · (f) OPEN / deferred (ADR-031 Piper GPL split) · (g) DECIDED (ADR-030: QAIRT runtime
+ADOPT, clean — no escalation required). *Rubric: all 7 correct = pass; (c)/(f) are
+the common mistakes.*
 
 **Q3.** We benchmark **before** picking so the decision is evidence-based, not
-assumed (ADR-004 is gated by numbers). v0 must answer: **"does QNN meaningfully
+assumed (the tech-stack register is gated by numbers). v0 must answer: **"does QNN meaningfully
 beat CPU on this chip for these models, before we sink days into harder QNN
 engineering?"** v0 deliberately **defers COMET + human MOS** (and runs a single
 device / single run). *Rubric: names the QNN-vs-CPU question + at least one
@@ -128,8 +129,8 @@ three hard gates are the common miss.*
 **Q10.** The Phase-6 gate **ADOPTED Wiener** (`noisereduce`, `prop_decrease=0.5`):
 weighted-average WER **49.82%** on noisy conditions vs raw **51.23%**; RNNoise
 **REJECTED** (64.36%). Caveat: smoke test only (2 utterances × 5 conditions) — a
-full lean-slice eval is still pending before ADR-004 finalization, and the
-on-device GTCRN-vs-Wiener pick (ADR-007 D7) remains open.
+full lean-slice eval is still pending before the on-device denoiser pick closes, and the
+on-device GTCRN-vs-Wiener pick (ADR-018) remains open.
 *Rubric: names Wiener + 49.82% vs 51.23% + the smoke-test caveat.*
 
 **Q11.** `vivos` inherits **VIVOS CC-BY-NC-SA-4.0 (research-only)** → must not ship.

@@ -5,7 +5,7 @@
 > context binary for the `kavi-android` app. This is the **only** QNN artifact on
 > the v1 path — Whisper (ASR) and Piper (TTS) are CPU-only per ADR-008/009.
 > **Pre-requisite reading:** `docs/reference/phase-4-qnn-plan.md` (full conversion spec),
-> ADR-007 (Decision 8: QNN bundling), ADR-011 (asset provenance).
+> ADR-007 (ADR-019: QNN bundling), ADR-011 (asset provenance).
 
 ---
 
@@ -242,7 +242,7 @@ Confirm profiling shows `BackendType=HTP` for the encoder layers (not `CPU`).
 - `docs/reference/phase-4-qnn-plan.md` — full QNN conversion spec (§2, §8, §9 are live)
 - `docs/android-kotlin-cpp-implementation-plan.md` — Build D consumes this binary
 - `docs/android-implementation-plan.md` — Milestone 3 (M3) delivers this
-- ADR-007 — Decision 8 (QNN jniLibs roster + version lock)
+- ADR-007 — ADR-019 (QNN jniLibs roster + version lock)
 - ADR-011 — Android asset provenance & delivery (where to commit)
 - `bench/qnn/convert_to_qnn.sh` — conversion wrapper (read its --help for current flags)
 - `scripts/qairt-env.sh` — environment helper
