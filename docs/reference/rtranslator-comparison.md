@@ -16,7 +16,7 @@
 > scope rather than design merit — the comparison notes where this is the case.
 >
 > **Source documents:** `RTranslator/` (clone of niedev/RTranslator v2.00),
-> `docs/decisions/ADR-007-production-inference-architecture.md`,
+> `docs/decisions/ADR-007-translation-service.md`,
 > `docs/rtranslator-test-protocol.md`.
 
 ---
@@ -103,8 +103,8 @@ AudioTrack playback
 | | RTranslator | Kavi |
 | --- | --- | --- |
 | **NPU** | Not used. All inference on CPU via ORT 1.19.0 | Hexagon HTP v73 for ASR + MT encoders (QNN context binaries compiled via QAIRT) |
-| **GPU** | Not used. No GPU fallback mentioned | Not used in v1. `libQnnGpu.so` bundled for future-proofing only; v1 fallback chain is NPU→CPU (Decision 9) |
-| **CPU optimisations** | `NO_OPT` on nearly all sessions. `CPUArenaAllocator(false)` and `MemoryPatternOptimization(false)` on < 7 GB RAM devices | `ALL_OPT` + `CPUArenaAllocator(true)` + `MemoryPatternOptimization(true)` on all CPU decoder sessions (Decision 10) |
+| **GPU** | Not used. No GPU fallback mentioned | Not used in v1. `libQnnGpu.so` bundled for future-proofing only; v1 fallback chain is NPU→CPU (ADR-020) |
+| **CPU optimisations** | `NO_OPT` on nearly all sessions. `CPUArenaAllocator(false)` and `MemoryPatternOptimization(false)` on < 7 GB RAM devices | `ALL_OPT` + `CPUArenaAllocator(true)` + `MemoryPatternOptimization(true)` on all CPU decoder sessions (ADR-021) |
 | **Quantisation** | Partial int8 (some weights skipped to preserve quality) | Encoders: compiled QNN binary (quantised during QAIRT). Decoders: int8/XNNPACK per ADR-003 baseline |
 
 **Key insight:** RTranslator runs everything on CPU as a practical necessity — it targets any Android phone with 6+ GB RAM. Kavi's NPU+CPU split is made possible by targeting a specific Snapdragon SKU (8 Gen 2). This is the single biggest architectural departure.
@@ -121,7 +121,7 @@ AudioTrack playback
 | **Decoder runtime** | ONNX Runtime CPU | ONNX Runtime CPU (`IsNaN` blocked QNN conversion — ADR-005) |
 | **Language support** | 29 high-quality (WER ≤ 37%) + ~60 low-quality | VI + EN only (contest scope) |
 | **Batch configuration** | Two modes: single-language (batch=1) and dual-language (dedicated `cache_init_batch` session, batch=2); separate ONNX file per mode | Single `cache_init` session always runs at batch=2 (dual ASR for language detection) |
-| **Beam search** | WalkieTalkie: `SPEECH_BEAM_SIZE=1`. Conversation: `SPEECH_BEAM_SIZE=4` | Greedy (beam=1) for v1; beam=4 deferred to Phase-5 as a latency-budget decision (Decision 9, note) |
+| **Beam search** | WalkieTalkie: `SPEECH_BEAM_SIZE=1`. Conversation: `SPEECH_BEAM_SIZE=4` | Greedy (beam=1) for v1; beam=4 deferred to Phase-5 as a latency-budget decision (ADR-020, note) |
 | **Decoding** | Autoregressive with run-time KV cache allocation | Autoregressive with pre-allocated max-size KV cache (448 tokens, batch=2) |
 
 [^1]: `Whisper_initializer.onnx`, `Whisper_encoder.onnx`, `Whisper_decoder.onnx`, `Whisper_cache_initializer.onnx`, `Whisper_cache_initializer_batch.onnx`, `Whisper_detokenizer.onnx`.
@@ -140,13 +140,13 @@ AudioTrack playback
 | **Encoder runtime** | ONNX Runtime CPU | QNN on Hexagon NPU |
 | **Decoder runtime** | ONNX Runtime CPU | ONNX Runtime CPU |
 | **Tokenizer** | SentencePiece (shared `sentencepiece_bpe.model`) | SentencePiece (separate source/target `.spm` files) |
-| **Beam search** | `TRANSLATOR_BEAM_SIZE=1`. Beam-search code present but doc-commented *"not updated, so it won't work with the final models"* | Greedy (beam=1) for v1; beam=4 path documented as latency-budget decision (Decision 9, note) |
+| **Beam search** | `TRANSLATOR_BEAM_SIZE=1`. Beam-search code present but doc-commented *"not updated, so it won't work with the final models"* | Greedy (beam=1) for v1; beam=4 path documented as latency-budget decision (ADR-020, note) |
 | **Language support** | 29+ languages via NLLB's multilingual model | vi↔en only (contest scope) |
 | **License** | CC-BY-NC-4.0 (non-commercial only). RTranslator 3.0 switching to MADLAD/HY-MT | Apache-2.0 |
 
-[^2]: Confirmed from the on-disk model: the CTranslate2 int8 checkpoint at `models/opus-mt-vi-en-ct2/model.bin` is 71 MB for the full encoder+decoder. At ~70M total parameters in FP16 the decoder-only session is expected at ~60–80 MB, **not the 350 MB shown in ADR-007 Decision 5's conservative estimate**. The ADR's table uses the same 350 MB figure for both Whisper decoder and Opus-MT decoder, but the underlying models differ by ~3× in parameter count. This comparison uses the ADR's stated numbers for consistency (see §3.7 footnotes), but the Opus-MT decoder figure likely overstates reality by a factor of 4–5× and should be revised when ADR-007 moves from Proposed to Accepted.
+[^2]: Confirmed from the on-disk model: the CTranslate2 int8 checkpoint at `models/opus-mt-vi-en-ct2/model.bin` is 71 MB for the full encoder+decoder. At ~70M total parameters in FP16 the decoder-only session is expected at ~60–80 MB, **not the 350 MB shown in ADR-016's conservative estimate**. The ADR's table uses the same 350 MB figure for both Whisper decoder and Opus-MT decoder, but the underlying models differ by ~3× in parameter count. This comparison uses the ADR's stated numbers for consistency (see §3.7 footnotes), but the Opus-MT decoder figure likely overstates reality by a factor of 4–5× and should be revised when ADR-007 moves from Proposed to Accepted.
 
-**Key insight:** RTranslator's NLLB is licensed for non-commercial use only — this is why RTranslator 3.0 is switching models (to Bergamot/MADLAD/HY-MT). Kavi's Opus-MT choice was explicitly driven by this license constraint (ADR-004). The trade-off is model quality: NLLB-600M is a larger, higher-quality multilingual model, while Opus-MT at ~70M parameters is smaller and VI-EN-specific.
+**Key insight:** RTranslator's NLLB is licensed for non-commercial use only — this is why RTranslator 3.0 is switching models (to Bergamot/MADLAD/HY-MT). Kavi's Opus-MT choice was explicitly driven by this license constraint (see the [open-parameters register](../decisions/README.md#open-parameters)). The trade-off is model quality: NLLB-600M is a larger, higher-quality multilingual model, while Opus-MT at ~70M parameters is smaller and VI-EN-specific.
 
 ---
 
@@ -156,7 +156,7 @@ AudioTrack playback
 | --- | --- | --- |
 | **Engine** | Android system TTS (`android.speech.tts.TextToSpeech`) | Bundled ONNX model (MeloTTS / Piper / Kokoro — open parameter) |
 | **Voice quality** | Depends on device's TTS engine and installed voice packs | Deterministic (same model, same voice on every device) |
-| **Model** | Google TTS recommended; user can install any engine | TBD — slot reserved in persistent-residency load sequence (Decision 2) |
+| **Model** | Google TTS recommended; user can install any engine | TBD — slot reserved in persistent-residency load sequence (ADR-013) |
 | **Language packs** | Must be downloaded per-language via device TTS settings | Bundled in APK. Single model supports both VI and EN |
 | **Offline at runtime** | Yes, if voice packs pre-downloaded | Yes, always |
 | **Latency** | Uncontrolled (depends on TTS engine, voice pack size, device CPU) | Deterministic — integrated into pipeline latency budget |
@@ -189,7 +189,7 @@ AudioTrack playback
 | **Denoising** | None | Tier 1: ADSP AI-ECNS (DSP, hardware-dependent, free when available) |
 | | | Tier 2: GTCRN (523 KB ONNX model via sherpa-onnx, permissive license) |
 | **License** | N/A | GTCRN: permissive |
-| **Status** | No denoising in pipeline | GTCRN is the working default for v1, pending benchmark confirmation (Decision 7 notes this as an open parameter per ADR-004) |
+| **Status** | No denoising in pipeline | GTCRN is the working default for v1, pending benchmark confirmation (ADR-018 notes this as an open parameter) |
 | **SNR strategy** | Physical: recommends Bluetooth headset / bone-conduction for noise rejection | Physical + software: BT headset optional; software denoising handles moderate noise without external hardware |
 
 **Notable:** RTranslator's README recommends Bluetooth headsets (especially bone-conduction) as a noise-rejection strategy for the Conversation mode. Kavi adds a software denoising layer, which is important for the target use case (factories, construction sites, logistics centres) where external headsets may not always be worn.
@@ -198,7 +198,7 @@ AudioTrack playback
 
 ### 3.7 Memory Management
 
-| | RTranslator | Kavi (ADR-007 Decision 5) |
+| | RTranslator | Kavi (ADR-016) |
 | --- | --- | --- |
 | **Whisper encoder** | Part of 0.9 GB (~460 MB encoder portion)[^3] | ~80 MB (QNN context binary, NPU ION/DDR) |
 | **Whisper decoder** | Included in 0.9 GB (~460 MB decoder portion)[^3] | ~350 MB (ONNX CPU, FP16 weights + decode graph)[^4] |
@@ -235,13 +235,13 @@ AudioTrack playback
 
 | | RTranslator | Kavi |
 | --- | --- | --- |
-| **Method** | Energy-based amplitude threshold | Energy-based amplitude threshold (Decision 11) |
+| **Method** | Energy-based amplitude threshold | Energy-based amplitude threshold (ADR-022) |
 | **Threshold** | `DEFAULT_AMPLITUDE_THRESHOLD = 2000` (in PCM16-scaled units, i.e. samples × 32767)[^5] | Configurable (exact value TBD in noise-benchmarking phase) |
 | **Margin** | 15-threshold margin: requires 15+ consecutive under-threshold samples before declaring silence | Not specified (v1 design is single-threshold) |
 | **Pre-voice duration** | Configurable: 100–1800 ms (default 1300 ms) — captures audio before threshold is crossed | Not specified (TBD in noise-benchmarking phase) |
 | **Speech timeout** | Configurable: 100–5000 ms (default 1300 ms) | Configurable, default ~500 ms |
 | **Max speech length** | 29 seconds (hard limit) | Not specified |
-| **Model-based VAD** | Not used (no slot reserved) | Not used for v1 but a lightweight model slot is reserved (Silero VAD or similar — Decision 11 notes this) |
+| **Model-based VAD** | Not used (no slot reserved) | Not used for v1 but a lightweight model slot is reserved (Silero VAD or similar — ADR-022 notes this) |
 | **Manual/Push-to-talk** | Yes — dedicated manual mode with per-language recognition buttons alongside automatic VAD | Push-to-talk via UI toggle (not detailed in ADR-007) |
 
 [^5]: **Unit conversion warning for implementers.** RTranslator's `amplitudeThreshold = 2000` operates on PCM16 (`ENCODING_PCM_16BIT`) samples in the range [-32768, 32767]. Kavi's `Recorder` uses `ENCODING_PCM_FLOAT` (range [-1.0, 1.0]). The raw constant 2000 does not transfer directly — the equivalent float threshold is approximately 2000 / 32768 ≈ **0.061**. Using 2000 unmodified in PCM_FLOAT mode would effectively disable VAD (threshold above the signal's maximum range). This note applies wherever RTranslator's VAD constants are referenced as design inspiration.
@@ -254,7 +254,7 @@ AudioTrack playback
 
 | | RTranslator | Kavi |
 | --- | --- | --- |
-| **Model** | Java `Thread` per operation (`new Thread("recognizer")`, `new Thread("textTranslation")`) | Kotlin coroutines on `Dispatchers.Default` within a lifecycle-scoped scope (Decision 9) |
+| **Model** | Java `Thread` per operation (`new Thread("recognizer")`, `new Thread("textTranslation")`) | Kotlin coroutines on `Dispatchers.Default` within a lifecycle-scoped scope (ADR-020) |
 | **Queue management** | `ArrayDeque<DataContainer>` with `synchronized(lock)` + `recognizing` / `translating` flags | Structured cancellation via `viewModelScope.launch` — no manual queue management |
 | **ASR threading** | Each `recognize()` call spawns a thread; serialised via `recognizing` boolean + `dataToRecognize` deque | Sequential `suspend` functions in a single coroutine |
 | **MT threading** | Each `translate()`/`translateMessage()` call spawns a thread; message translation uses its own deque + `translatingMessages` flag | Same coroutine scope as ASR — pipeline is a chain of suspend calls |
@@ -272,7 +272,7 @@ AudioTrack playback
 | --- | --- | --- |
 | **Delivery** | Downloaded on first launch (~1.2 GB from GitHub) | Bundled in APK assets (`jniLibs/arm64-v8a/` + `assets/`) |
 | **APK size** | ~10 MB (models downloaded separately) | **Estimated** ~1.5–2 GB based on the accounted memory footprint[^6] |
-| **Versioning** | Model bundle version tracked in app UI | Models version-locked with QAIRT SDK (2.31.0.250130 ↔ qnn-2.31 — Decision 8) |
+| **Versioning** | Model bundle version tracked in app UI | Models version-locked with QAIRT SDK (2.31.0.250130 ↔ qnn-2.31 — ADR-019) |
 | **Sideloading** | Supported — manual model placement per `Sideloading.md` | Not applicable (models inside APK) |
 | **First-launch UX** | Download progress screen (shown in `DownloadFragment`) with notification channel | Install-time APK size; no download needed |
 | **Play Store** | Not on Play Store (sideload via GitHub Releases) | Not specified; APK distribution via MDM or sideloading for contest deployment |
@@ -289,9 +289,9 @@ AudioTrack playback
 | --- | --- | --- |
 | **ORT version** | 1.19.0 (stable) | Later (no version specified in ADR-007) |
 | **ORT extensions** | `OrtxPackage.getLibraryPath()` registered on **every** session (initializer, encoder, decoder, cache_init, detokenizer) | Not specified in ADR-007 |
-| **CPU arena allocator** | Conditional on device RAM: `false` on < 7 GB, `true` on ≥ 7 GB | `true` (always enabled — Decision 10) |
-| **Memory pattern optimisation** | Conditional on device RAM: `false` on < 7 GB, `true` on ≥ 7 GB | `true` (always enabled — Decision 10) |
-| **Optimisation level** | `NO_OPT` on all encoder/decoder/cache_init sessions; only detokenizer uses ORT's default optimisation level | `ALL_OPT` on all CPU decoder sessions (Decision 10) |
+| **CPU arena allocator** | Conditional on device RAM: `false` on < 7 GB, `true` on ≥ 7 GB | `true` (always enabled — ADR-021) |
+| **Memory pattern optimisation** | Conditional on device RAM: `false` on < 7 GB, `true` on ≥ 7 GB | `true` (always enabled — ADR-021) |
+| **Optimisation level** | `NO_OPT` on all encoder/decoder/cache_init sessions; only detokenizer uses ORT's default optimisation level | `ALL_OPT` on all CPU decoder sessions (ADR-021) |
 | **Custom ops** | Required — RTranslator's Whisper detokenizer uses a fused custom op via `OrtxPackage`. The detokenizer session is the only one where optimisations are enabled, and it's the only one that registers `OrtxPackage` for a custom op | Not specified. If Kavi's CPU decoder graph fuses detokenization the same way (e.g. a Whisper `detokenizer.onnx` session with a custom `LogitsToText` op), `OrtxPackage` may still be needed on the CPU side **regardless of where the encoder runs**. Moving the encoder to QNN does not affect whether the CPU decoder graph has custom ops[^7] |
 
 [^7]: **Correction to an earlier draft.** The earlier version of this comparison reasoned that Kavi *"likely"* doesn't need `OrtxPackage` *"if QNN handles encoders."* This logic is incorrect: `OrtxPackage` registers custom ops in the ONNX Runtime graph, which in both designs is the **CPU decoder** graph (not the encoder). RTranslator needed it for its Whisper detokenizer custom op. If Kavi's decoder pipeline similarly fuses detokenization into an ONNX session (rather than doing it in Java/Kotlin code), it will need `OrtxPackage` regardless of whether the encoder runs on NPU, CPU, or GPU. The ADR-007 text simply doesn't address this — it should be resolved during Phase-4 implementation.
@@ -333,7 +333,7 @@ AudioTrack playback
 
 2. **Lazy model loading:** RTranslator initialises models on first use, adding cold-start latency to the first utterance and forcing every service to check `if(translator == null) { initializeTranslator(callback) }`. Kavi's eager loading in `TranslationService.onCreate()` is cleaner, though it moves the latency to app launch.
 
-3. **Broken beam search for MT:** RTranslator's beam-search code for NLLB is documented as *"not updated, so it won't work with the final models"* and crashes at runtime. This is a cautionary tale — beam search is not free, and Kavi's decision to defer it to Phase-5 with clear latency-budget reasoning (Decision 9 note) is prudent.
+3. **Broken beam search for MT:** RTranslator's beam-search code for NLLB is documented as *"not updated, so it won't work with the final models"* and crashes at runtime. This is a cautionary tale — beam search is not free, and Kavi's decision to defer it to Phase-5 with clear latency-budget reasoning (ADR-020 note) is prudent.
 
 4. **Thread-per-call concurrency:** RTranslator spawns `new Thread("recognizer")` and `new Thread("textTranslation")` for each operation, managing work queues manually with `synchronized`. The explicit `result.close()` calls in the decode loop (with the comment *"otherwise it accumulates and increases a lot"*) highlight the memory-pressure risk. Kavi's coroutine approach is safer and more maintainable.
 
@@ -383,8 +383,8 @@ The price Kavi pays is a larger APK (bundled models), longer cold start (eager l
 ## References
 
 - `RTranslator/` — Clone of niedev/RTranslator v2.00 (commit `e1cd028`)
-- `docs/decisions/ADR-007-production-inference-architecture.md` — Kavi's production inference architecture
-- `docs/decisions/ADR-005-qnn-conversion-workarounds.md` — Encoder/NPU, decoder/CPU split rationale
+- `docs/decisions/ADR-007-translation-service.md` — Kavi's production inference architecture
+- `docs/decisions/ADR-005-qnn-isnan-workaround.md` — Encoder/NPU, decoder/CPU split rationale
 - `docs/rtranslator-test-protocol.md` — RTranslator baseline test procedure
 - `bench/candidates/opusmt_mt.py` — CTranslate2 Opus-MT candidate adapter
 - `bench/qnn/export_opusmt_onnx.py` — Opus-MT ONNX export script
