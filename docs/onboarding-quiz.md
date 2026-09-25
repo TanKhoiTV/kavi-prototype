@@ -116,8 +116,9 @@ reported, so re-measure on our unit. Our advantage: **bundled Piper = verifiable
 version / commit + date** (RTranslator 3.0 is imminent and swaps backends).
 *Rubric: cites the anchor + offline advantage + version snapshot.*
 
-**Q8.** `prototype/` is a **private submodule** skipped by a plain parent clone.
-Fix: `git clone --recurse-submodules …` then `cd prototype && git checkout main`.
+**Q8.** `prototype/` is a **submodule** skipped by a plain parent clone (it is
+public, like the parent). Fix: `git clone --recurse-submodules …` then
+`cd prototype && git checkout main`.
 *Rubric: identifies the submodule + gives the recurse command.*
 
 **Q9.** Hard gate: **RTF < 1.0**, **turnaround < 2.0 s**, **no-internet (DQ)**.
