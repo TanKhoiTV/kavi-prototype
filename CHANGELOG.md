@@ -53,6 +53,8 @@
 - Reconcile plans with ADR-007-010; archive superseded docs to reference/ ([#95](https://github.com/TanKhoiTV/kavi-prototype/pull/95))
 - Add ADR-012 — ASR thread tuning strategy (Proposed) (#100)([#100](https://github.com/TanKhoiTV/kavi-prototype/pull/100))
 - Plan Kotlin + C++ implementation for the android app (#97)([#97](https://github.com/TanKhoiTV/kavi-prototype/pull/97))
+- **repo:** Document that the android app is not vendored here
+- Correct kavi-android repo structure after untracking
 
 ### Features
 
@@ -88,11 +90,14 @@
 - Update android submodule (stale .dlc refs removed)
 - Update android submodule (doc fixes)
 - **gitignore:** Ignore generated QNN artifacts, keep README (#81)([#81](https://github.com/TanKhoiTV/kavi-prototype/pull/81))
+- **repo:** Ignore the unvendored android path
+- **ci:** Drop the submodule opt-out from checkout
 
 ### Refactoring
 
 - **bench:** Make manifest candidate-agnostic + cheap FLEURS reads
 - **bench:** Cache candidate instances per cid in run_manifest
+- **repo:** Untrack the private android submodule
 
 ### Testing
 
