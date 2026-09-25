@@ -47,6 +47,16 @@ git checkout main  # submodules start on a detached commit; switch to a branch
   (`git@github.com:...`) with an SSH key registered on GitHub, or HTTPS with a
   personal access token.
 
+### The Android app is not part of this repo
+
+The Android app lives in a **separate private repository**
+([`kavi-android`](https://github.com/TanKhoiTV/kavi-android)) and is deliberately
+not vendored here. There is no `android/` submodule in this repo and `android/` is
+gitignored, so a clone of this repo will never populate it.
+
+For Android development, clone `kavi-android` separately (ask the owner for
+access). `--recursive` on the parent is no longer required for the Android app.
+
 ## Workflow
 
 1. Branch from `main`: `git checkout -b feat/<topic>` (or `fix/`, `chore/`).
