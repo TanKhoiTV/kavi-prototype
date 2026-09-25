@@ -134,4 +134,8 @@ picks. **Status remains *Proposed* until the on-device numbers exist.**
 - Vietnamese **TTS coverage** in AI Hub PiperTTS?
 - **w8a16 vs w8a8** accuracy for Opus-MT vi↔en?
 - Which stages truly need HTP vs are CPU-sufficient?
-- Can we obtain QAIRT Community Edition (free Qualcomm ID)? Expected yes, confirm.
+- ~~Can we obtain QAIRT Community Edition (free Qualcomm ID)?~~ **Resolved
+  (2026-09-25):** yes — obtained and in use. The SDK (`2.31.0.250130`) is installed
+  and drives the converter flow (`docs/ndk-conversion-runbook.md` §2.2,
+  `scripts/qairt-env.sh`), and
+  [ADR-030](ADR-030-qairt-runtime-redistribution.md) records its licence terms.

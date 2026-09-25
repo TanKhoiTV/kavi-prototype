@@ -109,14 +109,19 @@ here so nothing is silently forgotten. This register replaces the former
 
 | # | Open parameter | Owned by | Closes when |
 | --- | --- | --- | --- |
-| 1 | **Final MT model** | *no record yet* | An MT decision ADR is written. Opus-MT is in use and pinned in `.kavi.yaml`, but the choice was never recorded — ADR-004 deferred it and ADR-008/ADR-009 closed only ASR and TTS. |
-| 2 | **On-device denoiser model** (GTCRN vs Wiener) | [ADR-018](ADR-018-denoising-slot.md) | On-device benchmark; host-side Wiener gate already recorded in [`docs/reference/denoising-gate-results.md`](../reference/denoising-gate-results.md) |
-| 3 | **Piper engine licence path** | [ADR-031](ADR-031-piper-engine-gpl-split.md) | A decision is taken (subprocess isolation vs dropping Piper) |
-| 4 | **VAD thresholds** | [ADR-022](ADR-022-energy-vad.md) | Noise benchmarking (may trigger a model-based VAD) |
-| 5 | **ASR thread-tuning build** (B vs F) | [ADR-012](ADR-012-asr-thread-tuning.md) | On-device A/B test on the Meizu 21 Note |
-| 6 | **MT beam width** (greedy vs beam=4) | [ADR-020](ADR-020-pipeline-concurrency.md) | Phase-5 latency-vs-BLEU measurement |
-| 7 | **w8a16 vs w8a8** for Opus-MT | [ADR-003](ADR-003-hexagon-runtime.md) | Accuracy regression measurement |
-| 8 | **QAIRT Community Edition access** | [ADR-003](ADR-003-hexagon-runtime.md) | Qualcomm ID confirmed (expected) |
+| 1 | **Final MT model** | *no record yet* | An MT decision ADR is written (tracked as issue #110). Opus-MT is in use and pinned in `.kavi.yaml`, but the choice was never recorded — ADR-004 deferred it and ADR-008/ADR-009 closed only ASR and TTS. *Not measurement-gated: it needs a record, not a number.* |
+| 2 | **On-device denoiser model** (GTCRN vs Wiener) | [ADR-018](ADR-018-denoising-slot.md) | **Needs a number:** on-device WER for GTCRN vs Wiener on the same clips. The host-side Wiener gate is already recorded in [`docs/reference/denoising-gate-results.md`](../reference/denoising-gate-results.md) |
+| 3 | **Piper engine licence path** | [ADR-031](ADR-031-piper-engine-gpl-split.md) | **Downstream of the TTS decision — not currently blocking.** Piper is fallback-only in the working position, so this closes when the TTS choice is ratified: dropped from the shipped stack → closes outright; kept as fallback → the MIT-era `rhasspy/piper` snapshot must be pinned and subprocess isolation adopted. Urgent only if Supertonic misses the RTF ≤ 0.5 gate in `.kavi.yaml`. |
+| 4 | **VAD thresholds** | [ADR-022](ADR-022-energy-vad.md) | **Needs a number:** noise-condition benchmarking to fix the energy threshold and speech timeout (may trigger a model-based VAD) |
+| 5 | **ASR thread-tuning build** (B vs F) | [ADR-012](ADR-012-asr-thread-tuning.md) | **Needs a number:** on-device A/B on the Meizu 21 Note, 100 utterances per mode, logging RTF, thermal status and audio-overrun counters. Build B is already the working config, so this validates it and decides whether the Build F escalation is needed; the ADR's nine platform questions also need confirming on-device. |
+| 6 | **MT beam width** (greedy vs beam=4) | [ADR-020](ADR-020-pipeline-concurrency.md) | **Needs a number:** Phase-5 latency-vs-BLEU measurement |
+| 7 | **w8a16 vs w8a8** for Opus-MT | [ADR-003](ADR-003-hexagon-runtime.md) | **Needs a number:** accuracy regression measurement |
+
+> **Resolved — removed from the table.** **#8 QAIRT Community Edition access:**
+> obtained. The SDK (`2.31.0.250130`) is installed and in use — see
+> [`docs/ndk-conversion-runbook.md`](../ndk-conversion-runbook.md) §2.2 and
+> `scripts/qairt-env.sh` — and
+> [ADR-030](ADR-030-qairt-runtime-redistribution.md) records its licence terms.
 
 ## Conventions
 
