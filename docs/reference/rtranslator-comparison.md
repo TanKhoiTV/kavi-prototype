@@ -4,6 +4,12 @@
 **RTranslator version:** 2.1.5 (commit `49e7f20`, tag `2.1.5`)
 **Kavi ADR-007 status:** Proposed
 
+> **Note (2026-09-25):** relocated here from
+> `docs/decisions/ADR-007-vs-RTranslator-comparison.md` — it records no decision,
+> so it is reference material rather than an ADR. The comparison is against the
+> pre-split ADR-007; that description now lives in ADR-007 plus ADR-013–ADR-022
+> (see [`../decisions/README.md`](../decisions/README.md)).
+>
 > **Purpose:** Cross-reference the two architectures for the Kavi team. RTranslator
 > is the closest production analogue to Kavi's design (offline speech-to-speech
 > translation on Android) and served as the original inspiration for the

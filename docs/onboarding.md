@@ -204,7 +204,9 @@ under `archive/` for reference.
 | `voices/` | TTS voice model(s) (Piper). Usually gitignored / downloaded at runtime. |
 | `docs/` | Internal docs (this file's siblings). |
 | `docs/decisions/` | The ADRs — start at `README.md` (the index). Source of truth for architecture + licensing. |
-| `docs/android-implementation-plan.md` | The active implementation plan (ADR-007 → ADR-010). **Read this next.** |
+| `docs/android-implementation-plan.md` | The implementation plan, milestone view (M0–M6). **Read this next.** |
+| `docs/android-kotlin-cpp-implementation-plan.md` | The same plan at file level (Kotlin/C++ layout, JNI contract, Build A–F). |
+| `docs/ndk-conversion-runbook.md` | Runbook for the one remaining QNN artifact (Opus-MT encoder → HTP v73). |
 | `docs/reference/` | Superseded / deprecated docs (benchmarking-plan, phase-4-qnn-plan, …). |
 | `.pi/AGENTS.md`, `CONTRIBUTING.md`, `README.md` | Project / agent guidance, how we work, quickstart. |
 | `Makefile`, `pyproject.toml`, `LICENSE` | Build / run, deps (uv), MIT license. |

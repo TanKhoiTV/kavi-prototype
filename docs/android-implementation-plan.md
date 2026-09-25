@@ -1,10 +1,11 @@
-# Android Implementation Plan (ADR-007 → ADR-010)
+# Android Implementation Plan — milestone view
 
 > **Status:** Proposed — not yet executed
 > **Date:** 2026-08-03
-> **Sources:** ADR-007 (production inference architecture), ADR-008 (Dual Zipformer ASR),
-> ADR-009 (phased TTS: Supertonic → VieNeu-TTS), ADR-010 (`ALL_OPT` analysis),
-> ADR-006 (Android runner architecture), `.pi/PLAN.md` (Phases 4–7)
+> **Sources:** the inference architecture (ADR-007 plus ADR-013–ADR-022),
+> ADR-008 (Dual Zipformer ASR), ADR-009 (phased TTS: Supertonic → VieNeu-TTS),
+> ADR-010 (`ALL_OPT` analysis), ADR-006 (Android runner architecture),
+> `.pi/PLAN.md` (Phases 4–7)
 > **Scope:** Everything needed to take `android/` from a buildable skeleton to the
 > production two-mode speech-to-speech app.
 
@@ -12,8 +13,9 @@
 
 ## 1. Goal
 
-Turn the current `android/` submodule (bare `MainActivity` + stubbed QNN JNI bridge +
-39 bundled `libQnn*.so`) into the ADR-007 `TranslationService` app: a fully offline,
+Turn the current `android/` app (the separate `kavi-android` repo; bare
+`MainActivity` + stubbed QNN JNI bridge + 39 bundled `libQnn*.so`) into the
+`TranslationService` app (ADR-007): a fully offline,
 on-device, two-mode (OneDevice walkie-talkie / PeerToPeer BLE) Vietnamese↔English
 speech-to-speech translator meeting the 2.0 s turnaround budget on a Snapdragon 8 Gen 2.
 
@@ -232,11 +234,12 @@ Tech-stack closure (per `.pi/PLAN.md` §8 acceptance criteria).
 
 ## 6. Related documents
 
-- ADR-007 — Production Inference Architecture & Service Layer (parent; ADR-017 superseded)
+- ADR-007 — `TranslationService` two-mode foreground service (the inference architecture also spans ADR-013–ADR-022; ADR-017 is superseded)
 - ADR-008 — v1 Android ASR Decision: Dual Zipformer (revises ADR-014/ADR-016/ADR-017)
 - ADR-009 — v1 Android TTS Decision (Supertonic Phase 1 → VieNeu-TTS Phase 2)
 - ADR-010 — `ALL_OPT` Decoder Optimisation (confirms ADR-021)
 - ADR-006 — Android Runner Architecture (benchmark runner design)
+- `docs/android-kotlin-cpp-implementation-plan.md` — companion plan at file level (Kotlin/C++ layout, JNI contract, Build A–F)
 - `.pi/PLAN.md` — Phases 4–7 task breakdown (QNN conversion, RTranslator, COMET/MOS)
 - `docs/reference/phase-4-qnn-plan.md` — executable QNN conversion spec
 - `docs/ndk-conversion-runbook.md` — step-by-step NDK conversion runbook (Opus-MT encoder → HTP v73 context binary)
