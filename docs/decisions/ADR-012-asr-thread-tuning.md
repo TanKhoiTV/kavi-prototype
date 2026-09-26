@@ -243,7 +243,7 @@ which requires API 21+ (minimum supported API is Android 16 per ADR-002, so OK).
 
 ## References
 
-- ADR-007: Production Inference Architecture (parent architecture — threading decisions in context of overall pipeline)
+- ADR-007: TranslationService — two-mode foreground service (the service this threading configures; the wider inference architecture spans ADR-013–ADR-022)
 - ADR-008: v1 Android ASR Decision — Dual Zipformer (RTF 0.011 desktop benchmark, go/no-go gate at RTF > 0.05, streaming transducer architecture)
 - ADR-002: Target Platform — Snapdragon 8 Gen 2, Android 16
 - ADR-010: All-Opt Decoder Optimisation

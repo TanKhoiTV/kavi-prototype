@@ -68,5 +68,5 @@ afterwards. The QNN graph itself never sees a dynamic shape.
 
 - [ADR-003](ADR-003-hexagon-runtime.md) — Hexagon runtime (no dynamic shapes)
 - [ADR-006](ADR-006-native-on-device-runner.md) — Native on-device runner
-- [ADR-005](ADR-005-qnn-isnan-workaround.md) — QNN conversion workarounds (original `Decision 5` location)
+- [ADR-005](ADR-005-qnn-isnan-workaround.md) — QNN `IsNaN` workaround (original `Decision 5` location)
 - PR #73 comment from @winterSolstice25 — documented the padding/trimming requirement
