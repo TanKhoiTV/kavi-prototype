@@ -229,7 +229,7 @@ RIRS_NOISES = public-safe.
 
 ### Phase 4 — On-device runner (QNN)
 
-- [ ] Convert Whisper-Small-Quantized-QNN, ORT+QNN-OpusMT, Piper-QNN to QNN artifacts (`<model>.cpp` → HTP v73 context binary on Windows).
+- [ ] Convert Whisper-Small-Quantized-QNN, ORT+QNN-OpusMT, Piper-QNN to QNN artifacts (`<model>.cpp` → HTP v73 context binary; Linux/WSL or Windows host).
 - [ ] Android instrumented runner: read manifest, run candidates, log latency/
       RTF/peak RSS, dump outputs.
 - [ ] Re-run v0 slice on-device; answer: **does QNN meaningfully beat CPU?**

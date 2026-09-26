@@ -203,11 +203,13 @@ identically on Windows, Linux, and macOS. The OS-specific pieces are the
   for Git Bash/WSL. In PowerShell set the variables directly, or use
   `scripts\qairt-env.ps1`.
 
-**Our setup (reference, not a requirement):** the assistant builds the Android
-app on **Windows** and runs QAIRT conversion in **WSL2** — only because this
-box's WSL environment cannot launch the Windows `.exe` converters. A human
-Windows developer runs conversion natively on Windows; the split is an
-environment quirk, not a project requirement.
+**Our setup (reference, not a requirement):** everything runs in **WSL2** on
+this box — the Android app is built there against a Linux SDK/NDK (app repo:
+`scripts/setup-android-sdk.sh`) and QAIRT conversion uses the **Linux** QAIRT
+SDK, whose `x86_64-linux-clang` converters and host libs run natively. The
+earlier split (app on Windows, conversion in WSL2) applied while only the
+Windows QAIRT SDK was installed; the Linux SDK is now the one in use, so no OS
+hopping is required.
 
 **QAIRT conversion toolchain (Phase 4):** host build-time only, needed solely
 when producing HTP v73 context binaries. See `docs/reference/phase-4-qnn-plan.md`
