@@ -67,7 +67,8 @@ sourceable model (PyTorch / TFLite / ONNX)
 - **Artifact choice:** `qnn-onnx-converter` emits `<model>.cpp` (graph source) +
   `<model>_net.json` + a QNN_CPU `.bin` — **not** a `.dlc`. The on-device NPU
   artifact is the **HTP v73 context binary** (plus the model `.so` library), built
-  on Windows via `qnn-model-lib-generator` + `qnn-context-binary-generator`. (A
+  via `qnn-model-lib-generator` + `qnn-context-binary-generator` on a host with
+  the QAIRT toolchain — Linux/WSL or Windows. (A
   `.dlc` is a separate SNPE-era format loaded via `libQnnModelDlc.so --dlc_path`
   and is **not** produced by `qnn-onnx-converter`.)
 
@@ -92,7 +93,7 @@ benchmark below is what decides.
 - **Hard part:** the autoregressive decoder needs **fixed-sequence handling** —
   KV-cache / padded decoding, because **no dynamic shapes** are allowed. This is
   the riskiest conversion; budget time for it.
-- **Output:** encoder `.cpp` (graph) → Windows builds model `.so` + HTP v73 context binary.
+- **Output:** encoder `.cpp` (graph) → host builds model `.so` + HTP v73 context binary.
 
 ### 3.2 MT — Opus-MT vi↔en (Helsinki-NLP, PyTorch, Apache-2.0)
 
@@ -103,7 +104,7 @@ benchmark below is what decides.
   the en-es recipe is a template.
 - **Scope:** export **vi→en** (v0 need) and **en→vi** if the bidirectional eval
   set requires it.
-- **Output:** `<model>.cpp` (graph) → HTP v73 context binary (Windows).
+- **Output:** `<model>.cpp` (graph) → HTP v73 context binary (Linux/WSL or Windows).
 
 ### 3.3 TTS — Piper (MIT-era `rhasspy/piper`, ONNX) — **Deferred** (ADR-024)
 
@@ -123,7 +124,7 @@ benchmark below is what decides.
   reference tensor), then pin the data-dependent output length by normalizing
   the duration-sum to a fixed `T_FIXED` (see §10).
 - **Output (if ever re-evaluated):** `<model>.cpp` (graph) → HTP v73 context
-  binary (Windows).
+  binary (Linux/WSL or Windows).
 
 ---
 
@@ -189,9 +190,10 @@ that finalize the **tech-stack register**.
   Whisper-Small-Quantized-QNN re-source proving the path; (2) **Opus-MT vi→en** —
   same autoregressive decoder pattern, no sampling op. **(3) Piper — Deferred**
   per ADR-024 (cyclic graph, unsupported ops, already fast on CPU).
-  The WSL host runs `qnn-onnx-converter` → `<model>.cpp`; the model
-  `.so` + HTP v73 context binary are built on Windows (clang++ / NDK / MSVC), per
-  the §1 env split.
+  The host runs `qnn-onnx-converter` → `<model>.cpp`, then builds the model
+  `.so` + HTP v73 context binary with `qnn-model-lib-generator` /
+  `qnn-context-binary-generator` (clang / NDK on Linux/WSL, MSVC / NDK on
+  Windows) — both hosts ship the full toolchain; see §1 for the env contract.
 - **Risks:**
   - ASR decoder **fixed-shape reformulation** (KV-cache / padded decode) — the
     heaviest lift.
@@ -237,13 +239,13 @@ qnn-onnx-converter \
   ONNX graph + `input_list`. For data-dependent outputs (Piper TTS), pin the
   length **inside the ONNX graph** (§10), not via a converter flag.
 
-**Model lib + HTP v73 context binary (build host: Windows, NDK r26c + MSVC/clang):**
+**Model lib + HTP v73 context binary (build host: Linux/WSL or Windows; NDK `26.1.10909125` clang on Linux, MSVC/clang on Windows):**
 
 ```bash
 qnn-model-lib-generator -c <model>.cpp -t aarch64-android -n <model> -o <model>_libs/
 qnn-context-binary-generator \
   --model <model>_libs/aarch64-android/lib<model>.so \
-  --backend %QAIRT_SDK_ROOT%\lib\aarch64-android\libQnnHtp.so \
+  --backend "$QAIRT_SDK_ROOT/lib/aarch64-android/libQnnHtp.so" \
   --htp_arch v73 --binary_file <model>_v73.bin --output_dir <model>_ctx/
 ```
 
@@ -251,15 +253,17 @@ qnn-context-binary-generator \
   required** — without it the `.so` is named `libqnn_model.so` (SDK default), and
   every downstream `--model` path breaks. The `aarch64-android/` subdir is
   auto-appended inside `-o`.
-- `--backend` needs the **full path** to `libQnnHtp.so` (on Windows
-  `%QAIRT_SDK_ROOT%\lib\aarch64-android\libQnnHtp.so`); a bare `libQnnHtp.so`
-  will not resolve.
+- `--backend` needs the **full path** to `libQnnHtp.so` —
+  `$QAIRT_SDK_ROOT/lib/aarch64-android/libQnnHtp.so` on Linux/WSL,
+  `%QAIRT_SDK_ROOT%\lib\aarch64-android\libQnnHtp.so` on Windows; a bare
+  `libQnnHtp.so` will not resolve.
 - `--htp_arch v73` is accepted **only** with `--model <compiled .so>` (passing a
   `.dlc` directly errors with "Unused Arguments").
 
 **First validation target = Whisper encoder** (static `[1,80,3000]`, no decoder
-loop — lowest risk). Convert on WSL, build + generate the context binary on
-Windows (build model `.so` + HTP v73 context binary there), run on-device via
+loop — lowest risk). Convert, build the model `.so` and generate the context
+binary on the same host (WSL/Linux here; Windows works identically), then run
+on-device via
 `qnn-net-run --model <model>_libs/aarch64-android/lib<model>.so --backend libQnnHtp.so
 --binary_file <model>_v73.bin --input_list input_features:<real_fleurs_mel>.raw`. Save the FP32 `whisper.audio.log_mel_spectrogram`
 reference on WSL (`np.save`) so the on-device HTP output can be diffed (max abs
