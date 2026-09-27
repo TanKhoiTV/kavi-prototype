@@ -10,13 +10,18 @@ on:
       - CHANGELOG.md
   workflow_dispatch:
 
+# Read-only by default, so a job added later cannot inherit a write scope.
 permissions:
-  contents: write
-  pull-requests: read
+  contents: read
 
 jobs:
   update-changelog:
     runs-on: ubuntu-latest
+    # Elevated per job rather than at the workflow level: this is the only job
+    # that regenerates and writes CHANGELOG.md.
+    permissions:
+      contents: write # covers this job's own writes; see the App-token note below
+      pull-requests: read # git-cliff resolves commit.remote.pr_number
     # A hung git-cliff or push step would otherwise hold a runner for the
     # 360-minute default; 10 is comfortably above the observed ~20s runtime.
     timeout-minutes: 10
