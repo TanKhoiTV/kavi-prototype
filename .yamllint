@@ -11,6 +11,20 @@
 # defaults.
 extends: default
 
+# Local-only trees are not ours to lint, and they are where vendored YAML shows
+# up: the two `uv sync` virtualenvs, the RTranslator reference checkout, and the
+# frozen legacy tree. yamllint walks the filesystem rather than honouring
+# `.gitignore`, so without this an unignored `.venv` alone contributes thousands
+# of findings — a malformed indentation inside torch's bundled
+# `serde/schema.yaml` is an *error*, which fails `make check` outright. `archive`
+# and `RTranslator` already carry the same exclusion in `pyproject.toml` (ruff
+# `extend-exclude`) and in `.pre-commit-config.yaml`.
+ignore: |
+  .venv/
+  .venv-qairt/
+  archive/
+  RTranslator/
+
 rules:
   # Long lines are intentional, so this must not block. The repository's only
   # line-length convention is ruff's 88 (Python-only, pyproject.toml); the same

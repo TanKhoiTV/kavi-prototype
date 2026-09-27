@@ -15,6 +15,14 @@ repos:
       - id: check-added-large-files
         args: ['--maxkb=5000']
 
+  # Style rules for the repository's YAML; `.yamllint` is discovered from the
+  # repository root. It holds line-length at warning level, so this hook passes
+  # on `.kavi.yaml` where the long provenance comments are deliberate.
+  - repo: https://github.com/adrienverge/yamllint
+    rev: v1.38.0
+    hooks:
+      - id: yamllint
+
   # commitlint runs in a Node env provisioned by pre-commit itself,
   # so no package.json / node_modules is needed in this Python repo.
   - repo: local

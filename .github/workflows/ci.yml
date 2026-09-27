@@ -21,7 +21,7 @@ jobs:
         run: uv python install
       - name: Install dependencies
         run: uv sync
-      - name: make check (ruff lint + format)
+      - name: make check (ruff lint + format + yamllint)
         run: make check
       - name: make test (pytest)
         run: make test
