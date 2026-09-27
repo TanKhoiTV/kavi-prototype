@@ -22,7 +22,15 @@
 #       --input-dims "1,128" \
 #       --input-list /path/to/input_list.txt \
 #       --output-dir models/qnn/opus-mt-vi-en/ctx \
-#       --name opus_mt_vi_en_encoder
+#       --name opus_mt_vi_en_encoder \
+#       --quantization w8a16
+#
+# Quantization:
+#   --quantization w8a16|w8a8 selects the arm of an A/B bit-width comparison
+#   (issue #116). Equivalent to --weights-bitwidth/--act-bitwidth, but matches
+#   the `quantization:` key in .kavi.yaml. Builds with different bit-widths
+#   MUST use different --name values (suffix _w8a16 / _w8a8); the script refuses
+#   to overwrite an existing build that used different settings.
 #
 # Environment:
 #   QAIRT_SDK_ROOT   – path to QAIRT SDK 2.31.0.250130 (required)
@@ -45,6 +53,16 @@ QUANTIZE=true
 SKIP_LIB=false
 SKIP_CTX=false
 VERBOSE=false
+FORCE_REBUILD=false
+
+# Quantization settings — overridable (issue #116 A/B: w8a16 vs w8a8)
+WEIGHTS_BITWIDTH=8
+ACT_BITWIDTH=16
+PARAM_QUANTIZER=tf
+ACT_QUANTIZER=tf
+REQUIRE_INPUT_LIST=false
+BITWIDTH_FLAGS_USED=false
+QUANT_PRESET_USED=false
 
 # ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -53,6 +71,31 @@ die() {
 	exit 1
 }
 info() { echo "[INFO] $*"; }
+
+# SHA256 of a file, for stamping the build metadata. Echoes "-" when the file is
+# missing or no hashing tool is available (never fails the build).
+sha256_of() {
+	local f="$1"
+	if [[ ! -f "$f" ]]; then
+		echo "-"
+		return 0
+	fi
+	if command -v sha256sum >/dev/null 2>&1; then
+		sha256sum "$f" | awk '{print $1}'
+	elif command -v shasum >/dev/null 2>&1; then
+		shasum -a 256 "$f" | awk '{print $1}'
+	else
+		echo "-"
+	fi
+}
+
+# Read one key from a build-metadata file. Prints nothing when absent.
+meta_value() {
+	local key="$1" file="$2"
+	[[ -f "$file" ]] || return 0
+	sed -n "s/^${key}=//p" "$file" | head -n 1
+	return 0
+}
 
 usage() {
 	cat <<'USAGE'
@@ -69,6 +112,25 @@ Conversion options:
   --input-list <path>     Path to calibration input list (for quantization)
   --name <name>           Model name used in generated files (default: basename of ONNX)
   --no-quantize           Skip quantization (float conversion only)
+
+Quantization options (issue #116 — w8a16 vs w8a8 A/B):
+  --quantization <w8a16>  Preset selecting the arm, e.g. w8a16 or w8a8.
+                          Sets both bit-widths at once. Mutually exclusive with
+                          the explicit --weights-bitwidth/--act-bitwidth flags.
+  --weights-bitwidth <n>  Weight bit-width: 8 (default) or 16
+  --act-bitwidth <n>      Activation bit-width: 8 or 16 (default 16)
+  --param-quantizer <q>   Weight quantizer: tf (default), percentile, minmax, entropy
+  --act-quantizer <q>     Activation quantizer: tf (default), percentile, minmax, entropy
+  --require-input-list    Abort if --input-list is missing instead of falling back
+                          to synthesized ranges. Use for any A/B that feeds a
+                          recorded decision (ADR-026: calibration must be real data).
+  --force-rebuild         Allow overwriting an existing build of the same --name
+                          that used different quantization settings.
+
+Safety:
+  A build is stamped with <name>_qconv_meta.txt. Re-running the same --name with
+  different bit-widths, quantizers or calibration data is refused, so two A/B arms
+  cannot silently overwrite each other. Use a distinct --name (_w8a16 / _w8a8).
 
 Pipeline step options:
   --skip-lib              Skip model-lib generation (step 2)
@@ -89,6 +151,17 @@ Examples:
       --input-name input_features --input-dims "1,80,3000" \
       --input-list calibration_input_list.txt \
       --output-dir out/ --name whisper_encoder
+
+  # Issue #116 A/B — two arms of the same encoder, only bit-width differs.
+  # Same --onnx, same --input-list, same SDK; distinct --name per arm.
+  for ARM in w8a16 w8a8; do
+    ./bench/qnn/convert_to_qnn.sh --onnx encoder_model.onnx \
+        --input-name input_ids --input-dims "1,128" \
+        --input-list models/qnn/opusmt_input_list.txt \
+        --quantization "$ARM" --require-input-list \
+        --output-dir models/qnn/opus-mt-vi-en/ctx \
+        --name "opus_mt_vi_en_encoder_$ARM"
+  done
 USAGE
 	exit 0
 }
@@ -125,6 +198,47 @@ while [[ $# -gt 0 ]]; do
 		NAME="$2"
 		shift 2
 		;;
+	--quantization)
+		[[ "$BITWIDTH_FLAGS_USED" == true ]] &&
+			die "--quantization conflicts with --weights-bitwidth/--act-bitwidth; use one style or the other"
+		if [[ ! "$2" =~ ^w([0-9]+)a([0-9]+)$ ]]; then
+			die "--quantization expects w<weights>a<activations>, e.g. w8a16 or w8a8 (got: $2)"
+		fi
+		WEIGHTS_BITWIDTH="${BASH_REMATCH[1]}"
+		ACT_BITWIDTH="${BASH_REMATCH[2]}"
+		QUANT_PRESET_USED=true
+		shift 2
+		;;
+	--weights-bitwidth)
+		[[ "$QUANT_PRESET_USED" == true ]] &&
+			die "--weights-bitwidth conflicts with --quantization; use one style or the other"
+		WEIGHTS_BITWIDTH="$2"
+		BITWIDTH_FLAGS_USED=true
+		shift 2
+		;;
+	--act-bitwidth)
+		[[ "$QUANT_PRESET_USED" == true ]] &&
+			die "--act-bitwidth conflicts with --quantization; use one style or the other"
+		ACT_BITWIDTH="$2"
+		BITWIDTH_FLAGS_USED=true
+		shift 2
+		;;
+	--param-quantizer)
+		PARAM_QUANTIZER="$2"
+		shift 2
+		;;
+	--act-quantizer)
+		ACT_QUANTIZER="$2"
+		shift 2
+		;;
+	--require-input-list)
+		REQUIRE_INPUT_LIST=true
+		shift
+		;;
+	--force-rebuild)
+		FORCE_REBUILD=true
+		shift
+		;;
 	--no-quantize)
 		QUANTIZE=false
 		shift
@@ -153,6 +267,55 @@ done
 [[ ${#INPUT_DIMS[@]} -eq 0 ]] && die "At least one --input-dims is required"
 [[ ${#INPUT_NAMES[@]} -ne ${#INPUT_DIMS[@]} ]] && die "Number of --input-name entries must match --input-dims entries"
 
+# ── Validate quantization settings ──────────────────────────────────────────
+
+validate_bitwidth() {
+	local flag="$1" value="$2"
+	[[ "$value" =~ ^[0-9]+$ ]] || die "$flag expects an integer (got: $value)"
+	# 4-bit weights and 32-bit activations are out of scope for the #116 A/B and
+	# are rejected early rather than producing an off-contract artifact.
+	case "$value" in
+	8 | 16) ;;
+	*) die "$flag must be 8 or 16 for the w8a16/w8a8 A/B (got: $value)" ;;
+	esac
+}
+
+validate_quantizer() {
+	local flag="$1" value="$2"
+	[[ -n "$value" ]] || die "$flag must not be empty"
+	case "$value" in
+	tf | percentile | minmax | entropy) ;;
+	*) die "Unknown $flag: '$value'. Valid: tf, percentile, minmax, entropy" ;;
+	esac
+}
+
+QUANT_TAG="w${WEIGHTS_BITWIDTH}a${ACT_BITWIDTH}"
+
+if $QUANTIZE; then
+	validate_bitwidth "--weights-bitwidth" "$WEIGHTS_BITWIDTH"
+	validate_bitwidth "--act-bitwidth" "$ACT_BITWIDTH"
+	validate_quantizer "--param-quantizer" "$PARAM_QUANTIZER"
+	validate_quantizer "--act-quantizer" "$ACT_QUANTIZER"
+
+	if [[ "$ACT_BITWIDTH" == "8" && "$ACT_QUANTIZER" == "tf" ]]; then
+		info "  NOTE: 8-bit activations with the 'tf' quantizer — if this QAIRT"
+		info "        release rejects the combination, switch both A/B arms to the"
+		info "        same alternative (e.g. --act-quantizer percentile) so the"
+		info "        only difference between arms stays the bit-width."
+	fi
+
+	if $REQUIRE_INPUT_LIST; then
+		[[ -n "$INPUT_LIST" ]] || die "--require-input-list: --input-list is required (ADR-026 forbids fallback ranges)"
+	fi
+	# A mistyped path would otherwise surface as a confusing converter error
+	# (or, worse, as a build that silently fell back to no calibration).
+	if [[ -n "$INPUT_LIST" && ! -f "$INPUT_LIST" ]]; then
+		die "--input-list not found: $INPUT_LIST"
+	fi
+elif [[ "$BITWIDTH_FLAGS_USED" == true || "$QUANT_PRESET_USED" == true ]]; then
+	info "  NOTE: --no-quantize is set; bit-width settings are ignored."
+fi
+
 # If NAME is not set explicitly, derive from ONNX basename
 if [[ "$NAME" == "." ]]; then
 	NAME=$(basename "$ONNX" .onnx)
@@ -180,6 +343,12 @@ info "=== QAIRT Conversion Pipeline ==="
 info "ONNX:     $ONNX"
 info "Name:     $NAME"
 info "Output:   $OUTPUT_DIR"
+if $QUANTIZE; then
+	info "Quant:    $QUANT_TAG (param=$PARAM_QUANTIZER act=$ACT_QUANTIZER)"
+else
+	info "Quant:    disabled (--no-quantize)"
+fi
+[[ -n "$INPUT_LIST" ]] && info "Calib:    $INPUT_LIST"
 info "SDK:      $QAIRT_SDK_ROOT"
 [[ -n "${ANDROID_NDK_ROOT:-}" ]] && info "NDK:      $ANDROID_NDK_ROOT"
 info ""
@@ -187,6 +356,29 @@ info ""
 # ── Step 1: ONNX → .cpp (graph) ─────────────────────────────────────────────
 
 CPP_OUT="$OUTPUT_DIR/$NAME"
+
+# ── Build-stamp guard ───────────────────────────────────────────────────────
+# Refuse to overwrite an existing build of this --name that used different
+# quantization settings, so the two arms of an A/B cannot clobber each other.
+
+META_FILE="$OUTPUT_DIR/${NAME}_qconv_meta.txt"
+CALIB_SHA="$(sha256_of "$INPUT_LIST")"
+
+if [[ -f "$META_FILE" ]] && ! $FORCE_REBUILD; then
+	META_DIFF=()
+	[[ "$(meta_value param_quantizer "$META_FILE")" != "$PARAM_QUANTIZER" ]] && META_DIFF+=("param_quantizer $(meta_value param_quantizer "$META_FILE") → $PARAM_QUANTIZER")
+	[[ "$(meta_value act_quantizer "$META_FILE")" != "$ACT_QUANTIZER" ]] && META_DIFF+=("act_quantizer $(meta_value act_quantizer "$META_FILE") → $ACT_QUANTIZER")
+	[[ "$(meta_value weights_bitwidth "$META_FILE")" != "$WEIGHTS_BITWIDTH" ]] && META_DIFF+=("weights_bitwidth $(meta_value weights_bitwidth "$META_FILE") → $WEIGHTS_BITWIDTH")
+	[[ "$(meta_value act_bitwidth "$META_FILE")" != "$ACT_BITWIDTH" ]] && META_DIFF+=("act_bitwidth $(meta_value act_bitwidth "$META_FILE") → $ACT_BITWIDTH")
+	if [[ -n "$INPUT_LIST" && "$(meta_value input_list_sha256 "$META_FILE")" != "$CALIB_SHA" ]]; then
+		META_DIFF+=("input_list_sha256 $(meta_value input_list_sha256 "$META_FILE") → $CALIB_SHA")
+	fi
+	if [[ ${#META_DIFF[@]} -gt 0 ]]; then
+		die "Existing build '$NAME' used different settings:
+    - $(printf '%s\n' "${META_DIFF[@]}" | tr '\n' '\n    ')
+  Use a distinct --name (e.g. <prefix>_$QUANT_TAG) or pass --force-rebuild."
+	fi
+fi
 
 info "Step 1: qnn-onnx-converter → $CPP_OUT.cpp"
 
@@ -198,16 +390,17 @@ done
 QUANT_FLAGS=()
 if $QUANTIZE; then
 	QUANT_FLAGS=(
-		--param_quantizer tf
-		--act_quantizer tf
-		--weights_bitwidth 8
-		--act_bitwidth 16
+		--param_quantizer "$PARAM_QUANTIZER"
+		--act_quantizer "$ACT_QUANTIZER"
+		--weights_bitwidth "$WEIGHTS_BITWIDTH"
+		--act_bitwidth "$ACT_BITWIDTH"
 	)
 	if [[ -n "$INPUT_LIST" ]]; then
 		QUANT_FLAGS+=(--input_list "$INPUT_LIST")
 	else
 		info "  WARNING: No --input-list provided; quantizer will use fallback ranges."
 		info "  For best accuracy, supply real calibration data via --input-list"
+		info "  (--require-input-list turns this into a hard error)."
 	fi
 fi
 
@@ -226,6 +419,25 @@ NET_JSON="$CPP_OUT"_net.json
 [[ -f "$NET_JSON" ]] || die "Step 1 failed: $NET_JSON not generated"
 info "  ✓ $CPP_FILE"
 info "  ✓ $NET_JSON"
+info ""
+
+# Stamp the build so a later run with different settings is detected.
+cat >"$META_FILE" <<META
+# QAIRT conversion build stamp — written by bench/qnn/convert_to_qnn.sh
+# Used to detect an accidental rebuild of the same --name with different
+# quantization settings. Do not edit by hand; use --force-rebuild to override.
+name=$NAME
+onnx=$ONNX
+quant=$QUANT_TAG
+param_quantizer=$PARAM_QUANTIZER
+act_quantizer=$ACT_QUANTIZER
+weights_bitwidth=$WEIGHTS_BITWIDTH
+act_bitwidth=$ACT_BITWIDTH
+input_list=${INPUT_LIST:--}
+input_list_sha256=$CALIB_SHA
+htp_arch=v73
+META
+info "  ✓ $META_FILE"
 info ""
 
 # ── Step 2: .cpp → model library (.so) ──────────────────────────────────────
@@ -294,6 +506,11 @@ fi
 # ── summary ──────────────────────────────────────────────────────────────────
 
 info "=== Conversion complete ==="
+if $QUANTIZE; then
+	info "Arm:      $QUANT_TAG (param=$PARAM_QUANTIZER act=$ACT_QUANTIZER)"
+else
+	info "Arm:      float (--no-quantize)"
+fi
 info "Artifacts in: $OUTPUT_DIR"
 info ""
 info "Generated files:"
