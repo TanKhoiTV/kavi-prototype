@@ -53,9 +53,9 @@ Verified against the working tree, 2026-09-25.
 | RTF capture | ✅ **Ready** | via the runner latency logs |
 | COMET scorer | ❌ Missing | `bench/scorer.py`: *"COMET deferred to v1"* — see [§7 Open decisions](#7-open-decisions-need-a-call) D1 |
 | CPU baseline | ✅ **Ready** | `models/opus-mt-vi-en-ct2`; prior run in `bench-results/mt-vi-en-v1` (BLEU ≈ 76) |
-| Calibration list generator | ⚠️ Script only | `bench/qnn/generate_calibration_lists.py`; has a **single-sample fallback** that violates ADR-026 |
-| Quantization flag | ❌ Missing | `bench/qnn/convert_to_qnn.sh` **hardcodes** `--weights_bitwidth 8 --act_bitwidth 16` |
-| Encoder ONNX | ❌ Missing | `models/qnn/` contains only `README.md`; no `encoder_model.onnx` (186 MB) |
+| Calibration list generator | ⚠️ Script only | `bench/qnn/generate_calibration_lists.py`; has a **single-sample fallback** that violates ADR-026, and emits **int32** while the graph is **int64** (see P1) |
+| Quantization flag | ✅ **Done** | `bench/qnn/convert_to_qnn.sh` — `--quantization` / bit-width / `--require-input-list` (P0) |
+| Encoder ONNX | ✅ **Exported** | `models/qnn/opus-mt-vi-en/opus-mt-vi-en/encoder_model.onnx` (178.2 MiB), verified vs the PyTorch reference (max\|Δ\| 2.9e-06) |
 | Calibration list file | ❌ Missing | no `opusmt_input_list.txt` |
 | Model `.so` + context binary | ❌ Missing | `.kavi.yaml` marks the context binary *"NOT YET PRODUCED — M3 deliverable"* |
 | On-device runner | ❌ Stub | `bench/candidates/qnn_opusmt_mt.py` raises `NotImplementedError`; `android/app/src/main/java/com/kavi/app/runner/` does not exist |
@@ -130,24 +130,60 @@ flag is sufficient; the fallback is a percentile/minmax activation quantizer, wh
 must then be held **identical across both arms**. The script prints a NOTE when
 `--act-bitwidth 8 --act-quantizer tf` is combined.
 
-### P1 — Export the encoder ONNX
+### P1 — Export the encoder ONNX — ✅ **DONE**
 
 **Objective:** produce the single source graph both arms are built from.
 
-- [ ] Run `bench/qnn/export_opusmt_onnx.py` against the pinned Opus-MT weights
-      (`make models` if absent) to emit `encoder_model.onnx` (186 MB fp32) into
-      `models/qnn/opus-mt-vi-en/opus-mt-vi-en/`.
-- [ ] Record input names and fixed input dims (HTP forbids dynamic shapes —
-      ADR-003; expect `[1, 128]` token ids) for the P3 invocation.
-- [ ] Confirm the decoder ONNX export is still needed — the decoder runs on CPU
-      (ADR-023), so it is **not** part of this A/B. Export it only if M3 needs it
-      for the CPU fallback path.
+- [x] Fetch the missing `pytorch_model.bin` (289 MB, SHA-256 verified against
+      `assets.lock.toml`). It was absent, so the export could not start.
+- [x] Run `bench/qnn/export_opusmt_onnx.py` to emit `encoder_model.onnx` into
+      `models/qnn/opus-mt-vi-en/opus-mt-vi-en/` (178.2 MiB = 186.9 MB, matching
+      the size `.kavi.yaml` already documented).
+- [x] Record input names and fixed input dims (HTP forbids dynamic shapes —
+      ADR-003). The exported graph declares *symbolic* dims, so the QAIRT step must
+      pin them explicitly:
 
-**Exit criteria:** ONNX loads; a CPU ORT run produces a sane translation, proving
-the graph is good **before** quantizing it.
+  | Tensor | Name | Shape | Dtype |
+  | --- | --- | --- | --- |
+  | in | `input_ids` | `[1, 128]` | int64 |
+  | in | `attention_mask` | `[1, 128]` | int64 |
+  | out | `last_hidden_state` | `[1, 128, 512]` | float32 |
 
-**Trap:** if the fp32 graph is wrong, both arms will be wrong in the same way and the
-comparison will look fine. Always sanity-check fp32 output first.
+- [x] Confirm the decoder is **not** part of this A/B — it runs on CPU (ADR-023).
+      `decoder_model.onnx` (307 MB) and `decoder_with_past_model.onnx` were exported
+      only because the exporter emits them; they are not quantized here.
+- [x] Sanity-check the fp32 graph before any quantization: `bench/qnn/verify_onnx_encoder.py`
+      compares it against the PyTorch reference on real eval sentences at the fixed
+      shape. Result: **max|Δ| = 2.9e-06, cos = 1.000000, all finite → PASS.**
+
+**Fixed along the way** (all were blocking the export):
+
+| Problem | Fix |
+| --- | --- |
+| `export_opusmt_onnx.py` loaded `google/fleurs` config `all`, then `list(ds)` — the whole train split of every language, with audio, into RAM. Unpinned, and on any failure it fell through `except Exception: pass` to **synthetic** sequences (ADR-026) | Removed calibration generation from the exporter; `bench.qnn.generate_calibration_lists.py` is now the single owner (P2). The synthetic path is deleted, not just unreached |
+| `optimum` 2.1 rejects `task=` for `ORTModelForSeq2SeqLM` (pyproject pins `>=1.20.0`, so a 2.x resolves) | Dropped the `task=` argument |
+| Passing the Hub ID made transformers load `tf_model.h5` and fail on missing TensorFlow | Export from the pinned local snapshot (`models/opus-mt-vi-en-src`), which `fetch_models.py` deliberately keeps TF-free |
+| `--help` crashed on Windows (`UnicodeEncodeError`, cp1252 vs `↔`/`→`) | ASCII-only argparse text |
+
+**Exit criteria:** ✅ met — ONNX loads, runs on CPU, and matches the checkpoint.
+
+**Blockers found for the next phases (do not skip):**
+
+1. **Dtype mismatch (blocks P2).** The graph declares `input_ids`/`attention_mask` as
+   **int64**, but `generate_calibration_lists.py` writes calibration `.raw` files as
+   **int32** (`enc["input_ids"].astype(np.int32)`). QNN calibration inputs must match
+   the graph. Decide per arm — emit int64, or cast the graph inputs to int32 (often
+   friendlier on HTP) — and confirm on the Linux host with the real converter.
+2. **Sequence length must match.** Calibration is generated at a fixed length; if it
+   is not 128, the raw files will not match `--input-dims "1,128"` in P3.
+3. **Doc drift.** `docs/ndk-conversion-runbook.md` §3 claims step-1 outputs
+   (`opus_mt_vi_en_encoder.cpp`, `opusmt_input_list.txt`, 32 calibration items)
+   already exist. `models/qnn/*` is gitignored, so they are absent from a fresh
+   checkout. P2 must **regenerate** the calibration list rather than assume it.
+
+**Trap (now closed):** if the fp32 graph is wrong, both arms inherit the same bug and
+the comparison looks clean. The verification script makes that failure loud.
+
 
 ### P2 — Build the calibration input list (real data only)
 
