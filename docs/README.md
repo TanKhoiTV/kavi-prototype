@@ -13,6 +13,11 @@ parent repo `aivoice-2026/docs/` (the prototype copy is deprecated — see
 - `android-implementation-plan.md` — the active implementation plan
   (ADR-007 → ADR-010): Milestones 0–6, risks R1–R5, execution order.
 - `rtranslator-test-protocol.md` — Phase-5 APK test procedure (live).
+- `issue-116-quantization-ab-plan.md` — Opus-MT encoder w8a16 vs w8a8 A/B
+  (closes ADR-003 open parameter #7). Phases P0–P7, decision rule, and the
+  pre-requisite gap analysis. Gated on Milestone 3.
+- `ndk-conversion-runbook.md` — step-by-step NDK/QAIRT conversion runbook
+  (Opus-MT encoder → HTP v73 context binary); required reading for the plan above.
 - `specifications.md` — the six objective metrics + hard thresholds; cited by
   every plan as the gate contract.
 

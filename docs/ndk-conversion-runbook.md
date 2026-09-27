@@ -117,6 +117,49 @@ export ANDROID_NDK_ROOT=/home/dmin/Android/Sdk/ndk/26.1.10909125
 | 2 | `qnn-model-lib-generator` | `ctx/opus_mt_vi_en_encoder_libs/aarch64-android/libopus_mt_vi_en_encoder.so` |
 | 3 | `qnn-context-binary-generator` | `ctx/opus_mt_vi_en_encoder_ctx/opus_mt_vi_en_encoder_v73.bin` |
 
+### 4.1 Bit-width A/B (issue #116)
+
+To compare two quantization arms of the same encoder, run the wrapper once per arm.
+**Everything except the bit-width must be identical** — same ONNX, same calibration
+list, same SDK version — otherwise the comparison is contaminated.
+
+```bash
+for ARM in w8a16 w8a8; do
+    ./bench/qnn/convert_to_qnn.sh \
+        --onnx models/qnn/opus-mt-vi-en/opus-mt-vi-en/encoder_model.onnx \
+        --input-name input_ids --input-dims "1,128" \
+        --input-name attention_mask --input-dims "1,128" \
+        --input-list models/qnn/opusmt_input_list.txt \
+        --quantization "$ARM" \
+        --require-input-list \
+        --output-dir models/qnn/opus-mt-vi-en/ctx \
+        --name "opus_mt_vi_en_encoder_$ARM"
+done
+```
+
+Rules the wrapper enforces for you:
+
+- **Distinct `--name` per arm** (suffix `_w8a16` / `_w8a8`). Re-running a name whose
+  build stamp records different bit-widths, quantizers or calibration hash is
+  **refused** — pass `--force-rebuild` to override deliberately.
+- **`--require-input-list`** aborts instead of falling back to synthesized ranges
+  (ADR-026: calibration must be real data).
+- Each build writes `<name>_qconv_meta.txt` recording the quantization settings and
+  the calibration SHA256 — keep it with the artifact as provenance.
+
+**Always verify the two context binaries actually differ** (a byte-identical pair
+means the bit-width flag was ignored by the converter):
+
+```bash
+sha256sum models/qnn/opus-mt-vi-en/ctx/opus_mt_vi_en_encoder_w8a{16,8}_ctx/*.bin
+```
+
+To exercise the flag plumbing without a Qualcomm SDK:
+
+```bash
+bash bench/qnn/test_convert_to_qnn.sh   # 31 assertions, stubbed toolchain
+```
+
 ### Step 2 in detail (NDK-gated)
 
 ```bash
