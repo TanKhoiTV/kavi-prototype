@@ -53,7 +53,8 @@ Verified against the working tree, 2026-09-25.
 | RTF capture | ✅ **Ready** | via the runner latency logs |
 | COMET scorer | ❌ Missing | `bench/scorer.py`: *"COMET deferred to v1"* — see [§7 Open decisions](#7-open-decisions-need-a-call) D1 |
 | CPU baseline | ✅ **Ready** | `models/opus-mt-vi-en-ct2`; prior run in `bench-results/mt-vi-en-v1` (BLEU ≈ 76) |
-| Calibration list generator | ⚠️ Script only | `bench/qnn/generate_calibration_lists.py`; has a **single-sample fallback** that violates ADR-026, and emits **int32** while the graph is **int64** (see P1) |
+| Calibration list generator | ✅ **Done** | `bench/qnn/generate_calibration_lists.py` — both graph inputs, int64, `--require-disjoint` (P2) |
+| Calibration list file | ✅ **Generated** | `models/qnn/opusmt_input_list.txt` — 64 samples / 128 entries, sha256 `d98546fd2787…` |
 | Quantization flag | ✅ **Done** | `bench/qnn/convert_to_qnn.sh` — `--quantization` / bit-width / `--require-input-list` (P0) |
 | Encoder ONNX | ✅ **Exported** | `models/qnn/opus-mt-vi-en/opus-mt-vi-en/encoder_model.onnx` (178.2 MiB), verified vs the PyTorch reference (max\|Δ\| 2.9e-06) |
 | Calibration list file | ❌ Missing | no `opusmt_input_list.txt` |
@@ -185,24 +186,58 @@ must then be held **identical across both arms**. The script prints a NOTE when
 the comparison looks clean. The verification script makes that failure loud.
 
 
-### P2 — Build the calibration input list (real data only)
+### P2 — Build the calibration input list (real data only) — ✅ **DONE**
 
 **Objective:** one calibration list, real data, used by **both** arms. This is the
 single most likely source of an invalid conclusion.
 
-- [ ] Run `python -m bench.qnn.generate_calibration_lists` against a **real** corpus
-      (FLEURS or GOLD_SET) to produce `opusmt_input_list.txt`.
-- [ ] **Disable / refuse the single-sample fallback.** ADR-026 forbids synthetic
-      data; the script's fallback to a previously converted single sample is exactly
-      the failure mode #74 exists to catch.
-- [ ] Sanity-check sample count and distribution (≥ tens of samples; cover the
-      sentence-length range present in the eval set).
-- [ ] Freeze the list and checksum it — both arms must byte-match this input.
+- [x] Generate the list from real text via `bench.qnn.generate_calibration_lists`:
+      **64 samples**, shape `[1, 128]`, **int64**, both graph inputs.
+- [x] **Fixed the `attention_mask` gap.** The list previously carried only
+      `input_ids`, while the encoder takes two inputs — `attention_mask` would have
+      stayed on fallback ranges, silently skewing exactly the activation ranges
+      this issue measures. One file per input is now written per sample.
+- [x] **Fixed the dtype.** The generator wrote int32; the exported graph declares
+      int64. `--opusmt-dtype` defaults to int64, int32 stays available.
+- [x] Sanity-checked: 64 samples run through the real ONNX encoder →
+      `(64, 128, 512)`, all finite, **64/64 distinct outputs** (no collapsed
+      or duplicated samples). Token lengths min 15 / median 34 / max 81 of 128.
+- [x] Frozen and checksummed: `opusmt_input_list.txt.sha256`
+      (`d98546fd2787…`). The P0 build stamp records the same digest, so a
+      calibration swap between the two arms is refused.
 
-**Exit criteria:** list exists, is non-trivial in size, and is committed/checksummed.
+**Activation range observed:** max|activation| ≈ 6.6 per sample — a plausible
+transformer range, and the bound the converter must cover.
 
-> **Coupled to #74:** if #74 changes the calibration corpus, **P3 must re-run for both
-> arms**. See [§6](#6-coupling-with-issue-74).
+**Calibration provenance — overlap, and why it is acceptable here:** the local FLEURS
+`vi_vn` **test** split holds 857 rows but only **347 unique sentences, all of which
+the MT eval set scores on**. There is no disjoint text available locally, and
+GOLD_SET is 12 sentences (too few). The generator therefore measures the overlap and
+warns rather than claiming disjointness it cannot deliver.
+
+- Both arms use identical calibration, so the **w8a16-vs-w8a8 comparison is valid**.
+- The **absolute** BLEU is optimistic against the CT2 CPU baseline, which was not
+  calibrated on these sentences. Read the third row of the P6 table accordingly.
+- `--require-disjoint` turns this into a hard error, and `--calib-source fleurs`
+  becomes usable as soon as a FLEURS dev/train split is pinned in
+  `assets.lock.toml`. Tracked as **D6** in §7.
+
+**Fixed along the way:**
+
+| Problem | Fix |
+| --- | --- |
+| Manifest read without `encoding=` → `UnicodeDecodeError` on the first Vietnamese sentence (cp1252) | Explicit UTF-8 on every manifest/list read |
+| Disjointness was checked against one manifest only: `eval_manifest_v1.json` has 42 MT items while `mt_vi_en_eval_manifest.json` has the 347 actually scored, so 347 eval sentences were reported as "unused" | `_collect_eval_texts` scans every `*manifest*.json` in the eval dir and prints which files it consulted |
+| Sample count was computed as `len(list_lines) // 2` although each element already held both inputs | Explicit `samples` counter |
+| The provenance line interpolated the whole item list, dumping 40 manifest records into the log | Reports counts only |
+
+**Exit criteria:** ✅ met — real data, both inputs, correct dtype, verified against
+the graph, checksummed.
+
+**Carry into P3:** the sequence length **must** stay 128 (`--input-dims "1,128"`),
+and both arms must be built from this exact list. `convert_to_qnn.sh
+--require-input-list` enforces the second at build time.
+
 
 ### P3 — Build both context binaries
 
@@ -365,6 +400,7 @@ independent of this work:
 | **D3** | **Latency measurement** — is a Meizu 21 Note available, or do we use the Qualcomm AI Hub device farm? | P5 cannot start; also affects whether the result is a real-device claim |
 | **D4** | **RTF materiality threshold** (§4) | Same bias risk as D2 |
 | **D5** | Run the **full 347-item set** or a fixed subset (e.g. 100) for both arms? | Full set = better confidence, longer device time |
+| **D6** | Calibration currently **overlaps the eval split** (P2): the local FLEURS test split is fully consumed by the 347 MT eval sentences and GOLD_SET is too small. Accept the overlap and note the optimistic absolute BLEU, or pin a FLEURS dev/train split in `assets.lock.toml` and regenerate? | The w8a16-vs-w8a8 decision is valid either way; the number reported against the CPU baseline is not |
 
 ---
 
