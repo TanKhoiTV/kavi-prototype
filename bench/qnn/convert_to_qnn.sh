@@ -96,6 +96,9 @@ sha256_of() {
 	else
 		echo "-"
 	fi
+	# Always succeed: a hasher that fails must reach the caller's validation
+	# and produce a diagnosable error, not abort the script under set -e.
+	return 0
 }
 
 # Read one key from a build-metadata file. Prints nothing when absent.
@@ -372,6 +375,14 @@ CPP_OUT="$OUTPUT_DIR/$NAME"
 
 META_FILE="$OUTPUT_DIR/${NAME}_qconv_meta.txt"
 CALIB_SHA="$(sha256_of "$INPUT_LIST")"
+
+# sha256_of yields "-" for two different things: no file, and no hashing tool.
+# A supplied list that cannot be hashed would be stamped exactly like an
+# uncalibrated build, and the next calibration-less run would match that stamp
+# and overwrite the arm — the hole this guard exists to close. Fail closed.
+if [[ -n "$INPUT_LIST" && ! "$CALIB_SHA" =~ ^[0-9a-f]{64}$ ]]; then
+	die "Cannot hash the calibration list ($INPUT_LIST): neither sha256sum nor shasum produced a SHA-256. Refusing to stamp a build whose calibration cannot be identified."
+fi
 
 if [[ -f "$META_FILE" ]] && ! $FORCE_REBUILD; then
 	META_DIFF=()

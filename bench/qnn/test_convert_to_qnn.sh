@@ -342,6 +342,31 @@ else
 	no "--skip-lib alone fails with a clear message, not a crash" "$(printf '%s' "$SKIP_LIB" | tail -2 | tr '\n' ' ')"
 fi
 
+# ─────────────────────────────────────────���────────────────────────────────────
+
+section "9. An unusable hasher fails closed"
+# Regression guard: sha256_of yields "-" both for "no file" and for "no hashing
+# tool". A supplied list that cannot be hashed would be stamped exactly like an
+# uncalibrated build, and the next calibration-less run would match that stamp
+# and overwrite the arm. A broken sha256um on PATH stands in for the absent
+# tool -- same effect on the hash, and portable enough to test.
+BADHASH="$TMP/badhash-bin"
+mkdir -p "$BADHASH"
+printf '#!/usr/bin/env bash\nexit 1\n' >"$BADHASH/sha256sum"
+chmod +x "$BADHASH/sha256sum"
+BAD_OUT="$(PATH="$BADHASH:$PATH" run_convert --input-list "$CALIB" \
+	--output-dir "$TMP/badhash" --name enc 2>&1)"
+if [[ "$BAD_OUT" == *"Cannot hash the calibration list"* ]]; then
+	ok "a supplied list that cannot be hashed is refused with a reason"
+else
+	no "a supplied list that cannot be hashed is refused with a reason" "$(printf '%s' "$BAD_OUT" | tail -2 | tr '\n' ' ')"
+fi
+if [[ "$BAD_OUT" != *"Conversion complete"* ]]; then
+	ok "no artifact is produced when the calibration cannot be identified"
+else
+	no "no artifact is produced when the calibration cannot be identified"
+fi
+
 # ──────────────────────────────────────────────────────────────────────────────
 
 printf '\n\033[1mResult:\033[0m %d passed, %d failed\n' "$PASS" "$FAIL"
