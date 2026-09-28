@@ -257,6 +257,47 @@ else
 	no "build stamp file written"
 fi
 
+# --- the two ways a rerun used to overwrite an arm silently -------------------
+# Each uses its own output dir so no earlier build interferes.
+
+GUARD_A="$TMP/guard_drop_calib"
+run_convert --input-list "$CALIB" --output-dir "$GUARD_A" --name enc >/dev/null 2>&1
+expect_die "refuses a rerun that drops --input-list" "input_list_sha256" \
+	run_convert --output-dir "$GUARD_A" --name enc
+
+GUARD_B="$TMP/guard_add_calib"
+run_convert --output-dir "$GUARD_B" --name enc >/dev/null 2>&1
+expect_die "refuses a rerun that adds --input-list to an uncalibrated build" "input_list_sha256" \
+	run_convert --input-list "$CALIB" --output-dir "$GUARD_B" --name enc
+
+GUARD_C="$TMP/guard_float_to_quant"
+run_convert --no-quantize --output-dir "$GUARD_C" --name enc >/dev/null 2>&1
+expect_die "refuses --no-quantize then quantized on one --name" "quantize" \
+	run_convert --output-dir "$GUARD_C" --name enc
+
+GUARD_D="$TMP/guard_quant_to_float"
+run_convert --output-dir "$GUARD_D" --name enc >/dev/null 2>&1
+expect_die "refuses quantized then --no-quantize on one --name" "quantize" \
+	run_convert --no-quantize --output-dir "$GUARD_D" --name enc
+
+if grep -qx "quantize=true" "$GUARD_D/enc_qconv_meta.txt" 2>/dev/null &&
+	grep -qx "quantize=false" "$GUARD_C/enc_qconv_meta.txt" 2>/dev/null; then
+	ok "build stamp records the quantize state of both kinds"
+else
+	no "build stamp records the quantize state of both kinds" "quantize= missing from one of the stamps"
+fi
+
+# The unconditional hash comparison must not block a legitimate repeat: a
+# rebuild with byte-identical settings stays allowed in every shape.
+GUARD_E="$TMP/guard_idem_nocalib"
+run_convert --output-dir "$GUARD_E" --name enc >/dev/null 2>&1
+expect_ok "repeat build without calibration is still idempotent" \
+	run_convert --output-dir "$GUARD_E" --name enc
+GUARD_F="$TMP/guard_idem_float"
+run_convert --no-quantize --output-dir "$GUARD_F" --name enc >/dev/null 2>&1
+expect_ok "repeat --no-quantize build is still idempotent" \
+	run_convert --no-quantize --output-dir "$GUARD_F" --name enc
+
 section "7. Float path unaffected"
 : >"$CONVERTER_LOG"
 run_convert --no-quantize --output-dir "$TMP/float" --name enc_float >/dev/null 2>&1

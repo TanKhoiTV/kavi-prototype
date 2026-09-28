@@ -366,13 +366,17 @@ CALIB_SHA="$(sha256_of "$INPUT_LIST")"
 
 if [[ -f "$META_FILE" ]] && ! $FORCE_REBUILD; then
 	META_DIFF=()
+	# A run that omits --input-list leaves CALIB_SHA="-", so this single
+	# comparison covers both changing the calibration list and dropping it: a
+	# calibrated build must not be replaced by one on synthesized ranges.
+	[[ "$(meta_value input_list_sha256 "$META_FILE")" != "$CALIB_SHA" ]] && META_DIFF+=("input_list_sha256 $(meta_value input_list_sha256 "$META_FILE") → $CALIB_SHA")
+	# Recorded because a --no-quantize build otherwise carries the default
+	# tf/8/16 values and looks like a quantized build to the next run.
+	[[ "$(meta_value quantize "$META_FILE")" != "$QUANTIZE" ]] && META_DIFF+=("quantize $(meta_value quantize "$META_FILE") → $QUANTIZE")
 	[[ "$(meta_value param_quantizer "$META_FILE")" != "$PARAM_QUANTIZER" ]] && META_DIFF+=("param_quantizer $(meta_value param_quantizer "$META_FILE") → $PARAM_QUANTIZER")
 	[[ "$(meta_value act_quantizer "$META_FILE")" != "$ACT_QUANTIZER" ]] && META_DIFF+=("act_quantizer $(meta_value act_quantizer "$META_FILE") → $ACT_QUANTIZER")
 	[[ "$(meta_value weights_bitwidth "$META_FILE")" != "$WEIGHTS_BITWIDTH" ]] && META_DIFF+=("weights_bitwidth $(meta_value weights_bitwidth "$META_FILE") → $WEIGHTS_BITWIDTH")
 	[[ "$(meta_value act_bitwidth "$META_FILE")" != "$ACT_BITWIDTH" ]] && META_DIFF+=("act_bitwidth $(meta_value act_bitwidth "$META_FILE") → $ACT_BITWIDTH")
-	if [[ -n "$INPUT_LIST" && "$(meta_value input_list_sha256 "$META_FILE")" != "$CALIB_SHA" ]]; then
-		META_DIFF+=("input_list_sha256 $(meta_value input_list_sha256 "$META_FILE") → $CALIB_SHA")
-	fi
 	if [[ ${#META_DIFF[@]} -gt 0 ]]; then
 		die "Existing build '$NAME' used different settings:
     - $(printf '%s\n' "${META_DIFF[@]}" | tr '\n' '\n    ')
@@ -429,6 +433,7 @@ cat >"$META_FILE" <<META
 name=$NAME
 onnx=$ONNX
 quant=$QUANT_TAG
+quantize=$QUANTIZE
 param_quantizer=$PARAM_QUANTIZER
 act_quantizer=$ACT_QUANTIZER
 weights_bitwidth=$WEIGHTS_BITWIDTH
