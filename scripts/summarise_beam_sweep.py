@@ -72,7 +72,9 @@ def corpus_bleu(per_beam: dict[int, dict[str, dict]]) -> dict[int, float]:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("sweep_dir", type=Path, help="dir containing beam-N/run_results.json")
+    ap.add_argument(
+        "sweep_dir", type=Path, help="dir containing beam-N/run_results.json"
+    )
     ap.add_argument("--beams", type=int, nargs="+", default=[1, 2, 4, 5, 8])
     args = ap.parse_args()
 
@@ -106,24 +108,30 @@ def main() -> int:
         i
         for i in sorted(ids)
         if not all(
-            per_beam[a][i]["result"]["latency_s"] <= per_beam[b][i]["result"]["latency_s"]
-            for a, b in zip(ladder, ladder[1:])
+            per_beam[a][i]["result"]["latency_s"]
+            <= per_beam[b][i]["result"]["latency_s"]
+            for a, b in zip(ladder, ladder[1:], strict=False)
         )
     ]
     regressions = [
         (i, a, b)
         for i in sorted(ids)
-        for a, b in zip(ladder, ladder[1:])
+        for a, b in zip(ladder, ladder[1:], strict=False)
         if per_beam[b][i]["result"]["latency_s"] < per_beam[a][i]["result"]["latency_s"]
     ]
 
     print()
     print(f"items compared: {len(ids)}")
     print(f"ladder: {' <= '.join(f'b{b}' for b in ladder)}")
-    print(f"items breaking monotonicity: {len(broken)} ({100 * len(broken) / len(ids):.0f}%)")
+    print(
+        f"items breaking monotonicity: {len(broken)} ({100 * len(broken) / len(ids):.0f}%)"
+    )
     print(f"adjacent pairs where the wider beam is FASTER: {len(regressions)}")
     for item, a, b in regressions[:5]:
-        ratio = per_beam[b][item]["result"]["latency_s"] / per_beam[a][item]["result"]["latency_s"]
+        ratio = (
+            per_beam[b][item]["result"]["latency_s"]
+            / per_beam[a][item]["result"]["latency_s"]
+        )
         print(f"  {item}: b{b} is {ratio:.2f}x the time of b{a}")
     return 0
 
