@@ -61,6 +61,7 @@
 - **adr:** Add the ADR index, withdraw ADR-004, move the comparison doc
 - **adr:** Repoint ADR cross-references after the split
 - Tag code-fence languages in repo markdown
+- Correct stale references and index gaps in docs and ADRs (#109)([#109](https://github.com/TanKhoiTV/kavi-prototype/pull/109))
 
 ### Features
 
