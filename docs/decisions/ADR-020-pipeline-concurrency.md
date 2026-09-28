@@ -88,7 +88,7 @@ Zipformer runs **two concurrent CPU recognizers compared by confidence**
 ([ADR-008](ADR-008-dual-zipformer-asr.md)), not one batch=2 Whisper decoder. The
 concurrency model and the per-encoder fallback rule are unchanged.
 
-### Revision — 2026-09-26 (evidence status; decision unchanged)
+### Revision — 2026-09-28 (evidence status; decision unchanged)
 
 The Phase-5 latency-vs-BLEU measurement this record defers to **has not been
 made**, and cannot be yet. The 2.0 s turnaround gate is an on-device number, and
@@ -99,15 +99,19 @@ per-stage latency is recorded on-device by `SpeechPipeline` while WER/BLEU is
 scored off-device.
 
 A **host-side** beam sweep does exist (open parameter #6 in
-[the register](README.md#open-parameters)). From it:
+[the register](README.md#open-parameters)), reduced to a citable table in
+[`docs/reference/beam-sweep-host-aggregate.md`](../reference/beam-sweep-host-aggregate.md).
+It settles the quality side of the trade-off — Opus-MT vi→en scores 6.2 at greedy
+against 8.8 at beam=4 by sentence-BLEU, and 3.98 against 6.58 by corpus BLEU —
+with the gain flattening or reversing beyond beam=4.
 
-- The **BLEU column is usable**, and settles the quality side of the trade-off:
-  Opus-MT vi→en scores 6.2 at greedy against 8.8 at beam=4.
-- The **latency column is not citable.** Its ratios are means over a *single*
-  timing sample per item, and per-item latency is not monotonic in beam width —
-  18 of 30 items violate `b1 ≤ b2 ≤ b4 ≤ b5 ≤ b8`, and 10 of 30 have beam=4
-  faster than beam=2. The sweep's mean-based figure for beam=4 is 2.50×, but the
-  median-based figure is 1.30×.
+It **cannot substitute for the Phase-5 number this record defers to.** Its latency
+column is not usable: the ratios are means over a *single* timing sample per item,
+and per-item latency is not monotonic in beam width, with 18 of 30 items breaking
+`b1 ≤ b2 ≤ b4 ≤ b5 ≤ b8` and 24 adjacent pairs where the wider beam finishes
+faster. The mean- and median-based ratios for beam=4 disagree — 2.50× against
+1.30× — and the spread is wide enough that the ordering of the ratios depends on
+which statistic is chosen.
 
 The consequence for this record is one of **evidence, not of decision**: the
 rationale above asserts that greedy "keeps the CPU decoder fast enough to meet
