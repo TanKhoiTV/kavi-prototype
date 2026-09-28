@@ -448,6 +448,16 @@ def generate_opusmt_list(
                     f"{', '.join(scanned) if scanned else 'n/a'})"
                 )
             else:
+                # "fleurs" is an explicit request for eval-disjoint text, so
+                # falling back to manifest items here would hand back exactly
+                # what the caller asked not to have. Only "auto" falls through.
+                if source == "fleurs":
+                    raise ValueError(
+                        "--calib-source fleurs but no FLEURS sentence is "
+                        "disjoint from the eval set; pass --calib-source auto "
+                        "to accept the overlap, or --require-disjoint to make "
+                        "it an error"
+                    )
                 overlap = available
         elif source == "fleurs":
             raise ValueError(

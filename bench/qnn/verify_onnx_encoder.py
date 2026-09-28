@@ -36,6 +36,10 @@ DEFAULT_MIN_COSINE = 0.9999
 
 def _load_manifest_texts(manifest: Path, num_samples: int) -> list[str]:
     """Read ``num_samples`` real source sentences from an eval manifest."""
+    # A non-positive count would slice to nothing (crash in max() below) or,
+    # when negative, drop only the last item and silently compare the rest.
+    if num_samples <= 0:
+        raise SystemExit("--num-samples must be a positive integer")
     items = json.loads(manifest.read_text(encoding="utf-8"))["items"]
     texts = [it["input_text"] for it in items if it.get("input_text")]
     if not texts:

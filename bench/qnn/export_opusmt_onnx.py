@@ -50,16 +50,30 @@ except ImportError as exc:
 # ── graph inspection ────────────────────────────────────────────────────────
 
 
+def _dim_value(d: Any) -> int | str:
+    """One ONNX dimension: a name, a size, or ``'?'`` when unspecified.
+
+    ``dim_value`` reads 0 when unset, so ``d.dim_param or d.dim_value`` would
+    report an unknown axis as the static size 0 — and that is exactly the
+    number an operator pastes into ``--input-dims``.
+    """
+    if d.dim_param:
+        return d.dim_param
+    if d.dim_value > 0:  # 0 is the unset default, and 0 is not a valid size
+        return d.dim_value
+    return "?"
+
+
 def _describe(value_info: Any, model: Any) -> str:
     """Format one graph input/output as ``name [dims] dtype``."""
     import onnx
 
     tensor_type = value_info.type.tensor_type
-    dims = [d.dim_param or d.dim_value for d in tensor_type.shape.dim]
+    dims = [_dim_value(d) for d in tensor_type.shape.dim]
     dtype = onnx.TensorProto.DataType.Name(tensor_type.elem_type)
     if any(not isinstance(d, int) for d in dims):
         # HTP rejects dynamic shapes (ADR-003): the converter needs a static
-        # --input_dim for every axis.
+        # --input_dim for every axis. '?' lands here too, which is correct.
         return f"{value_info.name} {dims} {dtype}  <-- DYNAMIC, HTP rejects"
     return f"{value_info.name} {dims} {dtype}"
 
