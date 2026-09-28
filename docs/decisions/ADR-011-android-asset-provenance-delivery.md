@@ -29,7 +29,7 @@ Kavi team
 
 ## Context
 
-The on-device app (`android/` = `kavi-android` submodule) needs a fixed set of
+The on-device app (`android/` = the separate `kavi-android` repo) needs a fixed set of
 inference artifacts: sherpa-onnx Zipformer models (ADR-008), Supertonic TTS
 bundle (ADR-009), the Opus-MT ONNX decoder (CPU), and — once built — the
 Opus-MT encoder HTP v73 context binary (ADR-015/ADR-019).
