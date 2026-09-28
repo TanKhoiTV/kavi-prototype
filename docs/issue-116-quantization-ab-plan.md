@@ -57,7 +57,6 @@ Verified against the working tree, 2026-09-25.
 | Calibration list file | ✅ **Generated** | `models/qnn/opusmt_input_list.txt` — 64 samples / 128 entries, sha256 `d98546fd2787…` |
 | Quantization flag | ✅ **Done** | `bench/qnn/convert_to_qnn.sh` — `--quantization` / bit-width / `--require-input-list` (P0) |
 | Encoder ONNX | ✅ **Exported** | `models/qnn/opus-mt-vi-en/opus-mt-vi-en/encoder_model.onnx` (178.2 MiB), verified vs the PyTorch reference (max\|Δ\| 2.9e-06) |
-| Calibration list file | ❌ Missing | no `opusmt_input_list.txt` |
 | Model `.so` + context binary | ❌ Missing | `.kavi.yaml` marks the context binary *"NOT YET PRODUCED — M3 deliverable"* |
 | On-device runner | ❌ Stub | `bench/candidates/qnn_opusmt_mt.py` raises `NotImplementedError`; `android/app/src/main/java/com/kavi/app/runner/` does not exist |
 | QNN candidate registration | ⚠️ Single arm | `bench/registry.py` has only `qnn-opus-mt-vi-en-htp-v73`; no way to hold two arms |
@@ -116,11 +115,16 @@ two artifacts differ **only** in bit-width.
 | `--input-list` existence check | A mistyped calibration path now fails early instead of reaching the converter |
 | Log lines | `Quant: w8a8 (param=tf act=tf)` header + `Arm:` summary |
 
-Verification: `bash bench/qnn/test_convert_to_qnn.sh` — 31 assertions, no Qualcomm
+Verification: `bash bench/qnn/test_convert_to_qnn.sh` — 38 assertions, no Qualcomm
 SDK required (the `qnn-*` tools are replaced by stubs). Covers flag plumbing,
 validation rejection, back-compat of the w8a16 default, the build-stamp guard, and
-that the two arms produce **different** context binaries (the check that catches a
-silently ignored bit-width flag).
+that the two arms produce **different** context binaries.
+
+**What that does and does not prove.** The stubs verify *flag plumbing* — that
+the wrapper hands the intended bit-widths to the converter binary. They cannot
+verify that QAIRT *applies* them. Byte-differing binaries are a provenance and
+difference check; confirming the effective widths needs the real converter — see
+the P3 checklist.
 
 **Exit criteria:** ✅ met — `bash -n` clean; `--help` documents all flags; dry run
 shows the intended quantizer tuple per arm.
@@ -168,19 +172,18 @@ must then be held **identical across both arms**. The script prints a NOTE when
 
 **Exit criteria:** ✅ met — ONNX loads, runs on CPU, and matches the checkpoint.
 
-**Blockers found for the next phases (do not skip):**
+**Findings carried forward from P1, with their current state:**
 
-1. **Dtype mismatch (blocks P2).** The graph declares `input_ids`/`attention_mask` as
-   **int64**, but `generate_calibration_lists.py` writes calibration `.raw` files as
-   **int32** (`enc["input_ids"].astype(np.int32)`). QNN calibration inputs must match
-   the graph. Decide per arm — emit int64, or cast the graph inputs to int32 (often
-   friendlier on HTP) — and confirm on the Linux host with the real converter.
-2. **Sequence length must match.** Calibration is generated at a fixed length; if it
-   is not 128, the raw files will not match `--input-dims "1,128"` in P3.
-3. **Doc drift.** `docs/ndk-conversion-runbook.md` §3 claims step-1 outputs
-   (`opus_mt_vi_en_encoder.cpp`, `opusmt_input_list.txt`, 32 calibration items)
-   already exist. `models/qnn/*` is gitignored, so they are absent from a fresh
-   checkout. P2 must **regenerate** the calibration list rather than assume it.
+1. **Dtype mismatch — resolved in P2.** The graph declares `input_ids` /
+   `attention_mask` as int64 while the generator wrote int32.
+   `--opusmt-dtype` now defaults to int64, matching the graph.
+2. **Sequence length — resolved in P2.** `--opusmt-seq-len` defaults to 128,
+   which is the value P3 must pass as `--input-dims "1,128"`.
+3. **Fresh-checkout note (still true).** `docs/ndk-conversion-runbook.md` §3
+   claims the step-1 outputs and the calibration list already exist.
+   `models/qnn/*` is gitignored, so a fresh checkout has neither: regenerate the
+   calibration list rather than assume it. This does not block the completed P2
+   state.
 
 **Trap (now closed):** if the fp32 graph is wrong, both arms inherit the same bug and
 the comparison looks clean. The verification script makes that failure loud.
@@ -256,10 +259,16 @@ ADR-019); `ANDROID_NDK_ROOT` = NDK **r26c (26.1.10909125)**;
 - [ ] Verify each output is a **context binary** (`.bin`), not the weight-tar
       (`.cpp_net.json` / step-1 output). M3 explicitly calls out this confusion.
 - [ ] Record `SHA256SUMS` for both (ADR-011 provenance) and confirm the two differ
-      (a byte-identical pair means a flag did not take effect).
+      — this proves the artifacts are distinct, not that the requested widths
+      were applied.
+- [ ] Read back the **effective** quantization widths per arm from the converter
+      output (`<name>_net.json` quantization params, or the converter log). This
+      is the only check that shows what QAIRT actually applied; the stub test and
+      the hashes above cannot.
 
-**Exit criteria:** two distinct, version-locked HTP v73 context binaries, verified
-by hash and by a device-side load smoke test (P5).
+**Exit criteria:** two distinct, version-locked HTP v73 context binaries, each
+with its effective widths confirmed, verified by hash and by a device-side load
+smoke test (P5).
 
 **Blocker note:** this host is Windows/MINGW64 with both env vars unset; conversion
 must happen on the Linux build host.
@@ -410,7 +419,7 @@ independent of this work:
 | --- | --- |
 | **Contaminated comparison** — a differing flag (padding, kv_cache, decoder, max_length) is blamed on quantization | P4 pins both arms' configs; diff them before running |
 | **Calibration collapse** — single-sample or synthetic calibration (ADR-026) makes the w8a8 arm look arbitrarily bad | P2 forbids the fallback; ≥ tens of real samples; shared and checksummed |
-| **Flag silently ignored** — the converter accepts `--act_bitwidth 8` but the build still emits a w8a16 graph | P3 verifies the two binaries differ by hash, and a device smoke test confirms the loading path |
+| **Flag silently ignored** — the converter accepts `--act_bitwidth 8` but the build still emits a w8a16 graph | P3 reads the effective widths back from the converter output; differing hashes are only a difference check, and a device smoke test confirms the loading path |
 | **fp32 graph defect** — both arms inherit the same bug and the A/B looks clean | P1 sanity-checks the fp32 ONNX on CPU before any quantization |
 | **NPU timing noise** inverts a small RTF delta | ≥ 3 repeated runs in P5; report variance, not a single number |
 | **Wrong artifact type** — the weight-tar is mistaken for the context binary | P3 verifies `.bin` output; M3 calls this out explicitly |

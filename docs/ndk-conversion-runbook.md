@@ -147,12 +147,16 @@ Rules the wrapper enforces for you:
 - Each build writes `<name>_qconv_meta.txt` recording the quantization settings and
   the calibration SHA256 — keep it with the artifact as provenance.
 
-**Always verify the two context binaries actually differ** (a byte-identical pair
-means the bit-width flag was ignored by the converter):
+Confirm the two context binaries are distinct:
 
 ```bash
 sha256sum models/qnn/opus-mt-vi-en/ctx/opus_mt_vi_en_encoder_w8a{16,8}_ctx/*.bin
 ```
+
+A differing pair proves the artifacts are distinct — it does **not** prove the
+requested bit-widths were applied. Only reading the converter's own output does:
+check the quantization params in `<name>_net.json`, or the converter log, for
+each arm.
 
 To exercise the flag plumbing without a Qualcomm SDK:
 
