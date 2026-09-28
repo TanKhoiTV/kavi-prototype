@@ -307,6 +307,41 @@ else
 	no "--no-quantize sends no quantizer flags" "$(tail -1 "$CONVERTER_LOG")"
 fi
 
+# ─────────────────────────────────────────���────────────────────────────────────
+
+section "8. Skipped steps do not crash the summary"
+# Regression guard: the summary block read $MODEL_SO / $CTX_BIN / $LIB_SO, which
+# only exist when steps 2 and 3 ran. Under `set -u` a skipped step turned a
+# finished build into exit 1 with "unbound variable" — after every artifact had
+# already been written.
+SKIP_OUT="$(run_convert --skip-ctx --output-dir "$TMP/skipctx" --name enc 2>&1)"
+if [[ $? -eq 0 && "$SKIP_OUT" != *"unbound variable"* ]]; then
+	ok "--skip-ctx exits 0 with no unbound variable"
+else
+	no "--skip-ctx exits 0 with no unbound variable" "$(printf '%s' "$SKIP_OUT" | tail -2 | tr '\n' ' ')"
+fi
+if [[ "$SKIP_OUT" == *"On-device verification: skipped"* ]]; then
+	ok "--skip-ctx says the verification hint was skipped"
+else
+	no "--skip-ctx says the verification hint was skipped"
+fi
+
+SKIP_BOTH="$(run_convert --skip-lib --skip-ctx --output-dir "$TMP/skipboth" --name enc 2>&1)"
+if [[ $? -eq 0 && "$SKIP_BOTH" != *"unbound variable"* ]]; then
+	ok "--skip-lib --skip-ctx exits 0 with no unbound variable"
+else
+	no "--skip-lib --skip-ctx exits 0 with no unbound variable" "$(printf '%s' "$SKIP_BOTH" | tail -2 | tr '\n' ' ')"
+fi
+
+# Step 3 genuinely cannot run without the .so step 2 builds, so --skip-lib on
+# its own must fail loudly with guidance, not crash.
+SKIP_LIB="$(run_convert --skip-lib --output-dir "$TMP/skiplib" --name enc 2>&1)"
+if [[ "$SKIP_LIB" == *"No model .so available"* && "$SKIP_LIB" != *"unbound variable"* ]]; then
+	ok "--skip-lib alone fails with a clear message, not a crash"
+else
+	no "--skip-lib alone fails with a clear message, not a crash" "$(printf '%s' "$SKIP_LIB" | tail -2 | tr '\n' ' ')"
+fi
+
 # ──────────────────────────────────────────────────────────────────────────────
 
 printf '\n\033[1mResult:\033[0m %d passed, %d failed\n' "$PASS" "$FAIL"

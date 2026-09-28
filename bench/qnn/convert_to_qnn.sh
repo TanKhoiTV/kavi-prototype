@@ -55,6 +55,15 @@ SKIP_CTX=false
 VERBOSE=false
 FORCE_REBUILD=false
 
+# Set by steps 2 and 3. Declared here because the summary block reads them even
+# when those steps are skipped, and `set -u` turns an unset reference into a
+# hard failure *after* every artifact has already been written.
+MODEL_SO=""
+CTX_BIN=""
+HTP_BACKEND=""
+LIB_SO=""
+LIB_OUT=""
+
 # Quantization settings — overridable (issue #116 A/B: w8a16 vs w8a8)
 WEIGHTS_BITWIDTH=8
 ACT_BITWIDTH=16
@@ -527,9 +536,13 @@ if [[ -d "${CTX_OUT:-}" ]]; then
 	ls -lh "$CTX_OUT"/ 2>/dev/null || true
 fi
 info ""
-info "On-device verification:"
-info "  qnn-net-run \\"
-info "    --model $MODEL_SO \\"
-info "    --backend $HTP_BACKEND \\"
-info "    --binary_file $CTX_BIN \\"
-info "    --input_list <input_name>:<input_data>.raw"
+if [[ -n "$MODEL_SO" && -n "$CTX_BIN" ]]; then
+	info "On-device verification:"
+	info "  qnn-net-run \\"
+	info "    --model $MODEL_SO \\"
+	info "    --backend $HTP_BACKEND \\"
+	info "    --binary_file $CTX_BIN \\"
+	info "    --input_list <input_name>:<input_data>.raw"
+else
+	info "On-device verification: skipped (step 2 and/or 3 did not run)."
+fi
