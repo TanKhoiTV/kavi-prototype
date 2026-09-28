@@ -1,7 +1,7 @@
 # NDK Conversion Runbook — Opus-MT Encoder (HTP v73 Context Binary)
 
 > **Audience:** The person handling the NDK-gated part of the QNN conversion pipeline.
-> **Last reviewed:** 2026-09-25
+> **Last reviewed:** 2026-09-28
 > **Scope:** Convert the already-exported Opus-MT vi→en encoder ONNX into an HTP v73
 > context binary for the `kavi-android` app. This is the **only** QNN artifact on
 > the v1 path — Whisper (ASR) and Piper (TTS) are CPU-only per ADR-008/009.
