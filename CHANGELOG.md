@@ -61,6 +61,7 @@
 - **adr:** Add the ADR index, withdraw ADR-004, move the comparison doc
 - **adr:** Repoint ADR cross-references after the split
 - Tag code-fence languages in repo markdown
+- Correct stale references and index gaps in docs and ADRs (#109)([#109](https://github.com/TanKhoiTV/kavi-prototype/pull/109))
 
 ### Features
 
@@ -101,6 +102,7 @@
 - Stop tracking third-party artifacts and personal docs
 - Normalize line endings and make local checks deterministic
 - **env:** Make the QAIRT helper portable and add a Windows one
+- **env:** Default ANDROID_NDK_ROOT to the installer's SDK root (#118)([#118](https://github.com/TanKhoiTV/kavi-prototype/pull/118))
 
 ### Refactoring
 
@@ -120,6 +122,7 @@
 - Pin third-party assets and add fetch/verify tooling
 - **deps:** Bump orhun/git-cliff-action from 4.8.0 to 4.9.0
 - **deps:** Bump astral-sh/setup-uv from 9.0.0 to 10.2.0
+- **deps:** Bump orhun/git-cliff-action from 4.9.0 to 4.9.1([#117](https://github.com/TanKhoiTV/kavi-prototype/pull/117))
 
 ### Ci
 

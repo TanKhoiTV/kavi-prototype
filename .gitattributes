@@ -19,6 +19,7 @@ Makefile           text eol=lf
 .gitattributes     text eol=lf
 .gitignore         text eol=lf
 .gitmodules        text eol=lf
+.yamllint          text eol=lf
 
 # Source, config, docs.
 *.py               text eol=lf

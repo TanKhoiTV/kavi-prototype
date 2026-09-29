@@ -133,7 +133,7 @@ The ADR-007 vs RTranslator comparison doc (§3.11) estimates `ALL_OPT` provides 
 | Supertonic vocoder | ~150 ms | ~105–128 ms | ~22–45 ms |
 | **Total per utterance** | **~270 ms** | **~189–230 ms** | **~40–80 ms saved** |
 
-The ~40–80 ms saving per utterance directly contributes to the 2.0 s end-to-end turnaround budget (ADR-007 §Decision 9). Note that these are **desktop-class estimates** — actual savings on SD8G2 will be measured during Phase 4 benchmarking, but the *direction* of the benefit is well-established.
+The ~40–80 ms saving per utterance directly contributes to the 2.0 s end-to-end turnaround budget (ADR-020). Note that these are **desktop-class estimates** — actual savings on SD8G2 will be measured during Phase 4 benchmarking, but the *direction* of the benefit is well-established.
 
 ### Cost
 
@@ -195,7 +195,7 @@ None involve writing raw ORT sessions from scratch.
 
 ## Cross-reference to ADR-021
 
-This ADR supersedes the brief motivation in ADR-021 with a full analysis. The three ORT session options from Decision 10 remain unchanged:
+This ADR supersedes the brief motivation in ADR-021 with a full analysis. The three ORT session options from ADR-021 remain unchanged:
 
 | Option | Purpose | Status |
 | --- | --- | --- |

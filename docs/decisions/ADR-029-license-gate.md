@@ -115,7 +115,7 @@ late resolution is the main route to a forced TTS swap.
 ### Positive
 
 
-+ De-risks ADR-004 **before** the benchmark harness runs — most candidates
++ De-risks the deferred tech-stack pick **before** the benchmark harness runs — most candidates
   are already license-decided.
 + The adopt/avoid lists let us wire candidates into the harness with no legal
   ambiguity.
@@ -137,8 +137,10 @@ late resolution is the main route to a forced TTS swap.
 ## Open items
 
 
-ADR-004 (architecture / tech-stack) records the licensed-clean candidate set
-but **defers the final tech-stack pick** until the v0 benchmark harness runs.
+The licensed-clean candidate set is in the adopt/avoid tables above, but the
+**final tech-stack pick is deferred** until the v0 benchmark harness runs
+(ADR-004 was withdrawn — see the
+[open-parameters register](README.md#open-parameters)).
 Remaining gates: **Piper engine GPL split** (deferred — MIT-era is the clean
 option), and harness confirmation that the CPU-default stack is license-clean.
 The **QAIRT runtime gate is RESOLVED** (ADOPT, clean — see above). Lookups #3–#8

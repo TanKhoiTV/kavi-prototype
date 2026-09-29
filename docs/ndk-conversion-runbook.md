@@ -1,6 +1,7 @@
 # NDK Conversion Runbook — Opus-MT Encoder (HTP v73 Context Binary)
 
 > **Audience:** The person handling the NDK-gated part of the QNN conversion pipeline.
+> **Last reviewed:** 2026-09-28
 > **Scope:** Convert the already-exported Opus-MT vi→en encoder ONNX into an HTP v73
 > context binary for the `kavi-android` app. This is the **only** QNN artifact on
 > the v1 path — Whisper (ASR) and Piper (TTS) are CPU-only per ADR-008/009.
@@ -275,6 +276,8 @@ from `_net.json`, take them from the converter's own stdout in the run log
 
 Per ADR-011, the context binary and model `.so` are committed **inside the
 `kavi-android` repo**, never in `prototype/models/qnn/*` (which is gitignored).
+From the `kavi-prototype/` root, clone `kavi-android` into the gitignored
+`android/` directory once:
 
 **There is no `android/` directory in this repository.** The app lives in the
 separate private `kavi-android` repo, so the `cd android` below means "your
@@ -283,7 +286,13 @@ step belongs to whoever holds that repo; nothing in P3 depends on it, since P3
 ends when the two context binaries exist and are verified in §5.
 
 ```bash
-cd android  # your local kavi-android checkout, from that other repo
+git clone git@github.com:TanKhoiTV/kavi-android.git android
+```
+
+Then run these commands from the `kavi-prototype/` root:
+
+```bash
+cd android
 
 # Copy artifacts into assets
 mkdir -p app/src/main/assets/models/opus-mt-vi-en-encoder
@@ -293,17 +302,17 @@ cp ../models/qnn/opus-mt-vi-en/ctx/*/aarch64-android/libopus_mt_vi_en_encoder.so
    app/src/main/assets/models/opus-mt-vi-en-encoder/
 
 # Generate / update SHA256SUMS manifest
-cd app/src/main/assets && sha256sum models/opus-mt-vi-en-encoder/* >> SHA256SUMS
+(cd app/src/main/assets && sha256sum models/opus-mt-vi-en-encoder/* >> SHA256SUMS)
 
-# Commit inside the submodule
+# Commit inside your kavi-android checkout
 git add -A app/src/main/assets/
 git commit -m "feat(android): add Opus-MT encoder HTP v73 context binary + model lib"
-
-# Bump the pointer in the parent repo
-cd ../..  # back to kavi-prototype
-git add android
-git commit -m "chore: bump kavi-android with Opus-MT encoder QNN artifacts"
 ```
+
+There is **no gitlink to bump**: `kavi-android` is not a submodule of
+`kavi-prototype` — it was unregistered so this public repo carries no gitlink to
+a private repository (see `.gitmodules` and ADR-011's 2026-08-14 note).
+The local `android/` checkout is gitignored here.
 
 ---
 
