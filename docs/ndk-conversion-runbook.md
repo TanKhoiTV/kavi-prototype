@@ -67,24 +67,49 @@ The venv **must** be Python 3.10 — the SDK's compiled `.so` files link against
 
 ---
 
-## 3. What is already done (do not redo)
+## 3. What has to be produced (nothing here is committed)
 
-Step 1 of the pipeline (ONNX → `.cpp` + `_net.json` + `.bin`) has already been run
-for the Opus-MT encoder:
+**Everything under `models/qnn/*` is gitignored** (`.gitignore`: only
+`models/qnn/README.md` is tracked). A fresh checkout therefore contains **none**
+of the inputs below, even if an earlier run produced them. Do not skip ahead
+because an artifact looks familiar — re-run the step that produced it, on the
+host that will run the conversion.
+
+The run has three inputs, none of them present by default:
 
 ```text
-models/qnn/opus-mt-vi-en/encoder/
-├── opus_mt_vi_en_encoder.cpp       ← graph source (step 1 output)
-├── opus_mt_vi_en_encoder.bin       ← QNN_CPU calibration artifact (step 1 output)
-└── opus_mt_vi_en_encoder_net.json  ← network descriptor (step 1 output)
+models/qnn/opus-mt-vi-en/opus-mt-vi-en/encoder_model.onnx   ← 178 MiB, from P1
+models/qnn/opusmt-calib/opusmt_calib_*.bin                 ← calibration, from P2
+models/qnn/opusmt_input_list.txt                           ← names both inputs
 ```
 
-The source ONNX is at `models/qnn/opus-mt-vi-en/opus-mt-vi-en/encoder_model.onnx`
-(186 MB). Calibration data is in `models/qnn/opusmt-calib/` (32 items) with the
-input list at `models/qnn/opusmt_input_list.txt`.
+Produce the missing ones on the **conversion host** (or copy the whole repo
+there, since the list's paths are repo-root-relative):
 
-The encoder's input tensors are: `input_ids` `[1,128]` and `attention_mask` `[1,128]`.
-Output: `last_hidden_state`. (All float32 → quantized w8a16 by the converter.)
+```bash
+# 1. the fp32 graph — the exporter takes the pinned snapshot, not the Hub id
+uv run python -m bench.qnn.export_opusmt_onnx \
+    --model models/opus-mt-vi-en-src \
+    --output models/qnn/opus-mt-vi-en/opus-mt-vi-en
+
+# 2. the calibration list — regenerate rather than copy, because the paths
+#    inside it are written with the host's separator (see §4.2)
+uv run python -m bench.qnn.generate_calibration_lists --opusmt-only \
+    --manifest eval_data/mt_vi_en_eval_manifest.json \
+    --max-opusmt-samples 64 --out-dir models/qnn
+```
+
+**Regenerating the list on the conversion host matters.** `qnn-onnx-converter`
+reads it as `<path> <input_name>`, one line per tensor, and a list produced on
+Windows carries `models\qnn\...` — on Linux that is a single non-existent
+filename, every calibration file silently goes unread, and the converter falls
+back to synthesized ranges. That is exactly what ADR-026 forbids, and nothing
+fails loudly.
+
+The encoder's input tensors are `input_ids` `[1,128]` and `attention_mask`
+`[1,128]`, both int64; output `last_hidden_state` `[1,128,512]` float32. The
+graph declares those axes symbolically, so the QAIRT step must pin them with
+`--input-dims`.
 
 ---
 
@@ -195,7 +220,7 @@ resolve. `--htp_arch v73` is accepted only with `--model <compiled .so>`.
 
 ## 5. Verify the output
 
-Expected artifacts after success:
+For a single build (`--name opus_mt_vi_en_encoder`):
 
 ```text
 models/qnn/opus-mt-vi-en/ctx/
@@ -206,6 +231,9 @@ models/qnn/opus-mt-vi-en/ctx/
     ├── opus_mt_vi_en_encoder_v73.bin          ← HTP v73 context binary
     └── ...                                    ← ancillary outputs
 ```
+
+The bit-width A/B of §4.1 produces one such tree per arm, suffixed
+`_w8a16` / `_w8a8`.
 
 Sanity checks:
 
@@ -221,6 +249,26 @@ ls -lh models/qnn/opus-mt-vi-en/ctx/*_ctx/*.bin
 # (qnn-context-binary-generator has no --info flag; the verification is on-device — see §7)
 ```
 
+### 5.1 Read back the effective quantization widths
+
+**This is the check that matters most, and the only one nothing else substitutes
+for.** `--act_bitwidth 8` is a *request*; only the converter's own output says
+what it applied. The stubbed-toolchain test in `bench/qnn/` verifies that the
+wrapper passes the flag, and differing SHA-256s verify that the two artifacts
+are distinct — neither tells you the widths.
+
+```bash
+# per arm, the quantization params the converter wrote:
+grep -iE 'quantiz|bitwidth|activation' \
+  models/qnn/opus-mt-vi-en/ctx/opus_mt_vi_en_encoder_w8a{16,8}_net.json
+```
+
+Expect the two arms to report **different activation widths and identical weight
+widths**. Anything else means the arm you are holding is not the arm you asked
+for, and the A/B result would be meaningless. If the params are not readable
+from `_net.json`, take them from the converter's own stdout in the run log
+(the wrapper runs it under `set -x`).
+
 ---
 
 ## 6. Deliver into kavi-android (ADR-011)
@@ -228,8 +276,14 @@ ls -lh models/qnn/opus-mt-vi-en/ctx/*_ctx/*.bin
 Per ADR-011, the context binary and model `.so` are committed **inside the
 `kavi-android` repo**, never in `prototype/models/qnn/*` (which is gitignored).
 
+**There is no `android/` directory in this repository.** The app lives in the
+separate private `kavi-android` repo, so the `cd android` below means "your
+checkout of that repo" — it will not work from a `kavi-prototype` clone. This
+step belongs to whoever holds that repo; nothing in P3 depends on it, since P3
+ends when the two context binaries exist and are verified in §5.
+
 ```bash
-cd android  # your local kavi-android checkout
+cd android  # your local kavi-android checkout, from that other repo
 
 # Copy artifacts into assets
 mkdir -p app/src/main/assets/models/opus-mt-vi-en-encoder
