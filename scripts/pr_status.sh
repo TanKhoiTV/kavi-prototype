@@ -125,18 +125,23 @@ def section($t): "── \($t) " + ("─" * (68 - ($t | length)));
 | ($all | map(select(.author.login == "@ME@"))) as $mine
 | ($mine | map(select(approvals == 0))) as $mine_unreviewed
 | ($all | map(select(isstale))) as $stale
+# A fetched count below the limit means every open PR was retrieved, so the
+# counts are exact and need no qualifier. Only when the fetch hits the limit is
+# the set possibly incomplete — then label counts "fetched" and warn.
+| (($all | length) >= @LIMIT@) as $trunc
+| (if $trunc then " fetched" else "" end) as $fq
 
-| section("WAITING ON YOUR REVIEW (\($waiting | length) fetched)"),
+| section("WAITING ON YOUR REVIEW (\($waiting | length)\($fq))"),
   (if ($waiting | length) == 0 then
-     "   none — no unreviewed fetched PRs authored by others"
+     "   none" + (if $trunc then " among the fetched PRs" else " — no unreviewed open PRs authored by others" end)
    else ($waiting[] | row) end),
   (if $waiting_draft > 0 then
      "   note: \($waiting_draft) of these are DRAFT — may not be ready for review"
    else empty end),
   "",
-  section("YOUR OPEN PRS (\($mine | length) fetched)"),
+  section("YOUR OPEN PRS (\($mine | length)\($fq))"),
   (if ($mine | length) == 0 then
-     "   none of the fetched PRs are yours"
+     "   " + (if $trunc then "none of the fetched PRs are yours" else "you have no open PRs" end)
    else
      ($mine[] | row) ,
      (if ($mine_unreviewed | length) > 0 then
@@ -144,18 +149,18 @@ def section($t): "── \($t) " + ("─" * (68 - ($t | length)));
       else empty end)
    end),
   "",
-  section("ALREADY REVIEWED BY YOU, STILL OPEN (\($handled | length) fetched)"),
+  section("ALREADY REVIEWED BY YOU, STILL OPEN (\($handled | length)\($fq))"),
   (if ($handled | length) == 0 then
      "   none"
    else ($handled[] | row) end),
   "",
   section("SUMMARY"),
-  "   \($all | length) fetched open PRs  ·  \($waiting | length) awaiting you"
+  "   \($all | length)\($fq) open PRs  ·  \($waiting | length) awaiting you"
   + " (\($waiting_draft) draft)"
   + "  ·  \($mine | length) yours (\($mine_unreviewed | length) unapproved)"
   + "  ·  \($stale | length) idle >= @STALE@d",
-  (if ($all | length) >= @LIMIT@ then
-     "   warning: fetched PR count reached limit @LIMIT@; results may be truncated"
+  (if $trunc then
+     "   warning: only the first @LIMIT@ open PRs were fetched — counts may be incomplete (raise PR_STATUS_LIMIT)"
    else empty end)
 JQ
 )
@@ -171,5 +176,5 @@ gh pr list \
 	--repo "$REPO" \
 	--state open \
 	--limit "$LIMIT" \
-	--json number,title,author,isDraft,createdAt,updatedAt,reviewRequests,reviews,latestReviews,reviewDecision \
+	--json number,title,author,isDraft,createdAt,updatedAt,reviewRequests,reviews,latestReviews \
 	--jq "$PROG"
