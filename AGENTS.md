@@ -32,7 +32,9 @@ Guidance for AI coding agents working in this repository.
 3. Keep the public/private boundary: this repo and its parent are both **public**, so
    private implementation details belong in the private `kavi-android` repo.
 4. Benchmark harness: `make bench-data` (build eval set), `make bench` (run),
-   `make test` (suite) — see `bench/` + `docs/benchmarking-*.md`.
+   `make test` (suite) — see `bench/`. The notes in
+   `docs/reference/benchmarking-*.md` are **cold reference** (the corpus catalog
+   is still consulted for eval work); `docs/README.md` indexes what is current.
 5. PR/review status: `scripts/pr_status.sh` prints your review inbox and outbox in
    one call. The inbox is inferred (open + not yours + unreviewed) — do **not** trust
    `--review-requested` alone here, since PRs are often opened with no reviewer

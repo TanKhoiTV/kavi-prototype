@@ -10,7 +10,7 @@
 # PRs in this repo are frequently opened without a reviewer requested, so an
 # unassigned PR authored by someone else still counts as awaiting your review.
 # Relying on `--review-requested` alone silently reports "nothing to review"
-# while PRs sit unreviewed. See `.pi/AGENTS.md` -> "PR review status".
+# while PRs sit unreviewed. See `AGENTS.md` -> "PR review status".
 #
 # Drafts are listed, never hidden — they are marked DRAFT and counted
 # separately, because a draft is often "nearly ready" rather than "ignore".
