@@ -127,10 +127,15 @@ jobs:
           # A conflict here means a newer run already wrote a fuller CHANGELOG;
           # fail loudly rather than silently dropping entries.
           git pull --rebase
+          # Push explicitly to `main` rather than a bare `git push`: the bare
+          # form targets whichever branch is checked out, so dispatching this
+          # workflow from a feature ref wrote the regenerated file to that
+          # branch instead of `main` — and the notice below still reported
+          # success. Being explicit makes the target independent of the ref.
           # The only soft-fail: a rejected push is a configuration problem, and
           # this workflow is not a required check. Warn loudly rather than
           # turning `main` red, but leave a clear starting point for the fix.
-          if git push; then
+          if git push origin HEAD:main; then
             echo "::notice title=changelog::Pushed regenerated CHANGELOG.md to main."
           else
             echo "::warning title=changelog::Could not push CHANGELOG.md. Check that"\
