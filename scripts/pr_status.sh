@@ -71,8 +71,8 @@ if [[ "${1:-}" == "--web" ]]; then
 fi
 
 # The report is built entirely in one jq program (gh's embedded jq), because a
-# standalone jq binary is not guaranteed on PATH. @ME@ and @STALE@ are
-# substituted below; both are validated above so interpolation is safe.
+# standalone jq binary is not guaranteed on PATH. @ME@, @STALE@, and @LIMIT@
+# are substituted below; all are validated above so interpolation is safe.
 PROG=$(
 	cat <<'JQ'
 # ── formatting helpers ───────────────────────────────────────────────────────
@@ -86,7 +86,12 @@ def isstale: idle >= @STALE@;
 
 # ── per-PR facts ─────────────────────────────────────────────────────────────
 def myrev: [.latestReviews[]? | select(.author.login == "@ME@") | .state];
-def approvals: [.latestReviews[]? | select(.author.login != "@ME@") | select(.state == "APPROVED")] | length;
+def approvals:
+  [.reviews[]? | select(.author.login != "@ME@")
+   | select(.state == "APPROVED" or .state == "CHANGES_REQUESTED")]
+  | group_by(.author.login)
+  | map(sort_by(.submittedAt) | last | select(.state == "APPROVED"))
+  | length;
 def revsum:
   ([.latestReviews[]? | select(.author.login != "@ME@") | "\(.author.login):\(.state)"] | join(",")) as $s
   | if $s == "" then "no reviews" else $s end;
@@ -121,17 +126,17 @@ def section($t): "── \($t) " + ("─" * (68 - ($t | length)));
 | ($mine | map(select(approvals == 0))) as $mine_unreviewed
 | ($all | map(select(isstale))) as $stale
 
-| section("WAITING ON YOUR REVIEW (\($waiting | length))"),
+| section("WAITING ON YOUR REVIEW (\($waiting | length) fetched)"),
   (if ($waiting | length) == 0 then
-     "   none — no unreviewed open PRs authored by others"
+     "   none — no unreviewed fetched PRs authored by others"
    else ($waiting[] | row) end),
   (if $waiting_draft > 0 then
      "   note: \($waiting_draft) of these are DRAFT — may not be ready for review"
    else empty end),
   "",
-  section("YOUR OPEN PRS (\($mine | length))"),
+  section("YOUR OPEN PRS (\($mine | length) fetched)"),
   (if ($mine | length) == 0 then
-     "   you have no open PRs"
+     "   none of the fetched PRs are yours"
    else
      ($mine[] | row) ,
      (if ($mine_unreviewed | length) > 0 then
@@ -139,21 +144,25 @@ def section($t): "── \($t) " + ("─" * (68 - ($t | length)));
       else empty end)
    end),
   "",
-  section("ALREADY REVIEWED BY YOU, STILL OPEN (\($handled | length))"),
+  section("ALREADY REVIEWED BY YOU, STILL OPEN (\($handled | length) fetched)"),
   (if ($handled | length) == 0 then
      "   none"
    else ($handled[] | row) end),
   "",
   section("SUMMARY"),
-  "   \($all | length) open  ·  \($waiting | length) awaiting you"
+  "   \($all | length) fetched open PRs  ·  \($waiting | length) awaiting you"
   + " (\($waiting_draft) draft)"
   + "  ·  \($mine | length) yours (\($mine_unreviewed | length) unapproved)"
-  + "  ·  \($stale | length) idle >= @STALE@d"
+  + "  ·  \($stale | length) idle >= @STALE@d",
+  (if ($all | length) >= @LIMIT@ then
+     "   warning: fetched PR count reached limit @LIMIT@; results may be truncated"
+   else empty end)
 JQ
 )
 
 PROG="${PROG//@ME@/$ME}"
 PROG="${PROG//@STALE@/$STALE_DAYS}"
+PROG="${PROG//@LIMIT@/$LIMIT}"
 
 printf 'PR status — %s\n' "$REPO"
 printf '%s · as %s · stale >= %sd\n\n' "$(date -u '+%Y-%m-%d %H:%M UTC')" "$ME" "$STALE_DAYS"
@@ -162,5 +171,5 @@ gh pr list \
 	--repo "$REPO" \
 	--state open \
 	--limit "$LIMIT" \
-	--json number,title,author,isDraft,createdAt,updatedAt,reviewRequests,latestReviews,reviewDecision \
+	--json number,title,author,isDraft,createdAt,updatedAt,reviewRequests,reviews,latestReviews,reviewDecision \
 	--jq "$PROG"
