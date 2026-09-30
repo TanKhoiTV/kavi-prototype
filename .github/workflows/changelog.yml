@@ -17,6 +17,9 @@ permissions:
 jobs:
   update-changelog:
     runs-on: ubuntu-latest
+    # A hung git-cliff or push step would otherwise hold a runner for the
+    # 360-minute default; 10 is comfortably above the observed ~20s runtime.
+    timeout-minutes: 10
     # Serialise runs so two pushes to main can't regenerate CHANGELOG.md
     # concurrently and race to push. cancel-in-progress is false so a queued
     # run still executes (and regenerates from the newest tip) instead of
