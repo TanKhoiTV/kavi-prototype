@@ -90,16 +90,19 @@ def approvals: [.latestReviews[]? | select(.author.login != "@ME@") | select(.st
 def revsum:
   ([.latestReviews[]? | select(.author.login != "@ME@") | "\(.author.login):\(.state)"] | join(",")) as $s
   | if $s == "" then "no reviews" else $s end;
-def reqsum:
-  ([.reviewRequests[]? | (.login // .name // .slug)] | join(",")) as $s
-  | if $s == "" then "" else $s end;
+def reqdisp:
+  ([.reviewRequests[]? | (.login // .name // .slug)]) as $r
+  | if ($r | length) == 0 then "UNASSIGNED"
+    elif ($r | length) == 1 then "rq:" + $r[0]
+    else "rq:" + $r[0] + "+\((($r | length) - 1))"
+    end;
 
 # Render one PR as a single aligned row.
 def row:
   "   "
   + (("#\(.number)") | pad(7))
   + ((if .isDraft then "DRAFT" else "" end) | pad(7))
-  + ((if (reqsum == "") then "UNASSIGNED" else "rq:" + reqsum end) | cut(14) | pad(15))
+  + (reqdisp | cut(20) | pad(21))
   + (((dur(idle)) + " idle") | pad(11))
   + (((dur(age)) + " open") | pad(11))
   + ((if isstale then "STALE" else "" end) | pad(7))
