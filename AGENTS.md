@@ -39,6 +39,11 @@ Guidance for AI coding agents working in this repository.
    one call. The inbox is inferred (open + not yours + unreviewed) — do **not** trust
    `--review-requested` alone here, since PRs are often opened with no reviewer
    requested and that query then reports "nothing to review".
+6. Changelog commits are pushed with a **GitHub App** token, not `GITHUB_TOKEN`:
+   `github-actions[bot]` cannot be a ruleset bypass actor, so the default token is
+   rejected by the `main` ruleset. Read the header comment in
+   `.github/workflows/changelog.yml` before editing that workflow — reverting to
+   `GITHUB_TOKEN` reinstates a hard `GH013` push failure.
 
 ## Compact Instructions
 
