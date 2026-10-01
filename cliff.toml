@@ -21,7 +21,8 @@ body = """
     ### {{ group | upper_first }}
     {% for commit in commits %}
         - {% if commit.scope %}**{{ commit.scope }}:** {% endif %}\
-            {{ commit.message | upper_first }}\
+            {#- Squash merges leave "(#N)" in the subject, and the link below appends\n                the same PR again. Strip the subject's copy when it matches the\n                resolved PR number so each entry carries exactly one reference. #}\
+            {% if commit.remote.pr_number %}{{ commit.message | replace(from="(#" ~ commit.remote.pr_number ~ ")", to="") | trim | upper_first }}{% else %}{{ commit.message | upper_first }}{% endif %}\
             {% if commit.remote.pr_number %}([#{{ commit.remote.pr_number }}](https://github.com/TanKhoiTV/kavi-prototype/pull/{{ commit.remote.pr_number }})){% endif %}\
     {% endfor %}
 {% endfor %}
