@@ -82,14 +82,14 @@ class ZipformerCandidateBase(Candidate):
     def _infer(self, item: EvalItem) -> tuple[str | None, str | None]:
         lang = getattr(item, "language", None)
         if lang != self._expected_lang:
-            return None, (
+            raise ValueError(
                 f"{type(self).__name__} received a non-{self._expected_lang} item: "
                 f"{item.id} (language={lang!r})"
             )
 
         audio_path = item.audio_ref or item.input_text
         if not audio_path or not os.path.exists(audio_path):
-            return None, f"audio file not found: {audio_path!r}"
+            raise FileNotFoundError(f"audio file not found: {audio_path!r}")
 
         import soundfile as sf
 

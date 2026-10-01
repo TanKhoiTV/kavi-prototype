@@ -50,14 +50,14 @@ class MoonshineTinyViCandidate(Candidate):
     def _infer(self, item: EvalItem) -> tuple[str | None, str | None]:
         lang = getattr(item, "language", None)
         if lang != "vi":
-            return None, (
+            raise ValueError(
                 f"MoonshineTinyViCandidate received a non-vi item: "
                 f"{item.id} (language={lang!r})"
             )
 
         audio_path = item.audio_ref or item.input_text
         if not audio_path or not os.path.exists(audio_path):
-            return None, f"audio file not found: {audio_path!r}"
+            raise FileNotFoundError(f"audio file not found: {audio_path!r}")
 
         # Load audio as mono 16kHz
         import soundfile as sf
@@ -65,11 +65,19 @@ class MoonshineTinyViCandidate(Candidate):
         audio, sr = sf.read(audio_path)
         if audio.ndim > 1:
             audio = audio.mean(axis=1)  # stereo -> mono
+        # The processor is told 16 kHz below, so the audio must actually be at
+        # 16 kHz. Every manifest shipped today is, but a VSS or external
+        # manifest need not be, and mislabelling the rate yields a transcript
+        # that is wrong rather than an error.
+        if sr != 16000:
+            import torchaudio
+
+            audio = torchaudio.functional.resample(
+                torch.from_numpy(audio).float(), sr, 16000
+            ).numpy()
 
         # Process and generate
-        inputs = self.processor(
-            audio, sampling_rate=16000, return_tensors="pt"
-        )
+        inputs = self.processor(audio, sampling_rate=16000, return_tensors="pt")
         with torch.no_grad():
             generated_ids = self.model.generate(
                 inputs.input_values,
@@ -77,9 +85,7 @@ class MoonshineTinyViCandidate(Candidate):
                 **self._decode_kwargs,
             )
 
-        text = self.processor.batch_decode(
-            generated_ids, skip_special_tokens=True
-        )[0]
+        text = self.processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
         return text.strip(), None
 
 
@@ -113,24 +119,30 @@ class MoonshineTinyEnCandidate(Candidate):
     def _infer(self, item: EvalItem) -> tuple[str | None, str | None]:
         lang = getattr(item, "language", None)
         if lang != "en":
-            return None, (
+            raise ValueError(
                 f"MoonshineTinyEnCandidate received a non-en item: "
                 f"{item.id} (language={lang!r})"
             )
 
         audio_path = item.audio_ref or item.input_text
         if not audio_path or not os.path.exists(audio_path):
-            return None, f"audio file not found: {audio_path!r}"
+            raise FileNotFoundError(f"audio file not found: {audio_path!r}")
 
         import soundfile as sf
 
         audio, sr = sf.read(audio_path)
         if audio.ndim > 1:
             audio = audio.mean(axis=1)
+        # See the note in MoonshineTinyViCandidate._infer: the declared rate
+        # must match the audio, not merely be asserted to the processor.
+        if sr != 16000:
+            import torchaudio
 
-        inputs = self.processor(
-            audio, sampling_rate=16000, return_tensors="pt"
-        )
+            audio = torchaudio.functional.resample(
+                torch.from_numpy(audio).float(), sr, 16000
+            ).numpy()
+
+        inputs = self.processor(audio, sampling_rate=16000, return_tensors="pt")
         with torch.no_grad():
             generated_ids = self.model.generate(
                 inputs.input_values,
@@ -138,7 +150,5 @@ class MoonshineTinyEnCandidate(Candidate):
                 **self._decode_kwargs,
             )
 
-        text = self.processor.batch_decode(
-            generated_ids, skip_special_tokens=True
-        )[0]
+        text = self.processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
         return text.strip(), None

@@ -43,12 +43,14 @@ class WhisperASRCandidate(Candidate):
     def _infer(self, item: EvalItem) -> tuple[str | None, str | None]:
         audio_path = item.audio_ref or item.input_text
         if not audio_path or not os.path.exists(audio_path):
-            return None, f"audio file not found: {audio_path!r}"
+            raise FileNotFoundError(f"audio file not found: {audio_path!r}")
 
         # Language comes from the item — forced, not auto-detected.
         lang = getattr(item, "language", None)
         if lang not in ("vi", "en"):
-            return None, f"missing/invalid language tag on item {item.id}: {lang!r}"
+            raise ValueError(
+                f"missing/invalid language tag on item {item.id}: {lang!r}"
+            )
 
         segments, _info = self.model.transcribe(
             audio_path, language=lang, **self._decode_kwargs
