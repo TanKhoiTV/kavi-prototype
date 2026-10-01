@@ -96,7 +96,6 @@ def _ensure_zipformer_model():
 
 def _transcribe(audio_path: str, language: str = "vi") -> tuple[str, float]:
     """Transcribe audio with Zipformer dual (CPU-only v1). Returns (text, rtf)."""
-    import time
     t_start = time.time()
     model = _ensure_zipformer_model()
     segments, _info = model.transcribe(audio_path, language=language)
@@ -105,7 +104,6 @@ def _transcribe(audio_path: str, language: str = "vi") -> tuple[str, float]:
     # RTF = (transcription time) / (audio duration in seconds)
     # Approximate: use file duration via soundfile
     try:
-        import soundfile as sf
         info = sf.info(audio_path)
         duration = info.duration if info.duration else (t_end - t_start)
     except Exception:
