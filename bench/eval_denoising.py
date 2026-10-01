@@ -60,9 +60,6 @@ def _denoise_gtcrn(audio, sr):
     # Requires sherpa-onnx library and GTCRN TFLite model on device
     # Placeholder: actual implementation uses sherpa-onnx runtime
     # Note: This requires GTCRN model file (.tflite) available on device
-    import tempfile
-    import soundfile as sf
-    import numpy as np
     # Placeholder implementation: copy audio unchanged
     # In production, replace with sherpa-onnx call:
     #   from sherpa_onnx import OfflineDenoise
@@ -396,7 +393,7 @@ def run_denoising_eval(
         "prop_decrease": prop_decrease_value,
         "raw_noisy_wer": raw_noisy_w,
         "wiener_noisy_wer": wiener_noisy_w,
-        "rnnoise_noisy_wer": rnnoise_noisy_w,
+        "gtcrn_noisy_wer": gtcrn_noisy_w,
         "per_condition": agg_summary,
         "total_runs": processed,
         "wall_seconds": wall_seconds,
