@@ -126,6 +126,8 @@ Worth knowing:
 2. Make focused commits using **Conventional Commits**:
    - `feat:` new feature · `fix:` bugfix · `chore:` maintenance ·
      `docs:` documentation · `refactor:` restructure · `test:` tests.
+   - Never write `[skip ci]` (or `[ci skip]`) unless you mean to skip CI: GitHub
+     then suppresses **all** workflow runs for that push, changelog included.
 3. Keep changes offline/on-device friendly.
 4. Open a PR into `main`. Use the PR template.
 5. Run `make check` and `make test` before pushing — CI runs both.

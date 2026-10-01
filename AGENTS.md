@@ -21,6 +21,8 @@ Guidance for AI coding agents working in this repository.
 ## Conventions
 
 - Commits follow **Conventional Commits** (`feat:`, `fix:`, `chore:`, …).
+- Never write `[skip ci]` / `[ci skip]` in a commit message unless you mean to skip
+  CI — GitHub suppresses **all** workflow runs for that push, changelog included.
 - Branch per task: `feat/<topic>`, `fix/<topic>`, `chore/<topic>`; PR into `main`.
 - Run `make check` (ruff) before committing; `make test` for the bench harness suite.
 - Keep the project **fully offline / on-device**: no network calls at runtime.
