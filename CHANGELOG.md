@@ -74,6 +74,7 @@
 - **qnn:** Add Piper surgery script, calibration lists, and QNN adapter stubs
 - **qnn:** Whisper decoder patch + Opus-MT encoder conversion (#75)
 - Add .kavi.yaml — single source of truth for pinned config values (#98)
+- **scripts:** Add PR review-status dashboard, restore root AGENTS.md (#125)([#125](https://github.com/TanKhoiTV/kavi-prototype/pull/125))
 
 ### Miscellaneous
 
@@ -135,5 +136,6 @@
 - Pin GitHub Action tags to full commit SHAs
 - Stop recursing into the private kavi-android submodule
 - **changelog:** Serialise changelog runs and rebase before pushing
+- Push CHANGELOG.md with a GitHub App token (#126)([#126](https://github.com/TanKhoiTV/kavi-prototype/pull/126))
 [unreleased]: https://github.com/TanKhoiTV/kavi-prototype/compare/v0.1.0...HEAD
 
