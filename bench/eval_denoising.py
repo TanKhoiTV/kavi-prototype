@@ -69,9 +69,9 @@ def _denoise_gtcrn(audio, sr):
 
 
 DENOISERS = {
-    "raw": None,        # VAD-only pipeline (no denoising) — Option C
+    "raw": None,  # VAD-only pipeline (no denoising) — Option C
     "wiener": _denoise_wiener,  # Option B
-    "gtcrn": _denoise_gtcrn,    # GTCRN — Option A (sherpa-onnx JNI)
+    "gtcrn": _denoise_gtcrn,  # GTCRN — Option A (sherpa-onnx JNI)
 }
 
 
@@ -86,6 +86,7 @@ def _ensure_zipformer_model():
         # Uses sherpa-onnx or faster-whisper Zipformer path
         # Placeholder: load Zipformer model (replace with actual path)
         from faster_whisper import WhisperModel
+
         _ZIPFORMER_MODEL = WhisperModel(
             model_size_or_path="zipformer-dual-small-int8",
             device="cpu",
@@ -107,7 +108,7 @@ def _transcribe(audio_path: str, language: str = "vi") -> tuple[str, float]:
         info = sf.info(audio_path)
         duration = info.duration if info.duration else (t_end - t_start)
     except Exception:
-        duration = (t_end - t_start)
+        duration = t_end - t_start
     rtf = (t_end - t_start) / max(duration, 0.001)
     return (text or ""), rtf
 
