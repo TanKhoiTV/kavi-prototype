@@ -5,13 +5,18 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# Read-only by default, so a job added later cannot inherit a write scope.
 permissions:
-  contents: write
-  pull-requests: read
+  contents: read
 
 jobs:
   update-changelog:
     runs-on: ubuntu-latest
+    # Elevated per job rather than at the workflow level: this job regenerates
+    # and pushes CHANGELOG.md, which no other job needs to do.
+    permissions:
+      contents: write # the final step commits and pushes CHANGELOG.md
+      pull-requests: read # git-cliff resolves commit.remote.pr_number
     # Serialise runs so two pushes to main can't regenerate CHANGELOG.md
     # concurrently and race to push. cancel-in-progress is false so a queued
     # run still executes (and regenerates from the newest tip) instead of
