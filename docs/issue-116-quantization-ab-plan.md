@@ -85,7 +85,7 @@ Qualcomm access. Phases 3–4 need the Linux build host. Phases 5–6 need the d
 | **P6** | Score + compare | dev host | comparison table |
 | **P7** | Record decision & close #7 | dev host | ADR-003, `.kavi.yaml`, register row |
 
-### P0 — Make quantization configurable — ✅ **DONE**
+### P0 — Make quantization configurable — ✅ **DONE** (landed: PR #123)
 
 **Objective:** the conversion script can emit either arm from one code path, so the
 two artifacts differ **only** in bit-width.
@@ -135,7 +135,7 @@ flag is sufficient; the fallback is a percentile/minmax activation quantizer, wh
 must then be held **identical across both arms**. The script prints a NOTE when
 `--act-bitwidth 8 --act-quantizer tf` is combined.
 
-### P1 — Export the encoder ONNX — ✅ **DONE**
+### P1 — Export the encoder ONNX — ✅ **DONE** (landed: PR #123)
 
 **Objective:** produce the single source graph both arms are built from.
 
@@ -189,7 +189,7 @@ must then be held **identical across both arms**. The script prints a NOTE when
 the comparison looks clean. The verification script makes that failure loud.
 
 
-### P2 — Build the calibration input list (real data only) — ✅ **DONE**
+### P2 — Build the calibration input list (real data only) — ✅ **DONE** (landed: PR #123)
 
 **Objective:** one calibration list, real data, used by **both** arms. This is the
 single most likely source of an invalid conclusion.
