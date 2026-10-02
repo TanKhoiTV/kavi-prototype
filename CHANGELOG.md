@@ -106,6 +106,7 @@
 - Normalize line endings and make local checks deterministic
 - **env:** Make the QAIRT helper portable and add a Windows one
 - **env:** Default ANDROID_NDK_ROOT to the installer's SDK root([#118](https://github.com/TanKhoiTV/kavi-prototype/pull/118))
+- Add CODEOWNERS so PRs auto-request a reviewer([#130](https://github.com/TanKhoiTV/kavi-prototype/pull/130))
 
 ### Refactoring
 
