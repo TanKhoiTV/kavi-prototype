@@ -8,6 +8,10 @@ Proposed
 
 2026-07-14
 
+## Deciders
+
+Kavi team
+
 ## Context
 
 ADR-001 establishes offline-first, on-device execution. ADR-002 fixes the target
@@ -70,7 +74,7 @@ deferred to future per-stage ADRs (see Open Questions).
 
 ### Executable plan (pinned spec)
 
-The detailed, step-by-step spec lives in `docs/phase-4-qnn-plan.md`. In brief:
+The detailed, step-by-step spec lives in `docs/reference/phase-4-qnn-plan.md`. In brief:
 
 1. **Convert** each v0 candidate to a QAIRT / QNN artifact (host build-time only):
    - **ASR** — *evaluate* re-sourcing Whisper Small to ONNX (fixed-shape decoder,
@@ -93,7 +97,7 @@ The detailed, step-by-step spec lives in `docs/phase-4-qnn-plan.md`. In brief:
    **turnaround < 2.0 s**, **zero network**) **and** beats the CPU baseline on RTF /
    turnaround without accuracy regression; else keep CPU for that stage.
 
-This comparison **closes this ADR** (→ *Accepted*) and feeds ADR-004's tech-stack
+This comparison **closes this ADR** (→ *Accepted*) and feeds the [open-parameters register](README.md#open-parameters) tech-stack
 picks. **Status remains *Proposed* until the on-device numbers exist.**
 
 ## Alternatives Considered
@@ -130,4 +134,8 @@ picks. **Status remains *Proposed* until the on-device numbers exist.**
 - Vietnamese **TTS coverage** in AI Hub PiperTTS?
 - **w8a16 vs w8a8** accuracy for Opus-MT vi↔en?
 - Which stages truly need HTP vs are CPU-sufficient?
-- Can we obtain QAIRT Community Edition (free Qualcomm ID)? Expected yes, confirm.
+- ~~Can we obtain QAIRT Community Edition (free Qualcomm ID)?~~ **Resolved
+  (2026-09-25):** yes — obtained and in use. The SDK (`2.31.0.250130`) is installed
+  and drives the converter flow (`docs/ndk-conversion-runbook.md` §2.2,
+  `scripts/qairt-env.sh`), and
+  [ADR-030](ADR-030-qairt-runtime-redistribution.md) records its licence terms.

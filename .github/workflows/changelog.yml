@@ -3,6 +3,11 @@ name: Changelog
 on:
   push:
     branches: [main]
+    # Loop guard: the sync commit below only touches CHANGELOG.md, so ignoring
+    # that path here stops this workflow from re-triggering itself. The commit
+    # message also carries [skip ci] as a second, independent guard.
+    paths-ignore:
+      - CHANGELOG.md
   workflow_dispatch:
 
 permissions:
@@ -12,19 +17,89 @@ permissions:
 jobs:
   update-changelog:
     runs-on: ubuntu-latest
+    # A hung git-cliff or push step would otherwise hold a runner for the
+    # 360-minute default; 10 is comfortably above the observed ~20s runtime.
+    timeout-minutes: 10
+    # Serialise runs so two pushes to main can't regenerate CHANGELOG.md
+    # concurrently and race to push. cancel-in-progress is false so a queued
+    # run still executes (and regenerates from the newest tip) instead of
+    # being dropped.
+    concurrency:
+      group: changelog-${{ github.ref }}
+      cancel-in-progress: false
     steps:
+      # ── Why this pushes with a GitHub App token, not GITHUB_TOKEN ─────────
+      #
+      # The `main` ruleset requires changes to go through a pull request, and
+      # `github-actions[bot]` (the identity behind the default GITHUB_TOKEN)
+      # CANNOT be placed on a ruleset bypass list — GitHub only allows users,
+      # teams, roles, and GitHub Apps there. A GITHUB_TOKEN push is therefore
+      # rejected with:
+      #
+      #   GH013: Repository rule violations found for refs/heads/main.
+      #   - Changes must be made through a pull request.
+      #
+      # The supported fix is a GitHub App listed on the ruleset bypass list.
+      # The workflow mints a short-lived installation token for that App and
+      # pushes as the App, so the bypass applies without any long-lived token
+      # in the repo.
+      #
+      # One-time setup — repository Settings → Secrets and variables → Actions:
+      #   * Variable  CHANGELOG_SYNC_APP_ID          = the App's numeric App ID
+      #   * Secret    CHANGELOG_SYNC_APP_PRIVATE_KEY = the App's .pem contents
+      # The App itself needs: Contents = read and write, no webhook, installed
+      # on this repository, and added to the `main` ruleset bypass list as an
+      # Integration with bypass mode "always".
+      #
+      # Until both values exist this job SKIPS with a notice instead of
+      # failing, so `main` does not go red on a configuration gap.
+      - name: Check changelog sync is configured
+        id: config
+        env:
+          APP_ID: ${{ vars.CHANGELOG_SYNC_APP_ID }}
+          APP_KEY: ${{ secrets.CHANGELOG_SYNC_APP_PRIVATE_KEY }}
+        run: |
+          if [[ -n "$APP_ID" && -n "$APP_KEY" ]]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=changelog::Changelog sync is not configured —"\
+              "set the CHANGELOG_SYNC_APP_ID variable and the"\
+              "CHANGELOG_SYNC_APP_PRIVATE_KEY secret. See the header comment in"\
+              ".github/workflows/changelog.yml."
+          fi
+      - name: Mint GitHub App token
+        if: steps.config.outputs.configured == 'true'
+        id: app-token
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2.2.2
+        with:
+          app-id: ${{ vars.CHANGELOG_SYNC_APP_ID }}
+          private-key: ${{ secrets.CHANGELOG_SYNC_APP_PRIVATE_KEY }}
+          # Scope the installation token to this repository instead of every
+          # repository the App happens to be installed on.
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ github.event.repository.name }}
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        if: steps.config.outputs.configured == 'true'
         with:
           # Don't recurse into the private kavi-android submodule; the runner
           # token can't access it and git-cliff only needs the repo history.
           submodules: false
           fetch-depth: 0
+          # Check out and push as the App, so the ruleset bypass applies.
+          token: ${{ steps.app-token.outputs.token }}
+          # Deliberately persisted so the final step can push. Safe here because
+          # this job uploads no artifacts, so there is nothing for a credential
+          # to leak into; the token is also short-lived and repo-scoped above.
+          persist-credentials: true
       - name: Set up Node.js
+        if: steps.config.outputs.configured == 'true'
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: "lts/*"
       - name: Generate CHANGELOG.md
-        uses: orhun/git-cliff-action@f50e11560dce63f7c33227798f90b924471a88b5 # v4
+        if: steps.config.outputs.configured == 'true'
+        uses: orhun/git-cliff-action@a9a95522b26fe6403f7bb24031f21fb573d0f5ff # v4
         with:
           config: cliff.toml
           args: --unreleased --strip header
@@ -32,10 +107,40 @@ jobs:
           OUTPUT: CHANGELOG.md
           GITHUB_REPO: ${{ github.repository }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Commit CHANGELOG.md
+      - name: Commit and push CHANGELOG.md
+        if: steps.config.outputs.configured == 'true'
+        env:
+          # Passed via env rather than interpolated into the script, so the
+          # App slug can never be treated as shell code.
+          APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "${APP_SLUG}[bot]"
+          git config user.email "${APP_SLUG}[bot]@users.noreply.github.com"
           git add CHANGELOG.md
-          git commit -m "chore: update CHANGELOG" || echo "no changes"
-          git push
+          # [skip ci] keeps this commit from re-triggering workflows. An App
+          # token is NOT the GITHUB_TOKEN, so unlike a default-token push this
+          # one WOULD trigger them without the guard.
+          git commit -m "chore: update CHANGELOG [skip ci]" || echo "no changes"
+          # Another push may have landed while this job ran (e.g. a direct
+          # push, which the concurrency group above can't serialise against).
+          # Rebase before pushing so we don't fail on a non-fast-forward.
+          # A conflict here means a newer run already wrote a fuller CHANGELOG;
+          # fail loudly rather than silently dropping entries.
+          git pull --rebase
+          # Push explicitly to `main` rather than a bare `git push`: the bare
+          # form targets whichever branch is checked out, so dispatching this
+          # workflow from a feature ref wrote the regenerated file to that
+          # branch instead of `main` — and the notice below still reported
+          # success. Being explicit makes the target independent of the ref.
+          # The only soft-fail: a rejected push is a configuration problem, and
+          # this workflow is not a required check. Warn loudly rather than
+          # turning `main` red, but leave a clear starting point for the fix.
+          if git push origin HEAD:main; then
+            echo "::notice title=changelog::Pushed regenerated CHANGELOG.md to main."
+          else
+            echo "::warning title=changelog::Could not push CHANGELOG.md. Check that"\
+              "the App is still a bypass actor (mode 'always') on the 'main'"\
+              "ruleset and that CHANGELOG_SYNC_APP_ID /"\
+              "CHANGELOG_SYNC_APP_PRIVATE_KEY are current. CHANGELOG.md stays"\
+              "drifted until this succeeds."
+          fi

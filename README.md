@@ -5,16 +5,22 @@ Kavi is a fully **offline, on-device** speech-to-speech translation system for
 **OneVoice AI Challenge** (Saigon AI Hub × Qualcomm, May–Nov 2026) and targeting
 a Snapdragon 8 Gen 2 Android phone.
 
-This repository is the **private implementation** submodule of
-[`aivoice-2026`](https://github.com/TanKhoiTV/aivoice-2026) — the public parent
-that hosts documentation and CI. Code, model weights, and internal docs live
-here.
+This repository is the **implementation** submodule of
+[`aivoice-2026`](https://github.com/TanKhoiTV/aivoice-2026) — the umbrella repo
+that hosts the public-facing documentation and CI. Code and internal docs live
+here; the third-party model weights are fetched on demand with `make models`
+rather than committed (see [`NOTICE`](NOTICE)).
+
+> The Android application lives in a separate private repository and is not
+> publicly available.
 
 ## Repository layout
 
 | Path | Purpose |
 | ------ | --------- |
-| `models/` | MT weights kept at the repo root for immediate reuse (Opus-MT VI→EN). |
+| `models/` | CTranslate2 Opus-MT VI→EN weights + SentencePiece tokenizers (fetch with `make models`; not committed). |
+| `scripts/` | Asset fetchers/verifiers (`make models` / `make data` / `make verify-assets`) + QAIRT env helpers. |
+| `assets.lock.toml` | Pinned third-party asset revisions + SHA-256 digests. |
 | `voices/` | Piper TTS voice models (e.g. `en_US-lessac-medium`). |
 | `bench/` | v0 benchmark harness: candidate adapters, scorer, eval-manifest schema, data prep. |
 | `docs/` | Internal documentation (onboarding, benchmarking plan, ADRs). |
@@ -26,9 +32,15 @@ here.
 ## Quickstart
 
 ```bash
-uv sync            # install dependencies
-uv run ruff check .   # lint
+make setup         # deps + pinned model weights + FLEURS data + eval manifest
+make check         # lint + format check
+make test          # pytest
 ```
+
+`make setup` needs network access and ~1.5 GB of downloads; `make setup-min` is
+the offline path (fallback eval set). See [`CONTRIBUTING.md`](CONTRIBUTING.md)
+for prerequisites, the Windows notes, and the individual `make models` /
+`make data` / `make verify-assets` steps.
 
 ## Benchmark harness (v0)
 
@@ -37,17 +49,19 @@ ASR → MT → TTS candidate stack. It runs today on CPU-default, license-clean
 candidates:
 
 ```bash
+make models       # fetch pinned Opus-MT weights/tokenizers (~289 MB, one-time)
+make data         # fetch pinned FLEURS vi_vn/en_us test parquets (~1.1 GB, resumable)
 make bench-data   # build the lean eval set -> eval_data/eval_manifest_v1.json
 make bench        # run the harness (offline smoke: Opus-MT vi->en + Piper EN TTS)
-make test         # run the pytest suite (manifest round-trip, scorer, FLEURS id-merge)
+make verify-assets  # check downloaded digests against assets.lock.toml
 ```
 
 ASR items use real VI/EN speech from FLEURS parquets. Real-noise clips
 (MUSAN/RIRS_NOISES) can be swapped in via `build_lean_manifest(real_noise_dir=...)`.
-See `docs/benchmarking-plan.md` and `docs/benchmarking-todo.md`.
+See `docs/reference/benchmarking-plan.md` and `docs/reference/benchmarking-todo.md`.
 
-> Public contest documentation (contest-info, registration checklist, Luma
-> answers, pitch deck) lives in the parent repo `aivoice-2026/docs/`.
+> Public contest documentation (contest info, specifications) lives in the
+> parent repo `aivoice-2026/docs/`.
 
 ## Standards & tooling
 

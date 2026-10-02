@@ -5,7 +5,7 @@ implement a thin adapter interface; the off-device scorer computes the contest
 metrics from a fixed, versioned eval manifest so every candidate is scored on
 byte-identical inputs.
 
-See docs/benchmarking-plan.md (S6 harness design) and docs/benchmarking-todo.md
+See docs/reference/benchmarking-plan.md (S6 harness design) and docs/reference/benchmarking-todo.md
 (Phases 0-3). This package is the host-side, CPU-default scaffold (Phase 0-3);
 the on-device QNN runner is Phase 4 (QAIRT gate resolved).
 """

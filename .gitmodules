@@ -1,3 +1,9 @@
-[submodule "android"]
-	path = android
-	url = git@github.com:TanKhoiTV/kavi-android.git
+# The Android app lives in a private repository and is intentionally NOT
+# vendored into this public prototype repo.
+#
+#   git@github.com:TanKhoiTV/kavi-android.git
+#
+# It was previously registered here as a submodule. It was unregistered so that
+# public clones of this repo do not carry a gitlink to a private repository.
+# For local Android development, clone that repo alongside this one; its path is
+# ignored via `/android` in .gitignore.

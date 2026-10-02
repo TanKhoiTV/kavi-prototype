@@ -1,7 +1,8 @@
 # Phase 4 — On-device QNN Conversion & Comparison Plan
 
 > **Status:** Planning (precedes and parallels the Phase-4 implementation, job (1))
-> **Companion docs:** `benchmarking-todo.md` §Phase 4, `ADR-003` (Hexagon runtime, *Proposed*), `ADR-004` (architecture, *Draft*).
+> **Superseded scope (2026-08-05):** the ASR (Whisper) and TTS (Piper) QNN paths are **obsolete** — ADR-008 keeps ASR CPU-only (Dual Zipformer via sherpa-onnx); ADR-009 replaces Piper with Supertonic Phase 1 (ADR-024 already deferred Piper QNN). **Live scope = Opus-MT encoder only** (§2, §8, §9). Whisper/Piper sections are retained for reference only.
+> **Companion docs:** `benchmarking-todo.md` §Phase 4, `ADR-003` (Hexagon runtime, *Proposed*).
 > **Tracking:** issue #51, issue #57 (verified-command corrections), issue #59 (converter output / `.dlc` corrections).
 
 ## 0. Purpose
@@ -82,6 +83,8 @@ benchmark below is what decides.
 
 ### 3.1 ASR — Whisper Small (244M, MIT) — *evaluate re-source*
 
+> **Superseded (ADR-008):** ASR is CPU-only Dual Zipformer. The Whisper ONNX/QNN path below is retained for reference only.
+
 - **v0 (CPU):** `faster-whisper` Small int8 — ggml, **not** QNN-convertible.
 - **For QNN:** export Whisper Small to **ONNX** (e.g. `optimum` Whisper ONNX
   export), **or** use Qualcomm-optimized **Whisper-Small-Quantized** (w8a16) from
@@ -102,12 +105,14 @@ benchmark below is what decides.
   set requires it.
 - **Output:** `<model>.cpp` (graph) → HTP v73 context binary (Windows).
 
-### 3.3 TTS — Piper (MIT-era `rhasspy/piper`, ONNX) — **Deferred** (ADR-005 Decision 3)
+### 3.3 TTS — Piper (MIT-era `rhasspy/piper`, ONNX) — **Deferred** (ADR-024)
 
-> **ADR-005 Decision 3 supersedes this section.** Piper stays on CPU: cyclic
+> **ADR-024 supersedes this section.** Piper stays on CPU: cyclic
 > graph, `RandomNormalLike` unsupported, already fast on CPU (RTF 0.06–0.22),
 > and TTS is not the pipeline bottleneck. The QNN conversion path below is
 > retained for reference only.
+
+> **ADR-009 supersedes further (2026-07-30):** v1 TTS is Supertonic Phase 1 (sherpa-onnx `OfflineTts`) → VieNeu-TTS Phase 2, with Piper VITS as fallback. Piper QNN conversion is permanently out of scope.
 
 - **v0 (CPU):** Piper-CPU, **EN leg only** (`en_US-lessac-medium`; `vais1000` VI
   voice not in repo).
@@ -131,6 +136,7 @@ benchmark below is what decides.
     plus the compiled model `.so` library.
   - `app/src/main/assets/` — model `.so` library + HTP v73 context binaries (read at
     runtime, kept out of `jniLibs` binary load path if preferred).
+- **Provenance & commit (ADR-011):** on-device artifacts (HTP v73 context binary, model `.so`, ONNX decoder) are committed **inside `kavi-android` assets**. Host-side `prototype/models/qnn/*` outputs are gitignored (`.gitignore` `models/qnn/*`, commit 3502156) and regenerable — never treat them as deliverables.
 - **License:** AI Stack License §1(iv) permits distributing the runtime in object
   code within the app; `public.libraries.txt` does **not** list `libQnn*.so`, so
   the app **bundles** them (ADR-002 / QAIRT gate *ADOPT clean*).
@@ -170,7 +176,7 @@ accuracy regression (WER/BLEU within tolerance). Otherwise fall back to CPU for
 that stage.
 
 This comparison **closes ADR-003** (→ *Accepted*) and feeds the per-stage picks
-that finalize **ADR-004** (tech stack).
+that finalize the **tech-stack register**.
 
 ---
 
@@ -182,7 +188,7 @@ that finalize **ADR-004** (tech stack).
   static `[1,80,3000]`, no decoder loop, and Qualcomm already ships a
   Whisper-Small-Quantized-QNN re-source proving the path; (2) **Opus-MT vi→en** —
   same autoregressive decoder pattern, no sampling op. **(3) Piper — Deferred**
-  per ADR-005 Decision 3 (cyclic graph, unsupported ops, already fast on CPU).
+  per ADR-024 (cyclic graph, unsupported ops, already fast on CPU).
   The WSL host runs `qnn-onnx-converter` → `<model>.cpp`; the model
   `.so` + HTP v73 context binary are built on Windows (clang++ / NDK / MSVC), per
   the §1 env split.
@@ -273,7 +279,7 @@ do not compromise the benchmark with synthetic tensors.**
   shared sentence **`id`**.
 - **TTS (Piper):** real espeak-ng phonemizations of representative English
   sentences (factory-domain phrase list), not random phoneme IDs. **Deferred**
-  per ADR-005 Decision 3 (Piper stays on CPU).
+  per ADR-024 (Piper stays on CPU).
 - **Split discipline:** calibration draws from FLEURS **train**; `eval_manifest_v1.json`
   scoring draws from FLEURS **test** (same distribution, no overlap). Teacher-force
   reference transcripts into decoder calibration (not the model's own greedy output).
@@ -290,7 +296,7 @@ do not compromise the benchmark with synthetic tensors.**
 
 ## 10. Pre-execution checklist / known pitfalls
 
-1. ~~**Piper is NOT a short hop.**~~ **Deferred** per ADR-005 Decision 3 — Piper
+1. ~~**Piper is NOT a short hop.**~~ **Deferred** per ADR-024 — Piper
    stays on CPU. Items 1–3 below are retained for reference if Piper QNN is ever
    re-evaluated.
 2. **(Deferred — reference only, see item 1)** Piper output length is data-dependent (duration predictor → length regulator
@@ -315,7 +321,8 @@ do not compromise the benchmark with synthetic tensors.**
 ## 11. Status / tracking
 
 - **Precedes** job (1) (the actual conversion). Implementation tracks this spec.
+  → **2026-08-05:** superseded scope — see banner. Only the Opus-MT encoder path (§2, §8, §9) is live; Whisper/Piper are reference-only.
 - **Related:** `benchmarking-todo.md` §Phase 4 (terse checklist), `ADR-003`
-  (determination method → this plan), `ADR-004` open params #1–4.
+  (determination method → this plan), the [open-parameters register](../decisions/README.md#open-parameters).
 - **Issues:** #51 (this doc), #52 (ADR-003 tightening), #57 (verified-command
   corrections + pitfalls folded in), #78 (ADR status consolidation — closed).

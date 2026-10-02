@@ -11,6 +11,9 @@ from .candidates.moonshine_asr import (
 from .candidates.opusmt_mt import OpusMTMTCandidate
 from .candidates.piper_tts import PiperTTSCandidate
 from .candidates.qnn_opusmt_mt import QnnOpusMTMTCandidate
+
+# qnn_whisper_asr / qnn_piper_tts: superseded by ADR-008/009 — kept registered
+# as no-op stubs for the record; only QnnOpusMTMTCandidate is on the v1 path.
 from .candidates.qnn_piper_tts import QnnPiperTTSCandidate
 from .candidates.qnn_whisper_asr import QnnWhisperASRCandidate
 from .candidates.rtranslator import RTranslatorCandidate

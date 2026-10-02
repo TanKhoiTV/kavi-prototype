@@ -2,7 +2,7 @@
 
 > **Status:** Draft (planning). This document captures *what we will measure and on
 > what data* — it deliberately does **not** pick the ASR / MT / TTS tech stack.
-> Those choices are deferred to **ADR-004 (architecture)**, which this plan gates.
+> Those choices are deferred to the **[open-parameters register](../decisions/README.md#open-parameters)**, which this plan feeds.
 >
 > **Sources:** synthesized from an external analysis pass (Claude) on datasets,
 > the RTranslator baseline, and harness design, cross-checked with Context7 for the
@@ -15,7 +15,7 @@
 
 We run experiments **before** settling the tech stack (per the agreed sequencing).
 This plan is the first deliverable: a **model-agnostic testing & benchmarking
-suite** plus a **dataset decision**. The numbers it produces are what ADR-004 will
+suite** plus a **dataset decision**. The numbers it produces are what the register will
 record as the architecture choice.
 
 The suite must be **pluggable**: we swap ASR / MT / TTS candidates in and out and
@@ -31,7 +31,7 @@ into harness code.
 | **ADR-003** Hexagon runtime (Proposed) | QAIRT/QNN primary, ORT-XNNPACK CPU fallback, w8a16, fixed shapes | Determination method = **CPU baseline first, then on-device benchmark** (§6, §8) |
 | `docs/specifications.md` | The six objective metrics + hard thresholds | §7 restates them as harness outputs |
 
-> **Out of scope here:** which models/frameworks we ship. That is ADR-004, fed by
+> **Out of scope here:** which models/frameworks we ship. That is the [open-parameters register](../decisions/README.md#open-parameters), fed by
 > the v0 results in §8.
 
 ---
@@ -170,13 +170,13 @@ mode you have.
 
 ## 4. Model candidate landscape (ASR, MT, TTS)
 
-> **Input to ADR-004, not a decision here.** Candidate-model comparisons for the ASR,
+> **Input to the [open-parameters register](../decisions/README.md#open-parameters), not a decision here.** Candidate-model comparisons for the ASR,
 > MT, and TTS stages. ASR (§4.1–4.3) is sourced from one external analysis pass; MT and
 > TTS (§4.4–4.5) were synthesized from the repo's archived docs (architecture.md,
 > ADR-001) + Context7 library docs (CTranslate2, Piper, Transformers), then
 > **reconciled with a second external MT/TTS analysis pass** (Claude). It refines the
 > v0 candidate set (§8) and the per-stage list (§9); the final picks stay with
-> ADR-004.
+> the register.
 
 Four VI/EN ASR candidates were compared on accuracy, latency (Snapdragon 8 Gen 2
 estimates), memory, licensing, and Qualcomm AI Hub availability.
@@ -188,6 +188,7 @@ estimates), memory, licensing, and Qualcomm AI Hub availability.
 | **Whisper Small** (244M) | ~26–30% | ~20–25% | ~55–65% | Full multilingual | MIT | Yes (w8a16) |
 | **PhoWhisper Small** (244M) | **11.08** | **6.33** | **32.96** | Inherited (unbench) | BSD-3 | No (DIY export) |
 | **Zipformer 30M VI** (~30M) | no public # | — | — | **None — VI only** | Apache-2.0 | No (untested) |
+| **Zipformer small EN** (csukuangfj, ~27M) | — | — | — | **EN only** | Apache-2.0 | No (untested) |
 | **Moonshine Tiny VI** (27M) | 18.8 (CV17) | — | — | **None — VI only** | Apache-2.0 | No (DIY) |
 
 - **PhoWhisper Small** is the VI-accuracy winner (~2.4× better than Whisper Small on
@@ -195,8 +196,12 @@ estimates), memory, licensing, and Qualcomm AI Hub availability.
   w8a16 trick applies — a QNN/HTP path is feasible, just not prebuilt.
 - **Whisper Small** is the only candidate with **confirmed EN + VI** support and the
   only one with **published SD8G2 latency** (via Qualcomm AI Hub).
-- **Zipformer / Moonshine are VI-only** — they cannot serve the EN→VI direction's ASR
-  leg and can only compete for the VI→EN direction.
+- **Zipformer / Moonshine are single-language** — neither serves both directions alone.
+
+> **Superseded (ADR-008, 2026-07-30):** the v1 ASR decision pairs the VI
+> Zipformer-30M with the **EN Zipformer small** as a **Dual-Zipformer CPU
+> configuration** via sherpa-onnx, serving both directions. Whisper/PhoWhisper
+> QNN re-sourcing is out of scope; this table is the pre-decision landscape.
 
 ### 4.2 Latency & memory (SD8G2 estimates)
 
@@ -249,6 +254,10 @@ estimates), memory, licensing, and Qualcomm AI Hub availability.
 - **Realistic finalist set:** **Opus-MT (current) vs M2M-100** — the two commercial-safe,
   on-device-feasible dedicated MT models. Everything else is license-blocked (NLLB,
   SeamlessM4T), CPU-only (Hy-MT), or too large (MADLAD-400).
+
+> **Resolved (ADR-007):** Opus-MT vi↔en is the v1 MT choice; M2M-100 remains a
+> contingency candidate.
+
 - **Bidirectional coverage:** Opus-MT needs two models (vi-en + en-vi, both published).
   NLLB / Hy-MT / MADLAD / M2M / Seamless are multilingual (one model, both directions).
 - **NPU path (ADR-003):** CTranslate2 (current MT runtime) is **not** QNN-convertible —
@@ -307,10 +316,12 @@ estimates), memory, licensing, and Qualcomm AI Hub availability.
 > - **No public head-to-head** of Opus-MT vs M2M-100 vs MADLAD-400 on vi↔en exists.
 > - **TTS has less published data than MT**, especially Vietnamese: no MOS found for
 >   any VI-capable candidate — the human MOS panel (§7) exists for exactly this.
-> - **Piper license is the single most consequential open item** (not quality): old
->   MIT `rhasspy/piper` is frozen; active `OHF-Voice/piper1-gpl` is GPL-3.0; `espeak-ng`
->   is GPL. Decide pinned-version + distribution model (subprocess vs bundled) **now** —
->   it shapes the whole TTS choice, independent of voice.
+>
+- **Piper license — resolved for v1 (ADR-009):** TTS is Supertonic Phase 1 →
+  VieNeu-TTS Phase 2; Piper VITS is fallback only. The MIT/GPL fork question
+  matters only if the fallback is exercised — pin the MIT-era `rhasspy/piper`
+  snapshot then.
+>
 > - Sizes / latencies above are estimates or training-knowledge unless a measured
 >   figure is cited (e.g. RTranslator's NLLB numbers, Piper on Pi 4/5). The v0 harness
 >   must produce the real on-device numbers.
@@ -503,7 +514,7 @@ slice is marginal, that's a cheap, legitimate signal to reconsider effort alloca
 ### Pre-ASR denoising — status & open gate
 
 > Sourced from a scouting pass over `archive/` (the old implementation). **Not a
-> decision here** — it is an open pipeline question that ADR-004 should record, and
+> decision here** — it is an open pipeline question the register should record, and
 > this harness (§6/§8) is the vehicle to close it.
 
 - **Current state:** `pipeline.py` has **Silero VAD but no denoising stage**.
@@ -521,10 +532,12 @@ slice is marginal, that's a cheap, legitimate signal to reconsider effort alloca
   **Binary gate:** if denoisers beat raw-noisy WER → tune `prop_decrease` on
   50–100 files; else **VAD-only pipeline**. Phase-1 was scoped to 10 VIVOS files ×
   4 conditions on Whisper Small int8.
-- **That Phase-1 re-run was never executed** —
-  `archive/experiments/denoising-validation/results/` holds only `.gitkeep` and the
-  live `noise_samples/` is empty. So the gate was never triggered; "do denoisers
-  actually help on our pipeline?" is **still open**.
+- **RESOLVED (2026-07-20, Phase-6 gate):** executed — see
+  `docs/reference/denoising-gate-results.md`. **Wiener ADOPTED**
+  (`noisereduce`, `prop_decrease=0.5`): weighted avg WER **49.82%** vs raw
+  **51.23%**; RNNoise REJECTED (64.36%). Smoke test only (2 utts × 5
+  conditions); adaptive threshold on clean/high-SNR input is an open tune.
+  Feeds ADR-018's GTCRN-vs-Wiener choice (android plan Risk R1).
 - **DeepFilterNet dropped** (unresolved `torchaudio 2.x` PyPI bug; fix only on
   GitHub main). The old `architecture.md` "tonal-preservation" Anchor-2 rested on
   that now-dropped model + the flawed run → **treat as obsolete** unless
@@ -533,24 +546,24 @@ slice is marginal, that's a cheap, legitimate signal to reconsider effort alloca
   fixed-factors comparison in the §8 v0 lean slice (clean / +5 dB / 0 dB, both
   languages). Keep the mixing method consistent with §3.5 (`torchaudio.add_noise`),
   *not* the archived script's custom RMS mix, so the historical "noisy 20.23%"
-  ceiling stays comparable. Outcome feeds the ADR-004 gate directly.
+  ceiling stays comparable. Outcome feeds the register directly.
 
 ---
 
-## 9. Open questions / deferred decisions (→ ADR-004)
+## 9. Open questions / deferred decisions (→ [open-parameters register](../decisions/README.md#open-parameters))
 
 - **Final dataset set** — VSS (MIT), PhoST (research-only), and **InfoRe** licenses now resolved: VSS/PhoST as
   noted; **InfoRe confirmed AVOID** (no published terms, 401-gated) and `25hours_single` also **AVOID** (license
-  unknown, InfoRe-derived) — see `docs/decisions/license-situation.md` + PR #35.
+  unknown, InfoRe-derived) — see `docs/decisions/ADR-029-license-gate.md` + PR #35.
 - **VI→EN ST corpus** — adopt FLEURS ID-alignment, the bespoke gold set, or both?
 - **RTranslator snapshot** — which version/commit tested + dated in writeup; APK-eval
   task owner & timeline.
 - **MOS proxy** — DNSMOS vs small human panel (5–10 raters, 20–30 clips) for v1.
 - **Per-stage candidate list** — which two (and later finalist) models per stage,
   contingent on ADR-003 runtime availability (QAIRT Community Edition access).
-- **Pre-ASR denoising gate** — execute the archived denoising-scope ADR's Phase-1
-  (Wiener / RNNoise on Whisper Small int8, lean slice) to trigger its binary
-  gate; decide tune-`prop_decrease` vs VAD-only **before** ADR-004 records the
-  pipeline architecture (see §8 subsection).
-- **Architecture (ASR/MT/TTS frameworks)** — **not decided here**; selected by ADR-004
-  once v0/v1 numbers exist.
+- **Pre-ASR denoising gate — gate decision made (Wiener ADOPTED); full lean-slice
+  eval still pending** — see `denoising-gate-results.md`; the on-device
+  GTCRN-vs-Wiener pick (ADR-018) remains → android plan R1.
+- **Architecture — decided in ADR-007/008/009/010** (Dual Zipformer ASR, Opus-MT
+  MT, Supertonic Phase-1 TTS, sherpa-onnx + ORT, coroutines pipeline). **The register
+  remains Draft** pending the Phase-4/5/7 gates.

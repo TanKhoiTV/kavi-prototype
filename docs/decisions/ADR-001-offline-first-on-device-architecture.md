@@ -8,6 +8,10 @@ Accepted
 
 2026-07-14
 
+## Deciders
+
+Kavi team
+
 ## Context
 
 Kavi is our entry to the OneVoice AI Challenge: a real-time speech-to-speech

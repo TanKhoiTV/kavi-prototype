@@ -1,14 +1,14 @@
 # Benchmark Harness — TODO & Execution Plan
 
 > **Pitch doc for team members.** This is the *execution checklist* for the
-> benchmarking work that gates **ADR-004 (architecture / tech-stack)**. It is
-> derived from `docs/benchmarking-plan.md` (what we measure + datasets) and
+> benchmarking work that feeds the **[open-parameters register](../decisions/README.md#open-parameters)**. It is
+> derived from `docs/reference/benchmarking-plan.md` (what we measure + datasets) and
 > `docs/specifications.md` §3 (the six contest metrics). **No tech-stack decision
 > is made here** — the harness is pluggable; we swap candidates in and score them
 > against identical data.
 >
 > **Why this exists:** we run experiments *before* picking ASR / MT / TTS. The
-> numbers this harness produces are what ADR-004 records as the architecture.
+> numbers this harness produces are what the register records as the architecture.
 
 > **Progress & to-do snapshot (2026-07-18):**
 >
@@ -21,7 +21,7 @@
 > - **To-do (Phase 4–7):** on-device QNN runner (QAIRT gate **resolved** — runtime ADOPT, clean; ready when FLEURS assets + QNN compile land);
 >   fetch real FLEURS / MUSAN / RIRS_NOISES assets (large-file download currently
 >   limited); RTranslator baseline row (Phase 5); pre-ASR denoising gate (Phase 6);
->   COMET + human MOS depth (Phase 7); then finalize ADR-004 once on-device numbers
+>   COMET + human MOS depth (Phase 7); then finalize the tech-stack register once on-device numbers
 >   exist.
 
 ---
@@ -75,28 +75,24 @@ being **100% offline**.
 
 ## 3. Models to benchmark (candidates)
 
-> License-clean set only (see `docs/decisions/license-situation.md`). "v0?" =
-> in the first lean harness. **Registered** = has a candidate adapter in
-> `bench/` (see `bench/registry.py`; ported per
-> `docs/benchmark/register-missing-candidates.md`).
+> License-clean set only (see `docs/decisions/ADR-029-license-gate.md`). "v0?" =
+> in the first lean harness.
 
 ### ASR
 
 | Candidate | License | Runtime (v0) | EN+VI? | v0? |
 | --- | --- | --- | --- | --- |
-| Whisper Small (244M) | MIT | CPU + QNN | **Yes** | **Yes** (baseline; registered) |
+| Whisper Small (244M) | MIT | CPU + QNN | **Yes** | **Yes** (baseline pair) |
 | PhoWhisper Small (244M) | BSD-3 | CPU + DIY QNN | Inherited (unbench) | Follow-up |
-| Zipformer-30M-VI | Apache-2.0 | CPU / DIY | **VI only** | **Yes** (registered) |
-| Zipformer-Small-EN | Apache-2.0 | CPU / DIY | **EN only** | **Yes** (registered) |
-| Moonshine Tiny VI (27M) | Apache-2.0 | CPU / DIY | **VI only** | **Yes** (registered) |
-| Moonshine Tiny EN (27M) | Apache-2.0 | CPU / DIY | **EN only** | **Yes** (registered) |
+| Zipformer-30M-VI | Apache-2.0 | CPU / DIY | **VI only** | No (VI→EN only) |
+| Moonshine Tiny VI (27M) | Apache-2.0 | CPU / DIY | **VI only** | No (VI→EN only) |
 
 ### MT
 
 | Candidate | License | Runtime (v0) | Bidirectional? | v0? |
 | --- | --- | --- | --- | --- |
-| Opus-MT (vi-en + en-vi) | Apache-2.0 | CTranslate2-int8 / ORT+QNN | **Yes (2 models)** | **Yes** (baseline; registered) |
-| M2M-100 (418M) | MIT | CPU / ONNX-QNN | Yes (one model) | **Yes** (registered) |
+| Opus-MT (vi-en + en-vi) | Apache-2.0 | CTranslate2-int8 / ORT+QNN | **Yes (2 models)** | **Yes** (baseline pair) |
+| M2M-100 (418M) | MIT | CPU / ONNX-QNN | Yes (one model) | Follow-up |
 | Hy-MT1.5-1.8B | HY Community (ADOPT) | CPU-only STQ | Yes (one model) | Follow-up |
 | NLLB-200-distilled-600M | CC-BY-NC-4.0 | — | Yes | **Reference only** (NC) |
 | SeamlessM4T v2 | CC-BY-NC-4.0 | — | Yes | Avoid (NC) |
@@ -199,7 +195,8 @@ RIRS_NOISES = public-safe.
 - [x] Download lean eval set: `build_lean_manifest` emits an **offline fallback**
       (authored VI↔EN factory/logistics gold set as MT + TTS) and uses FLEURS
       parquets **when present** (real VI/EN ASR + VI→EN MT via shared IDs). Actual
-      FLEURS parquets are available via `download_fleurs` (PR #28, with resume support).
+      FLEURS parquets are fetched by `make data` (`scripts/fetch_data.py`:
+      pinned revision + digest verification, with resume support).
 - [x] Noise bank: synthetic steady/impulsive noise via `torchaudio.add_noise`
       (default); **real-noise hook added** — `_load_real_noise` + `real_noise_dir`
       swaps in MUSAN/RIRS_NOISES clips (PR #36). Assets not yet fetched.
@@ -263,7 +260,7 @@ checklist.
       archived custom RMS mix).
 - [x] Trigger binary gate: denoiser beats raw-noisy WER → tune `prop_decrease`;
       else VAD-only pipeline. **Result: ADOPT Wiener** (noisy WER 49.82% vs raw
-      51.23%). See `docs/denoising-gate-results.md`.
+      51.23%). See `docs/reference/denoising-gate-results.md`.
 
 ### Phase 7 — v1 (quality depth)
 
@@ -287,9 +284,9 @@ checklist.
 
 ## 9. References
 
-- `docs/benchmarking-plan.md` — datasets, candidate landscape, harness design, v0.
+- `docs/reference/benchmarking-plan.md` — datasets, candidate landscape, harness design, v0.
 - `docs/specifications.md` §3 — the six contest metrics + thresholds.
-- `docs/decisions/ADR-004-architecture.md` — tech-stack deferred; open params #1–4.
-- `docs/decisions/license-situation.md` — license-clean candidate set.
+- [open-parameters register](../decisions/README.md#open-parameters) — tech-stack choices still open.
+- `docs/decisions/ADR-029-license-gate.md` — license-clean candidate set.
 - ADR-001 / 002 / 003 — offline-first, target platform, Hexagon runtime.
 - `docs/onboarding.md` — architecture decoded for newcomers.

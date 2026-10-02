@@ -452,7 +452,7 @@ def main(argv: list[str] | None = None) -> None:
         "-n whisper_encoder\n"
         "  3. qnn-context-binary-generator --model ... --htp_arch v73 "
         "--binary_file whisper_encoder_v73.bin\n"
-        "See docs/phase-4-qnn-plan.md §8 for full command reference."
+        "See docs/reference/phase-4-qnn-plan.md §8 for full command reference."
     )
 
 

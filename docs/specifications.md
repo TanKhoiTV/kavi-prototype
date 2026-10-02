@@ -1,7 +1,7 @@
 # Kavi — Technical Specifications & Grading
 
 > **Audience:** new Kavi team members with no speech / ML background.
-> **Companion doc:** [Contest Information](contest-info.md) §4 (Evaluation & Benchmarks).
+> **Companion doc:** [Contest Information](reference/contest-info.md) §4 (Evaluation & Benchmarks).
 > **Purpose:** translate the contest's grading rules into the concrete targets Kavi must hit, and define every acronym in plain language.
 
 ---

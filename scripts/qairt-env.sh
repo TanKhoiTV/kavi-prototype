@@ -12,7 +12,7 @@
 #   QAIRT_SDK_ROOT=/custom/path source scripts/qairt-env.sh
 #
 # This script:
-#   - Sets QAIRT_SDK_ROOT (defaults to ~/Qualcomm/AIStack/QAIRT/2.31.0.250130)
+# Defaults to ~/Qualcomm/AIStack/QAIRT/2.31.0.250130
 #   - Creates .venv-qairt/ in the repo if missing (Python 3.10, qairt deps)
 #   - Sources $QAIRT_SDK_ROOT/bin/envsetup.sh (sets QNN_SDK_ROOT, SNPE_ROOT)
 #   - Exports LD_LIBRARY_PATH and PYTHONPATH for SDK + converter venv
@@ -29,7 +29,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # ---- Defaults ----
-: "${QAIRT_SDK_ROOT:=/home/dmin/Qualcomm/AIStack/QAIRT/2.31.0.250130}"
+: "${QAIRT_SDK_ROOT:=$HOME/Qualcomm/AIStack/QAIRT/2.31.0.250130}"
 export QAIRT_SDK_ROOT
 
 # ---- Resolve real paths ----
@@ -87,9 +87,10 @@ if [[ -d "$SDK_LIB" ]]; then
 	export LD_LIBRARY_PATH="${SDK_LIB}${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 fi
 
-# Add uv-managed Python 3.10 lib (libpython3.10.so.1.0)
-UV_PYTHON_LIB="/home/dmin/.local/share/uv/python/cpython-3.10.20-linux-x86_64-gnu/lib"
-if [[ -d "$UV_PYTHON_LIB" ]]; then
+# Add the converter venv's Python lib dir (libpython3.10.so.1.0), wherever
+# uv installed Python 3.10 on this machine.
+UV_PYTHON_LIB="$(python3 -c 'import sysconfig; print(sysconfig.get_config_var("LIBDIR") or "")')"
+if [[ -n "$UV_PYTHON_LIB" && -d "$UV_PYTHON_LIB" ]]; then
 	export LD_LIBRARY_PATH="${UV_PYTHON_LIB}${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 fi
 

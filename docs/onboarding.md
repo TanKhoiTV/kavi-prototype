@@ -9,37 +9,38 @@
 
 You probably arrived at the **public parent repo** (`aivoice-2026`). That repo
 only holds the *story and public docs*; the **real code and internal docs live
-in the private submodule** (`kavi-prototype`, under `prototype/`). Read in this
+in the submodule** (`kavi-prototype`, under `prototype/`). Read in this
 order — each step builds the mental model you need for the next.
 
-```
+```text
 aivoice-2026/                 (PUBLIC parent — what we tell the world)
 ├─ README.md                  ①  landing page
 └─ docs/
    ├─ contest-info.md         ②  the contest + how we're graded
    └─ specifications.md       ③  our concrete targets + glossary
-kavi-prototype/               (PRIVATE submodule — the real repo)
+kavi-prototype/               (submodule — the real repo; also public)
 ├─ README.md                  ④  pipeline + layout + how to run
 ├─ CONTRIBUTING.md            ⑤  cloning + tooling
 └─ docs/
    ├─ onboarding.md           ⑥  this file — architecture, decoded
-   ├─ benchmarking-plan.md    ⑪  datasets + candidate landscape + harness
-   ├─ benchmarking-todo.md    ⑫  execution checklist
+   ├─ android-implementation-plan.md  ⑪  the active plan (ADR-007 · ADR-013–022 · ADR-008/009)
+   ├─ reference/              ⑫  superseded / deprecated docs (benchmarking-plan, phase-4-qnn-plan, …)
    └─ decisions/
+      ├─ README.md            ⑩  the ADR index — one decision per record (start here)
       ├─ ADR-001 …            ⑦  100% offline, forever
       ├─ ADR-002 …            ⑧  one phone: Snapdragon 8 Gen 2
       ├─ ADR-003 …            ⑨  CPU now, NPU later
-      ├─ ADR-004 …            ⑩  tech stack NOT decided yet
-      ├─ ADR-005 …            ⑭  QNN conversion workarounds (Accepted)
-      ├─ ADR-006 …            ⑮  Android runner architecture (Accepted)
-      └─ license-situation …  ⑬  license gate
+      ├─ ADR-004 …            —  withdrawn (was the deferred tech-stack register)
+      ├─ ADR-005 …            ⑭  QNN conversion workarounds
+      ├─ ADR-006 …            ⑮  Android runner architecture
+      └─ ADR-029 …            ⑬  license gate
 ```
 
 **What to conclude from each:**
 
-1. **Parent `README.md`** → the public landing page; the code is in the private
+1. **Parent `README.md`** → the public landing page; the code is in the
    `prototype/` submodule; public docs are just the contest brief + our spec.
-2. **`docs/contest-info.md`** → Kavi is an entry to the **OneVoice AI Challenge**
+2. **`docs/reference/contest-info.md`** → Kavi is an entry to the **OneVoice AI Challenge**
    (Saigon AI Hub × Qualcomm, May–Nov 2026); an offline VI↔EN speech-to-speech
    translator; here are the contest rules + the six grading metrics.
 3. **`docs/specifications.md`** → our translated targets — offline, RTF < 1.0,
@@ -47,8 +48,9 @@ kavi-prototype/               (PRIVATE submodule — the real repo)
    acronym glossary. This is the scoreboard "good" is measured against.
 4. **Submodule `README.md`** → the pipeline is **ASR → MT → TTS**, fully offline,
    VI↔EN; repo layout + how to run.
-5. **Submodule `CONTRIBUTING.md`** (Cloning) → clone with `--recurse-submodules`;
-   a plain parent clone skips the private submodule. Tooling: ruff + commitlint +
+5. **Submodule `CONTRIBUTING.md`** (Cloning, Setup) → clone with
+   `--recurse-submodules`; a plain parent clone skips the submodule. Then
+   `make setup` for deps + pinned models/data. Tooling: ruff + commitlint +
    pre-commit.
 6. **`docs/onboarding.md`** (this file) → plain-language walkthrough of the three
    architecture decisions, so the ADRs below make sense without prior context.
@@ -59,21 +61,28 @@ kavi-prototype/               (PRIVATE submodule — the real repo)
 9. **`ADR-003` (Hexagon runtime)** → start on **CPU (ORT-XNNPACK int8)** —
    license-clean, ships today; add **NPU / QAIRT later** after on-device
    benchmarks. NNAPI rejected.
-10. **`ADR-004` (architecture, draft)** → the **actual ASR / MT / TTS model
-    choices are NOT made yet** — they wait for benchmark numbers. The doc the
-    whole benchmarking effort feeds.
-11. **`docs/decisions/license-situation.md`** → most candidates are license-clean;
-    this gate is *why* we can pick safely. One open item: the **Piper GPL split**.
-12. **`docs/benchmarking-plan.md`** → we **benchmark before choosing** — datasets,
+10. **`docs/decisions/README.md` (the ADR index)** → **one decision per record.**
+    Start here rather than reading ADRs in number order: it lists every record with
+    its status, the supersession graph, and the parameters still open. The tech-stack
+    choices are spread across records — ADR-007 (service) with ADR-013–022 (pipeline),
+    ADR-008 (Dual Zipformer ASR, CPU-only per ADR-027), ADR-009 (Supertonic Phase-1
+    TTS), ADR-010 (`ALL_OPT`). **ADR-004 is withdrawn** — it was the deferred
+    tech-stack register, which the index has replaced.
+11. **`docs/decisions/ADR-029-license-gate.md`** → most candidates are license-clean;
+    this gate is *why* we can pick safely. TTS licensing is **resolved for v1**
+    (ADR-009: Supertonic); the **Piper GPL split** matters only if the fallback is
+    exercised — pin the MIT-era `rhasspy/piper` snapshot then.
+12. **`docs/reference/benchmarking-plan.md`** → we **benchmark before choosing** — datasets,
     the ASR/MT/TTS candidate landscape, the pluggable harness design, the lean v0.
-13. **`docs/benchmarking-todo.md`** → the **execution checklist** (phases 0–7,
+13. **`docs/reference/benchmarking-todo.md`** → the **execution checklist** (phases 0–7,
     checkboxes) to produce those numbers — what you'd actually pick up and work on.
 14. **`ADR-005` (QNN conversion workarounds)** → when the QAIRT converter rejected
-    ops (IsNaN, cyclic graphs), these are the workarounds: strip IsNaN from the
-    Whisper decoder, run decoders on CPU, keep Piper on CPU.
+    ops (`IsNaN`, cyclic graphs), these are the workarounds: strip `IsNaN` from the
+    decoder (ADR-005), run decoders on CPU (ADR-023), keep TTS on CPU (ADR-024).
 15. **`ADR-006` (Android runner architecture)** → native on-device instrumented
     test (no ADB bridge), single push/pull, internal timing, zero-network
-    assertion.
+    assertion; with the fixed-shape padding rule in ADR-025 and real-data-only
+    calibration in ADR-026.
 
 > **Skip for now:** `archive/` (historical, superseded) and `docs/README.md`
 > (just an index).
@@ -89,7 +98,7 @@ translation fails.
 
 The pipeline is a single local chain:
 
-```
+```text
 [mic] → VAD → denoise → ASR → MT → TTS → [speaker]
 ```
 
@@ -194,9 +203,12 @@ under `archive/` for reference.
 | `models/` | Checked-in model weights. Today: **Opus-MT vi-en** (CTranslate2 + SentencePiece) — our current MT. |
 | `voices/` | TTS voice model(s) (Piper). Usually gitignored / downloaded at runtime. |
 | `docs/` | Internal docs (this file's siblings). |
-| `docs/decisions/` | The ADRs (001–006) + `license-situation.md`. Source of truth for architecture + licensing. |
-| `docs/benchmarking-plan.md` | The plan to *measure* models before picking them (gates ADR-004). **Read this next.** |
-| `.pi/AGENTS.md`, `CONTRIBUTING.md`, `README.md` | Project / agent guidance, how we work, quickstart. |
+| `docs/decisions/` | The ADRs — start at `README.md` (the index). Source of truth for architecture + licensing. |
+| `docs/android-implementation-plan.md` | The implementation plan, milestone view (M0–M6). **Read this next.** |
+| `docs/android-kotlin-cpp-implementation-plan.md` | The same plan at file level (Kotlin/C++ layout, JNI contract, Build A–F). |
+| `docs/ndk-conversion-runbook.md` | Runbook for the one remaining QNN artifact (Opus-MT encoder → HTP v73). |
+| `docs/reference/` | Superseded / deprecated docs (benchmarking-plan, phase-4-qnn-plan, …). |
+| `AGENTS.md`, `CONTRIBUTING.md`, `README.md` | Project / agent guidance, how we work, quickstart. |
 | `Makefile`, `pyproject.toml`, `LICENSE` | Build / run, deps (uv), MIT license. |
 | `.github/` | CI (lint + changelog) and PR / issue templates. |
 
@@ -204,61 +216,63 @@ under `archive/` for reference.
 
 The contest can lead to **commercialization**, so every model must permit
 commercial use. This single rule eliminates several otherwise-attractive models.
-Full detail is in `docs/benchmarking-plan.md` §4.4–§4.5.
+Full detail is in `docs/reference/benchmarking-plan.md` §4.4–§4.5.
 
 - **Commercial-clean (use these):** Opus-MT (Apache-2.0), MeloTTS (MIT),
   MADLAD-400 (Apache-2.0), M2M-100 (MIT), Kokoro (Apache-2.0),
   vietTTS / VITS (MIT / Apache, verify InfoRe terms), SpeechT5 (MIT).
-- **Live license decision — Piper:** **split / time-sensitive.** The old
-  `rhasspy/piper` is **MIT** (frozen, no fixes); the active `OHF-Voice/piper1-gpl`
-  is **GPL-3.0** (copyleft — problematic for a commercial product), and its
-  `espeak-ng` phonemizer is also GPL. Our prototype pins an MIT-era build today,
-  but we must decide pinned-version + distribution model (subprocess vs bundled)
-  before shipping. See `docs/benchmarking-plan.md` §4.5.
+- **TTS — resolved for v1 (ADR-009):** Supertonic Phase 1 → VieNeu-TTS Phase 2,
+  via sherpa-onnx; Piper VITS is fallback only. The old MIT/GPL fork question
+  matters only if the fallback is exercised (pin the MIT-era `rhasspy/piper`
+  snapshot then). See `docs/reference/benchmarking-plan.md` §4.5 for the landscape.
 - **Avoid (license blocks):** **NLLB** (CC-BY-NC), **MMS-TTS-vie** (CC-BY-NC),
   **Coqui XTTS** (CPML — restrictive; Coqui Inc. shut down Jan 2024).
 - **Caution (verify):** **Hy-MT** (HY Community License — commercial-permitted
   *per old ADR-001*, but a regional carve-out is flagged by our current stance).
 
-## Where the architecture is going (ADR-004)
+## Where the architecture is going
 
-The **tech stack** — exact ASR / MT / TTS models and runtimes — is **not yet
-decided**. That is **ADR-004**, and it is intentionally deferred until the
-**v0 benchmark harness** (spec'd in `docs/benchmarking-plan.md`) produces real
-on-device numbers. The candidate landscape in that plan (§4) is the working
-shortlist; the harness is what turns it into a decision.
+The **tech stack is decided** across several records: ADR-007 (service) with
+ADR-013–022 (pipeline), ADR-008 (Dual Zipformer ASR, CPU-only per ADR-027),
+ADR-009 (Supertonic Phase-1 TTS), ADR-010 (`ALL_OPT`). **ADR-004 is withdrawn** —
+the parameter table it maintained is now the
+[open-parameters register](decisions/README.md#open-parameters), which closes as
+the Phase-4/5/7 on-device numbers and hard gates land (see `.pi/PLAN.md` §8).
 
 ## How to get running & next steps
 
-1. **Clone** (see `CONTRIBUTING.md` → Cloning — it's a private submodule):
+1. **Clone** (see `CONTRIBUTING.md` → Cloning):
 
    ```bash
    git clone --recurse-submodules git@github.com:TanKhoiTV/aivoice-2026.git
    cd aivoice-2026/prototype && git checkout main
    ```
 
-2. **Install & check:**
+2. **Bootstrap & check** (`make setup` fetches the pinned model weights and
+   FLEURS data; `make setup-min` is the offline path):
 
    ```bash
-   uv sync
+   make setup
    make check
+   make test
    ```
 
 3. **Read in order** — see **Start here** (top of this guide): parent
    `README.md` → `contest-info.md` → `specifications.md`, then the submodule docs
-   (`README.md` → this guide → `benchmarking-plan.md` → `docs/decisions/*`).
+   (`README.md` → this guide → `reference/benchmarking-plan.md` → `docs/decisions/*`).
 4. **The v0 harness is built** (`bench/`) — build the eval set and run it:
 
    ```bash
+   make models       # pinned Opus-MT weights (already fetched by `make setup`)
    make bench-data   # -> eval_data/eval_manifest_v1.json
    make bench        # run the harness (offline smoke: Opus-MT vi->en + Piper EN TTS)
    make test         # run the pytest suite
    ```
 
-   Feed the numbers into ADR-004.
+   Feed the numbers into the [open-parameters register](decisions/README.md#open-parameters).
 
 > **If you remember nothing else:** Kavi is a fully-offline phone translator
 > (VI↔EN); we target **one chip** (Snapdragon 8 Gen 2 / Hexagon HTP v73); the
 > runtime path is **QAIRT / QNN via ONNX Runtime, CPU-first**; models must be
 > **commercial-licensed** and **small enough for < 2 s**; and the **exact model
-> choices are still TBD** behind ADR-004 + the benchmark harness.
+> choices are still TBD** behind the open-parameters register + the benchmark harness.

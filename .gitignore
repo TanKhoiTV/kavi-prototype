@@ -12,13 +12,18 @@ voices/
 # Runtime experiment data / outputs (canonical scripts now live under archive/)
 experiments/
 
-# Large downloaded models (regenerable) — kept out of VCS if present
-models/opus-mt-vi-en-src/pytorch_model.bin
-models/opus-mt-vi-en-src/tf_model.h5
-
-# QNN large artifacts (regenerable or build outputs)
+# Third-party model artifacts — not vendored; fetch with `make models`.
+# Only `models/qnn/README.md` is ours to track; everything else under models/
+# is either third-party weights or generated build output.
+models/*
+!models/qnn/
 models/qnn/*
 !models/qnn/README.md
+
+# Third-party eval audio (FLEURS-derived; see NOTICE). Not redistributed and
+# not currently read by the test suite; kept out of VCS when present locally.
+tests/fixtures/fleurs_vi_0.wav
+tests/fixtures/ref_mel_fleurs_vi_vn_0.npy
 
 # QNN smoke test artifacts
 bench/qnn/smoke/
@@ -46,3 +51,12 @@ eval_manifest_v1.json
 # Pi coding agent configurations
 .pi/
 .pi-subagents/
+
+# Per-machine env vars (contains absolute paths)
+.kavi.env
+
+# Local-only vendored reference project (never tracked; 100+ MB)
+RTranslator/
+
+# Android app lives in the private kavi-android repo; not vendored here.
+/android

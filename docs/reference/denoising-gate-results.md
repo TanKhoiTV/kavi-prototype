@@ -33,7 +33,7 @@
 
 ## Caveats
 
-- Smoke test only (2 utterances, limited noise types); full evaluation recommended before ADR-004 finalization
+- Smoke test only (2 utterances, limited noise types); full evaluation recommended before the on-device denoiser pick is closed (see the [open-parameters register](../decisions/README.md#open-parameters))
 - `prop_decrease=0.5` is the default; tuning may improve clean-speech preservation
 - Consider disabling denoiser for clean/High-SNR conditions (adaptive threshold)
 

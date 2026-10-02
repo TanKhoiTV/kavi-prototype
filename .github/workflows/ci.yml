@@ -11,19 +11,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          # Don't recurse into the private kavi-android submodule; this CI only
-          # lints/tests the Python harness and the runner token can't access it.
-          submodules: false
       - name: Set up Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: "lts/*"
       - name: Install uv
-        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10
       - name: Set up Python
         run: uv python install
       - name: Install dependencies
         run: uv sync
-      - name: make check (ruff lint + format)
+      - name: make check (ruff lint + format + yamllint)
         run: make check
+      - name: make test (pytest)
+        run: make test
