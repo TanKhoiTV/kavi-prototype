@@ -52,8 +52,9 @@ Nội dung cần viết cho mỗi model:
 - Nguồn: google/fleurs (HuggingFace), tập test tiếng Việt + tiếng Anh.
 - Ngôn ngữ: vi, en.
 - Split: test.
-- Đặc điểm: 30 base utterances mỗi ngôn ngữ × 9 điều kiện SNR = 594 items/condition.
+- Đặc điểm: 30 base utterances mỗi ngôn ngữ × 9 điều kiện SNR = 540 items tổng cộng (60 items/condition).
     + 9 conditions: clean + steady noise + impulsive noise @ 15/10/5/0 dB.
+    + Con số 594 là tổng số item của `eval_manifest_v1.json` (540 ASR + 42 MT + 12 TTS), không phải items/condition.
 - Đặc điểm tham chiếu: transcript FLEURS là informal spoken-language (ảnh hưởng BLEU interpretation).
 
 ### 3.2 VIVOS

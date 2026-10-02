@@ -27,7 +27,7 @@
 Lệnh chạy benchmark:
 
 ```bash
-uv run python -m bench/run.py --manifest eval_data/mt_vi_en_eval_manifest.json --candidate hy-mt1.5-1.8b-hf-cpu --out bench-results/fleurs-mt/gold-set/hy-mt1.5-1.8b-hf-cpu
+uv run python -m bench.run --manifest eval_data/mt_vi_en_eval_manifest.json --candidate hy-mt1.5-1.8b-hf-cpu --out bench-results/fleurs-mt/gold-set/hy-mt1.5-1.8b-hf-cpu
 ```
 
 - Manifest:
@@ -39,9 +39,26 @@ uv run python -m bench/run.py --manifest eval_data/mt_vi_en_eval_manifest.json -
 - Aggregation:
   - `bench/scripts/aggregate_results.py` → `docs/benchmark/benchmark-results-fleurs-vivos.md`
   - `benchmark-results-raw.md` (từ `docs/benchmark/raw-results/*.csv`).
+- *Không tái lập được từ repo:* `eval_data/` và `bench-results/` bị `.gitignore`
+  loại, và weight của các ứng viên mới không có trong `assets.lock.toml`. Các số
+  trong báo cáo chỉ tái lập được trên máy đã tải model, không tái lập được từ
+  kho một mình.
 
 == Limitations <sec:appendix-limits>
 
+- *CSV không giữ hypothesis:* `raw-results/*.csv` lưu `input_text` và đường dẫn
+  reference nhưng không lưu câu dịch của mô hình, nên không tính lại được BLEU
+  theo bất kỳ cách nào khác — mọi thay đổi trên đường chấm điểm đều đòi chạy lại
+  model.
+- *Script sinh CSV không có trong repo:* bước `run_results.json` →
+  `raw-results/*.csv` là thủ công. Vì vậy bảng inventory không thể liệt kê beam
+  width — CSV không có cột `beam_size` và không có script nào thêm được trong PR
+  này.
+- *Beam width không ghi theo dòng:* mỗi ứng viên chạy ở beam tối ưu riêng
+  (Opus-MT 5, M2M-100 4), nên đây là so sánh theo best-config-per-model chứ không
+  phải cùng một thiết lập. Thứ tự xếp hạng không đổi — M2M-100 dẫn dù beam hẹp
+  hơn — nhưng mức BLEU tuyệt đối không so được với BLEU đã công bố. Beam width
+  bản thân vẫn là open parameter #6 (ADR-020).
 - *FLEURS references là informal spoken transcripts* → BLEU penalty cho output fluent/literary (ảnh hưởng HY-MT nhiều hơn m2m/opus).
 - *VSS/Zipformer contamination:* Zipformer-vi train trên VSS; VIVOS cùng miền giọng đọc chuẩn → kết quả Zipformer-vi trên VIVOS có thể bị lạc quan. So sánh công bằng nhất nằm ở FLEURS.
 - *Single test environment* — CPU-only Core i7-1165G7 (Tiger Lake, 4 cores / 8 threads), không GPU/NPU.

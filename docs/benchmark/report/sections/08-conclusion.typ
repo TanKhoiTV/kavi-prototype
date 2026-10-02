@@ -11,7 +11,7 @@
 === Edge device (RAM < 1 GB, latency < 1 s)
 
 - *ASR vi:* Zipformer-vi — WER #d.va.at("zipformer-vi").wer (VIVOS) / #d.fa.at("zipformer-vi").wer (FLEURS), latency #d.va.at("zipformer-vi").lat s, RAM #d.va.at("zipformer-vi").ram MB.
-- *MT:* Opus-MT — RAM #d.mt.at("opus-full").ram MB, latency #d.mt.at("opus-full").lat s (chấp nhận BLEU #d.mt.at("opus-full").bleu thấp hơn M2M).
+- *MT:* *không ứng viên nào đạt cả hai ngưỡng* — M2M-100 đạt độ trễ #d.mt.at("m2m-full").lat s nhưng RAM #d.mt.at("m2m-full").ram MB vượt ngưỡng 1 GB; Opus-MT đạt RAM #d.mt.at("opus-full").ram MB nhưng độ trễ #d.mt.at("opus-full").lat s *vượt ngưỡng 1 s*, đổi lại BLEU #d.mt.at("opus-full").bleu thấp hơn M2M. Chọn Opus-MT khi bộ nhớ là ràng buộc cứng; nếu ưu tiên độ trễ thì chọn M2M-100 và chấp nhận bộ nhớ.
 
 === Server (chất lượng tối đa)
 

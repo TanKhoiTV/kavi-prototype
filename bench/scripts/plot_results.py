@@ -1,6 +1,6 @@
 """Plot benchmark results from docs/benchmark/raw-results/*.csv.
 
-Produces PNG charts into docs/benchmark/charts/:
+Produces PNG charts into docs/benchmark/report/charts/:
   1. asr-wer-vs-snr-fleurs.png  — per-candidate WER degradation lines (FLEURS)
   2. asr-wer-vs-snr-vivos.png   — per-candidate WER degradation lines (VIVOS)
   3. asr-latency-vs-wer.png     — latency (log) vs WER bubble scatter, vi only
@@ -21,9 +21,14 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 
-DOCS = Path("docs/benchmark")
+# Anchored to the repo root so the script reads and writes the same place from
+# any working directory. OUT is the directory the report actually reads: the
+# .typ sections reference image("../charts/…") from report/sections/, which
+# resolves to report/charts/. Writing to docs/benchmark/charts produced a tree
+# nothing referenced, so the checked-in charts could go stale unnoticed.
+DOCS = Path(__file__).resolve().parents[2] / "docs" / "benchmark"
 RAW = DOCS / "raw-results"
-OUT = DOCS / "charts"
+OUT = DOCS / "report" / "charts"
 
 # Display labels for the x-axis / heatmap columns.
 SNR_TICKS = ["clean", "15", "10", "5", "0 dB"]

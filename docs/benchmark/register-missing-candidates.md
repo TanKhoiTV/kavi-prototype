@@ -1,9 +1,8 @@
 # Plan: Register Missing Benchmark Candidates (M2M-100, Moonshine, Zipformer)
 
-> **Status:** Draft (planning only — no changes made yet).
-> **Implementation status:** **COMPLETE (all phases executed 2026-08-06, branch
-> `feat/bench/register-missing-candidates`)** — see §9 checked DoD + §10
-> implementation notes.
+> **Status:** **IMPLEMENTED** — all phases executed 2026-08-06, carried onto
+> `feat/benchmark` and open as PR #124. §9 records the DoD and §10 the
+> deviations found while executing.
 > **Context (owner-confirmed):** the beam-sweep work on `feat/beam-sweep-asr` /
 > `feat/beam-sweep-mt` was **exploratory** — it determined the optimal beam width
 > per model. That phase is done. On `feat/benchmark` we are now running the
@@ -398,8 +397,12 @@ All decisions are resolved; the implementation plan (§5) is final and proceeds 
 - [x] `--config-override '{"beam_size": N}'` honored by **all** ASR/MT candidates
       (whisper, opusmt, m2m, moonshine, zipformer).
 - [x] `uv run pytest` green; registry + run_manifest regression tests included
-      (23 passed).
-- [x] `sherpa-onnx` declared in `pyproject.toml`; `uv.lock` updated.
+      (26 passed as of PR #124).
+- [x] `sherpa-onnx` declared in `pyproject.toml`; `uv.lock` updated. *(The
+      declaration was made on the pre-rewrite branch and lost when the history
+      was rewritten; it was re-added on `feat/benchmark` in PR #124. It is
+      pinned `==1.12.40` because 1.13.x needs onnxruntime C API 27, which the
+      `qairt` group's 1.17.1 pin cannot load.)*
 - [x] Zipformer spot-run WER sane (case-normalized); M2M spot-run BLEU in the same
       ballpark as archived `bench-results/fluers/` numbers.
 - [x] CHANGELOG + `docs/benchmarking-todo.md` updated.
@@ -426,7 +429,10 @@ All decisions are resolved; the implementation plan (§5) is final and proceeds 
 4. **Sweep-branch `run.py` had a latent bug** (undefined `cid_label` in the
    `except` handler) — fixed to use `cid` when porting.
 5. **Verification parity** (all on `eval_data` subsets, vs archived `bench-results/fluers/`):
-   - M2M beam 4: mean BLEU **17.19 = 17.19** (exact)
+   - M2M beam 4: mean BLEU **17.19 = 17.19** (exact). This is the `eval_data`
+     subset used for the parity check. The figure reported in the benchmark
+     results, **17.50**, is the full 347-item FLEURS pool. Both are correct for
+     their own manifest — they are not the same number.
    - Zipformer-vi beam 5: mean WER **0.1375 = 0.1375** (exact); beam 1: **0.1460 = 0.1460**
    - Moonshine-vi beam 1: mean WER **0.499 vs 0.524** (same ballpark; small
      drift — case normalization now applied, minor manifest/audio differences)
