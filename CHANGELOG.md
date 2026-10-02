@@ -76,6 +76,7 @@
 - **qnn:** Whisper decoder patch + Opus-MT encoder conversion (#75)
 - Add .kavi.yaml — single source of truth for pinned config values (#98)
 - **scripts:** Add PR review-status dashboard, restore root AGENTS.md([#125](https://github.com/TanKhoiTV/kavi-prototype/pull/125))
+- **qnn:** Prepare the Opus-MT w8a16/w8a8 A/B (P0-P2)([#123](https://github.com/TanKhoiTV/kavi-prototype/pull/123))
 
 ### Miscellaneous
 

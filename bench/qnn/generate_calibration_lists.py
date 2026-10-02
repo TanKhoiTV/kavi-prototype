@@ -5,22 +5,29 @@ Produces two input list files consumed by ``qnn-onnx-converter --input_list``:
 
 * ``whisper_input_list.txt``  — paths to FP32 mel spectrogram binaries
   (shape ``[1, 80, 3000]``) for Whisper-Small encoder calibration.
-* ``opusmt_input_list.txt``   — paths to int32 token-ID sequences
-  (shape ``[1, 128]``) for Opus-MT encoder calibration.
+* ``opusmt_input_list.txt``   — paths to token-ID sequences
+  (shape ``[1, 128]``) for Opus-MT encoder calibration, one file per model
+  input (``input_ids`` **and** ``attention_mask``).
 
-Calibration data is drawn from real items in ``eval_data/eval_manifest_v1.json``,
-falling back to the previously converted single-sample file when available.
+Calibration data must be real text (ADR-026). The Opus-MT encoder takes two
+inputs, so a list that only carries ``input_ids`` would leave
+``attention_mask`` on fallback ranges and quietly skew the activation ranges
+that issue #116 is trying to measure.
+
+The exported encoder graph declares int64 inputs, so ``--opusmt-dtype`` defaults
+to ``int64``; ``int32`` remains available for graphs cast on the QAIRT side.
 
 Usage::
 
     uv run python -m bench.qnn.generate_calibration_lists \\
         --manifest eval_data/eval_manifest_v1.json \\
-        --out-dir models/qnn/
+        --out-dir models/qnn/ --opusmt-only
 """
 
 from __future__ import annotations
 
 import argparse
+import glob
 import json
 import os
 import sys
@@ -194,28 +201,37 @@ def _mel_filterbank(
 # Opus-MT tokenization
 # ═══════════════════════════════════════════════════════════════════════
 
+# The exported encoder graph declares int64 inputs; int32 stays available for
+# graphs whose inputs were cast on the QAIRT side.
+_DTYPES = {"int32": np.int32, "int64": np.int64}
+
 
 def _tokenize_opusmt(
-    texts: list[str],
+    text: str,
     tokenizer_path: str,
     max_length: int = 128,
-) -> np.ndarray:
-    """Tokenize a list of source texts into int32 arrays ``[1, max_length]``.
+    dtype: str = "int64",
+) -> tuple[np.ndarray, np.ndarray]:
+    """Tokenize one source sentence into ``(input_ids, attention_mask)``.
 
-    Returns the token IDs for the *first* text.  (Single-sample calibration
-    is sufficient for activation range estimation.)
+    Both arrays are ``[1, max_length]`` and padded to ``max_length`` because the
+    HTP rejects dynamic shapes (ADR-003) — the sequence length here must match the
+    ``--input-dims`` handed to ``convert_to_qnn.sh``.
     """
     from transformers import AutoTokenizer  # pyright: ignore[reportMissingImports]
 
     tok = AutoTokenizer.from_pretrained(tokenizer_path)
     enc = tok(
-        texts[:1],
+        [text],
         padding="max_length",
         truncation=True,
         max_length=max_length,
         return_tensors="np",
     )
-    return enc["input_ids"].astype(np.int32)  # (1, max_length)
+    return (
+        enc["input_ids"].astype(_DTYPES[dtype]),  # (1, max_length)
+        enc["attention_mask"].astype(_DTYPES[dtype]),
+    )
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -265,6 +281,68 @@ def _gather_mt_items(
     items = manifest.get("items", [])
     mt = [i for i in items if i.get("stage") == "MT" and i.get("direction") == "vi->en"]
     return mt[:max_samples]
+
+
+def _collect_eval_texts(
+    manifest: dict[str, Any], manifest_dir: str
+) -> tuple[set[str], list[str]]:
+    """Source sentences every eval manifest scores on, plus the files scanned.
+
+    Disjointness is checked against *all* manifests in the eval directory, not
+    just the one being converted: ``eval_manifest_v1.json`` carries 42 MT items
+    while ``mt_vi_en_eval_manifest.json`` carries the 347 the MT score is
+    computed on, so a check against the first alone would happily offer eval
+    sentences as "unused" calibration data.
+    """
+    used: set[str] = set()
+    sources: list[str] = []
+    for path in sorted(glob.glob(os.path.join(manifest_dir, "*manifest*.json"))):
+        try:
+            with open(path, encoding="utf-8") as fh:
+                other = json.load(fh)
+        except (OSError, json.JSONDecodeError) as exc:
+            print(f"  [warn] skipping {os.path.basename(path)}: {exc}", file=sys.stderr)
+            continue
+        count = 0
+        for item in other.get("items", []):
+            text = (item.get("input_text") or "").strip().lower()
+            if text:
+                used.add(text)
+                count += 1
+        sources.append(f"{os.path.basename(path)}({count})")
+    # The in-memory manifest may not be on disk (tests); fold it in regardless.
+    for item in manifest.get("items", []):
+        text = (item.get("input_text") or "").strip().lower()
+        if text:
+            used.add(text)
+    return used, sources
+
+
+def _fleurs_texts(parquet_path: str) -> list[str]:
+    """Read the ``transcription`` column of a FLEURS parquet.
+
+    Column projection only: the vi_vn test parquet is ~660 MB of audio and this
+    needs a few KB of text.
+    """
+    import pyarrow.parquet as pq  # pyright: ignore[reportMissingImports]
+
+    table = pq.read_table(parquet_path, columns=["transcription"])
+    return [str(x) for x in table.column("transcription").to_pylist() if str(x).strip()]
+
+
+def _disjoint_texts(
+    parquet_path: str,
+    used: set[str],
+    max_samples: int,
+) -> tuple[list[str], int]:
+    """FLEURS sentences no eval manifest scores on.
+
+    Returns ``(texts, available)`` where ``available`` counts every row left
+    after removing eval sentences — 0 means the split is fully consumed and
+    calibration would overlap the eval set.
+    """
+    free = [t for t in _fleurs_texts(parquet_path) if t.strip().lower() not in used]
+    return free[:max_samples], len(free)
 
 
 def _ensure_dir(path: str) -> str:
@@ -324,7 +402,7 @@ def generate_whisper_list(
         )
 
     list_path = os.path.join(out_dir, "whisper_input_list.txt")
-    with open(list_path, "w") as f:
+    with open(list_path, "w", encoding="utf-8") as f:
         f.write("\n".join(list_lines) + "\n")
 
     print(f"Wrote {len(list_lines)} lines to {list_path}")
@@ -335,15 +413,82 @@ def generate_opusmt_list(
     manifest: dict[str, Any],
     out_dir: str,
     max_samples: int = 32,
+    min_samples: int = 16,
+    max_length: int = 128,
+    dtype: str = "int64",
+    source: str = "auto",
+    fleurs_parquet: str | None = None,
+    manifest_dir: str | None = None,
+    require_disjoint: bool = False,
 ) -> str:
     """Generate ``opusmt_input_list.txt``.
 
+    One calibration file per model input: the encoder takes both
+    ``input_ids`` and ``attention_mask``, and a list carrying only the former
+    leaves the mask on fallback ranges.
+
     Returns the path to the created list file.
     """
-    items = _gather_mt_items(manifest, max_samples=max_samples)
+    texts: list[str] = []
+    provenance = ""
+    overlap = None
 
+    if source in ("auto", "fleurs") and fleurs_parquet:
+        if os.path.exists(fleurs_parquet):
+            manifest_dir = manifest_dir or os.path.dirname(
+                os.path.abspath("eval_data/eval_manifest_v1.json")
+            )
+            used, scanned = _collect_eval_texts(manifest, manifest_dir)
+            disjoint, available = _disjoint_texts(fleurs_parquet, used, max_samples)
+            if disjoint:
+                texts = disjoint
+                provenance = (
+                    f"FLEURS parquet, disjoint from every eval manifest "
+                    f"({available} available; scanned "
+                    f"{', '.join(scanned) if scanned else 'n/a'})"
+                )
+            else:
+                # "fleurs" is an explicit request for eval-disjoint text, so
+                # falling back to manifest items here would hand back exactly
+                # what the caller asked not to have. Only "auto" falls through.
+                if source == "fleurs":
+                    raise ValueError(
+                        "--calib-source fleurs but no FLEURS sentence is "
+                        "disjoint from the eval set; pass --calib-source auto "
+                        "to accept the overlap, or --require-disjoint to make "
+                        "it an error"
+                    )
+                overlap = available
+        elif source == "fleurs":
+            raise ValueError(
+                f"--calib-source fleurs but no parquet at {fleurs_parquet}"
+            )
+
+    if not texts:
+        if require_disjoint:
+            raise ValueError(
+                "No calibration sentence disjoint from the eval set is available. "
+                "Pin a FLEURS dev/train split (assets.lock.toml) or drop "
+                "--require-disjoint and accept the overlap, documented in the result."
+            )
+        all_mt = _gather_mt_items(manifest, max_samples=10**9)
+        items = _gather_mt_items(manifest, max_samples=max_samples)
+        texts = [i["input_text"] for i in items if i.get("input_text")]
+        provenance = f"eval manifest MT items ({len(texts)} of {len(all_mt)} available)"
+        if overlap is not None:
+            print(
+                "  WARNING: FLEURS split is fully consumed by the eval set "
+                "(0 disjoint sentences available); calibration overlaps the "
+                "eval sentences. Both #116 arms use the same data, so the "
+                "w8a16-vs-w8a8 comparison stays valid, but absolute BLEU is "
+                "optimistic versus the CPU baseline."
+            )
+
+    texts = texts[:max_samples]
     calib_dir = _ensure_dir(os.path.join(out_dir, "opusmt-calib"))
     list_lines: list[str] = []
+    lengths: list[int] = []
+    samples = 0
 
     # Use the local tokenizer if available, otherwise download
     local_tokenizer = os.path.join(
@@ -357,19 +502,27 @@ def generate_opusmt_list(
         else "Helsinki-NLP/opus-mt-vi-en"
     )
 
-    for idx, item in enumerate(items):
-        source_text = item.get("input_text")
+    for idx, source_text in enumerate(texts):
         if not source_text or not source_text.strip():
             continue
 
-        bin_path = os.path.join(calib_dir, f"opusmt_calib_{idx:04d}.bin")
+        ids_path = os.path.join(calib_dir, f"opusmt_calib_{idx:04d}.bin")
+        mask_path = os.path.join(calib_dir, f"opusmt_calib_{idx:04d}_mask.bin")
 
         try:
-            ids = _tokenize_opusmt([source_text], tokenizer_path)
-            ids.tofile(bin_path)
-            list_lines.append(f"{os.path.relpath(bin_path, _REPO_ROOT)} input_ids")
+            ids, mask = _tokenize_opusmt(
+                source_text, tokenizer_path, max_length=max_length, dtype=dtype
+            )
+            ids.tofile(ids_path)
+            mask.tofile(mask_path)
+            lengths.append(int(mask.sum()))
+            samples += 1
+            list_lines.append(
+                f"{os.path.relpath(ids_path, _REPO_ROOT)} input_ids\n"
+                f"{os.path.relpath(mask_path, _REPO_ROOT)} attention_mask"
+            )
         except Exception as exc:
-            print(f"  [skip] {item.get('id', '?')}: {exc}", file=sys.stderr)
+            print(f"  [skip] sample {idx}: {exc}", file=sys.stderr)
             continue
 
     # Require real calibration data (PR #73 review: random tokens degrade quantization)
@@ -379,13 +532,38 @@ def generate_opusmt_list(
             "Cannot proceed with synthetic tokens as they degrade w8a16 quantization. "
             "Ensure eval_manifest_v1.json contains MT items or provide FLEURS data."
         )
+    if samples < min_samples:
+        print(
+            f"  WARNING: only {samples} calibration samples available "
+            f"({min_samples} recommended). Activation ranges get a thin sample."
+        )
 
     list_path = os.path.join(out_dir, "opusmt_input_list.txt")
-    with open(list_path, "w") as f:
+    with open(list_path, "w", newline="\n", encoding="utf-8") as f:
         f.write("\n".join(list_lines) + "\n")
 
-    print(f"Wrote {len(list_lines)} lines to {list_path}")
+    print(f"Wrote {samples} samples ({samples * 2} input entries) to {list_path}")
+    print(f"  source    : {provenance}")
+    print(f"  shape     : [1, {max_length}] {dtype} (input_ids + attention_mask)")
+    if lengths:
+        arr = np.array(lengths)
+        print(
+            f"  tokens    : min {arr.min()} / median {int(np.median(arr))} / "
+            f"max {arr.max()} (of {max_length})"
+        )
+    digest = _sha256_of_file(list_path)
+    print(f"  sha256    : {digest}")
+    with open(list_path + ".sha256", "w", newline="\n") as f:
+        f.write(f"{digest}  {os.path.basename(list_path)}\n")
     return list_path
+
+
+def _sha256_of_file(path: str) -> str:
+    """SHA-256 of a file, or ``'-'`` when no hashing tool is available."""
+    import hashlib
+
+    with open(path, "rb") as fh:
+        return hashlib.sha256(fh.read()).hexdigest()
 
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -415,6 +593,45 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Max Opus-MT calibration samples (default: %(default)s)",
     )
     parser.add_argument(
+        "--min-opusmt-samples",
+        type=int,
+        default=16,
+        help="Warn below this many calibration samples (default: %(default)s)",
+    )
+    parser.add_argument(
+        "--opusmt-seq-len",
+        type=int,
+        default=128,
+        help="Calibration sequence length; must match the QAIRT --input-dims "
+        "(default: %(default)s)",
+    )
+    parser.add_argument(
+        "--opusmt-dtype",
+        choices=["int64", "int32"],
+        default="int64",
+        help="Token dtype; the exported encoder graph declares int64 inputs "
+        "(default: %(default)s)",
+    )
+    parser.add_argument(
+        "--calib-source",
+        choices=["auto", "manifest", "fleurs"],
+        default="auto",
+        help="Where calibration sentences come from: 'fleurs' draws sentences "
+        "disjoint from the eval set, 'auto' prefers that and falls back to the "
+        "manifest with a warning, 'manifest' always uses eval items",
+    )
+    parser.add_argument(
+        "--fleurs-parquet",
+        default="eval_data/raw/fleurs_vi_vn_test.parquet",
+        help="FLEURS parquet scanned for disjoint sentences (default: %(default)s)",
+    )
+    parser.add_argument(
+        "--require-disjoint",
+        action="store_true",
+        help="Fail instead of overlapping the eval set when no disjoint "
+        "calibration sentence is available",
+    )
+    parser.add_argument(
         "--whisper-only",
         action="store_true",
         help="Only generate Whisper calibration list",
@@ -435,7 +652,7 @@ def main(argv: list[str] | None = None) -> None:
         print(f"Error: manifest not found: {manifest_path}", file=sys.stderr)
         sys.exit(1)
 
-    with open(manifest_path) as f:
+    with open(manifest_path, encoding="utf-8") as f:
         manifest = json.load(f)
 
     manifest_base = os.path.dirname(os.path.abspath(manifest_path))
@@ -453,7 +670,7 @@ def main(argv: list[str] | None = None) -> None:
             manifest_base=manifest_base,
             max_samples=args.max_whisper_samples,
         )
-        with open(wlist) as f:
+        with open(wlist, encoding="utf-8") as f:
             print(f"  {len(f.readlines())} entries")
 
     if do_opusmt:
@@ -462,9 +679,16 @@ def main(argv: list[str] | None = None) -> None:
             manifest,
             out_dir,
             max_samples=args.max_opusmt_samples,
+            min_samples=args.min_opusmt_samples,
+            max_length=args.opusmt_seq_len,
+            dtype=args.opusmt_dtype,
+            source=args.calib_source,
+            fleurs_parquet=args.fleurs_parquet,
+            manifest_dir=manifest_base,
+            require_disjoint=args.require_disjoint,
         )
-        with open(olist) as f:
-            print(f"  {len(f.readlines())} entries")
+        with open(olist, encoding="utf-8") as f:
+            print(f"  {len(f.readlines())} input entries")
 
     print("Done.")
 
