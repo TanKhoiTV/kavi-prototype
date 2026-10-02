@@ -13,7 +13,10 @@ import statistics as st
 from collections import defaultdict
 from pathlib import Path
 
-DOCS = Path("docs/benchmark")
+# Anchored to the repo root so the script reads and writes the same place no
+# matter which directory it is invoked from. A CWD-relative path silently
+# regenerates the docs somewhere else, or fails outright.
+DOCS = Path(__file__).resolve().parents[2] / "docs" / "benchmark"
 RAW = DOCS / "raw-results"
 
 SNRS = [None, 15.0, 10.0, 5.0, 0.0]
@@ -117,13 +120,41 @@ def vivos_sections():
     return out
 
 
-INVENTORY = [
-    "| Dataset | Manifest | Items | Candidates (beam) |",
-    "|---|---|---|---|",
-    "| FLEURS ASR | `eval_data/eval_manifest_v1.json` | 540 (30 vi + 30 en base × 9 conditions) | whisper-small (2), moonshine-vi (1), moonshine-en (4), zipformer-vi (5), zipformer-en (4) |",
-    "| FLEURS MT | `eval_data/mt_vi_en_eval_manifest.json` | 347 vi→en pairs | opus-mt (5), m2m100 (4) |",
-    "| VIVOS ASR | `eval_data/vivos_vi_eval_manifest.json` | 900 (100 vi × 9 conditions) | whisper-small (2), moonshine-vi (1), zipformer-vi (5) |",
+# The manifest path is the only hand-maintained field below, because the CSVs
+# do not record which manifest produced them. Every other number is computed by
+# inventory_table(), so re-running against different data cannot leave the header
+# describing the previous run.
+DATASETS = [
+    ("FLEURS ASR", ASR, "eval_data/eval_manifest_v1.json"),
+    ("FLEURS MT", MT, "eval_data/mt_vi_en_eval_manifest.json"),
+    ("VIVOS ASR", VV, "eval_data/vivos_vi_eval_manifest.json"),
 ]
+
+BEAM_NOTE = (
+    "Beam width is not recorded per row, so it is not listed above. Each "
+    "candidate ran at its own sweep-optimal setting (Opus-MT 5, M2M-100 4), so "
+    "this is a best-config-per-model comparison rather than one shared setting. "
+    "The ordering is unaffected — M2M-100 leads despite the narrower beam — but "
+    "the absolute BLEU values are not comparable to published BLEU; see the "
+    "report appendix."
+)
+
+
+def inventory_table() -> list[str]:
+    """Derive the run inventory from the CSVs rather than restating it."""
+    lines = [
+        "| Dataset | Manifest | Runs | Rows | Items | Candidates |",
+        "|---|---|---|---|---|---|",
+    ]
+    for label, rows, manifest in DATASETS:
+        runs = {r["run"] for r in rows}
+        items = {r["item_id"] for r in rows}
+        cands = sorted({r["candidate_id"] for r in rows})
+        lines.append(
+            f"| {label} | `{manifest}` | {len(runs)} | {len(rows)} | "
+            f"{len(items)} | {', '.join(cands)} |"
+        )
+    return lines
 
 
 def gen_detailed():
@@ -132,12 +163,14 @@ def gen_detailed():
     append("# Benchmark Results — FLEURS + VIVOS\n")
     append(
         f"_Generated {datetime.date.today().isoformat()} from `docs/benchmark/raw-results/*.csv` "
-        "(error/skip rows removed). WER case-normalized; BLEU = sacrebleu corpus-bleu. "
+        "(error/skip rows removed). WER case-normalized; BLEU = mean per-item "
+        "sacrebleu (not corpus BLEU). "
         "RTF = latency / audio duration._\n"
     )
     append("## Run inventory\n")
-    append("\n".join(INVENTORY))
+    out.extend(inventory_table())
     append("")
+    append(BEAM_NOTE + "\n")
     append("All ASR runs cover the full SNR grid: **clean + steady/impulsive @ 15/10/5/0 dB** (60 items/condition FLEURS, 100 VIVOS).\n")
     append("## 1. FLEURS ASR — mean WER by condition\n")
     out.extend(fleurs_asr_sections())
@@ -164,8 +197,9 @@ def gen_raw_tables():
     append("# Benchmark Results — aggregated tables\n")
     append(f"_Generated {datetime.date.today().isoformat()} from `docs/benchmark/raw-results/*.csv`_\n")
     append("## Run inventory\n")
-    append("\n".join(INVENTORY))
+    out.extend(inventory_table())
     append("")
+    append(BEAM_NOTE + "\n")
     append("## 1. FLEURS ASR — mean WER by condition\n")
     out.extend(fleurs_asr_sections())
     append("## 2. FLEURS MT (vi→en) — BLEU\n")

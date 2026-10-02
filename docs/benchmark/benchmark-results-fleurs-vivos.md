@@ -1,14 +1,16 @@
 # Benchmark Results — FLEURS + VIVOS
 
-_Generated 2026-08-08 from `docs/benchmark/raw-results/*.csv` (error/skip rows removed). WER case-normalized; BLEU = sacrebleu corpus-bleu. RTF = latency / audio duration._
+_Generated 2026-10-02 from `docs/benchmark/raw-results/*.csv` (error/skip rows removed). WER case-normalized; BLEU = mean per-item sacrebleu (not corpus BLEU). RTF = latency / audio duration._
 
 ## Run inventory
 
-| Dataset | Manifest | Items | Candidates (beam) |
-|---|---|---|---|
-| FLEURS ASR | `eval_data/eval_manifest_v1.json` | 540 (30 vi + 30 en base × 9 conditions) | whisper-small (2), moonshine-vi (1), moonshine-en (4), zipformer-vi (5), zipformer-en (4) |
-| VIVOS ASR | `eval_data/vivos_vi_eval_manifest.json` | 900 (100 vi × 9 conditions) | whisper-small (2), moonshine-vi (1), zipformer-vi (5) |
-| FLEURS MT | `eval_data/mt_vi_en_eval_manifest.json` | 347 vi→en pairs | opus-mt (5), m2m100 (4) |
+| Dataset | Manifest | Runs | Rows | Items | Candidates |
+|---|---|---|---|---|---|
+| FLEURS ASR | `eval_data/eval_manifest_v1.json` | 5 | 1620 | 540 | moonshine-tiny-en-hf-cpu, moonshine-tiny-vi-hf-cpu, whisper-small-faster-whisper-cpu, zipformer-en-sherpa-onnx-cpu, zipformer-vi-30m-sherpa-onnx-cpu |
+| FLEURS MT | `eval_data/mt_vi_en_eval_manifest.json` | 4 | 778 | 359 | m2m100-vi-en-ct2-cpu, opus-mt-vi-en-ct2-cpu |
+| VIVOS ASR | `eval_data/vivos_vi_eval_manifest.json` | 3 | 2700 | 900 | moonshine-tiny-vi-hf-cpu, whisper-small-faster-whisper-cpu, zipformer-vi-30m-sherpa-onnx-cpu |
+
+Beam width is not recorded per row, so it is not listed above. Each candidate ran at its own sweep-optimal setting (Opus-MT 5, M2M-100 4), so this is a best-config-per-model comparison rather than one shared setting. The ordering is unaffected — M2M-100 leads despite the narrower beam — but the absolute BLEU values are not comparable to published BLEU; see the report appendix.
 
 All ASR runs cover the full SNR grid: **clean + steady/impulsive @ 15/10/5/0 dB** (60 items/condition FLEURS, 100 VIVOS).
 
@@ -74,7 +76,18 @@ mean WER 0.1280 | mean latency 0.58 s | RTF 0.04 | peak RAM 674 MB
 | steady | - | 0.1146 | 0.1253 | 0.1477 | 0.2088 |
 | impulsive | - | 0.1069 | 0.1097 | 0.1184 | 0.1206 |
 
-## 2. VIVOS ASR (vi) — mean WER by condition
+## 2. FLEURS MT (vi→en) — BLEU
+
+| run | n | mean BLEU | median | min | max | mean latency s | peak RAM MB |
+|---|---|---|---|---|---|---|---|
+| fleurs-mt/full/m2m100-vi-en-ct2-cpu | 347 | 17.50 | 14.12 | 1.95 | 60.13 | 0.97 | 1102 |
+| fleurs-mt/full/opus-mt-vi-en-ct2-cpu | 347 | 9.84 | 7.10 | 0.72 | 56.00 | 1.64 | 399 |
+| fleurs-mt/gold-set/m2m100-vi-en-ct2-cpu | 42 | 18.99 | 15.42 | 3.18 | 58.59 | 1.02 | 1102 |
+| fleurs-mt/gold-set/opus-mt-vi-en-ct2-cpu | 42 | 10.78 | 7.13 | 1.10 | 36.72 | 1.58 | 397 |
+
+Gold items across runs: 24 rows (`gold-mt-00..11` × candidates).
+
+## 3. VIVOS ASR (vi) — mean WER by condition
 
 ### `moonshine-tiny-vi-hf-cpu`
 
@@ -105,17 +118,6 @@ mean WER 0.0564 | mean latency 0.14 s | RTF 0.04 | peak RAM 383 MB
 | clean | 0.0513 | - | - | - | - |
 | steady | - | 0.0498 | 0.0491 | 0.0608 | 0.0924 |
 | impulsive | - | 0.0550 | 0.0482 | 0.0504 | 0.0503 |
-
-## 3. FLEURS MT (vi→en) — BLEU
-
-| run | n | mean BLEU | median | min | max | mean latency s | peak RAM MB |
-|---|---|---|---|---|---|---|---|
-| fleurs-mt/full/m2m100-vi-en-ct2-cpu | 347 | 17.50 | 14.12 | 1.95 | 60.13 | 0.97 | 1102 |
-| fleurs-mt/full/opus-mt-vi-en-ct2-cpu | 347 | 9.84 | 7.10 | 0.72 | 56.00 | 1.64 | 399 |
-| fleurs-mt/gold-set/m2m100-vi-en-ct2-cpu | 42 | 18.99 | 15.42 | 3.18 | 58.59 | 1.02 | 1102 |
-| fleurs-mt/gold-set/opus-mt-vi-en-ct2-cpu | 42 | 10.78 | 7.13 | 1.10 | 36.72 | 1.58 | 397 |
-
-Gold items across runs: 24 rows (`gold-mt-00..11` × candidates).
 
 ## 4. Notes & caveats
 

@@ -29,7 +29,7 @@ Benchmark được thiết kế theo hai trục:
 - Dataset: FLEURS (vi/en), VIVOS (vi) — xem @sec:datasets.
 - Metrics:
   - ASR: WER, CER (jiwer, lowercase normalized).
-  - Metrics NMT: BLEU (sacrebleu corpus-bleu, case-sensitive).
+  - Metrics NMT: BLEU (mean per-item sacrebleu, case-sensitive; không phải corpus BLEU).
 - Metrics hiệu suất: latency (s), peak RAM (MB), RTF.
 
 == Câu hỏi nghiên cứu
