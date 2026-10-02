@@ -49,9 +49,7 @@ class M2M100MTCandidate(Candidate):
 
     def _infer(self, item: EvalItem) -> tuple[str | None, str | None]:
         text = item.resolve_input()
-        tokens = self.tokenizer.convert_ids_to_tokens(
-            self.tokenizer.encode(text)
-        )
+        tokens = self.tokenizer.convert_ids_to_tokens(self.tokenizer.encode(text))
         # CRITICAL: target_prefix forces English output. Without this,
         # M2M-100 may translate to a random language, producing BLEU ~0
         # regardless of beam_size.
@@ -61,8 +59,6 @@ class M2M100MTCandidate(Candidate):
         )
         # Strip the leading language token from the output before decoding
         translation = self.tokenizer.decode(
-            self.tokenizer.convert_tokens_to_ids(
-                results[0].hypotheses[0][1:]
-            )
+            self.tokenizer.convert_tokens_to_ids(results[0].hypotheses[0][1:])
         )
         return translation, None

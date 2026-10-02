@@ -5,6 +5,7 @@ regenerates:
   - docs/benchmark/benchmark-results-fleurs-vivos.md (detailed, with notes)
   - docs/benchmark/benchmark-results-raw.md         (tables only)
 """
+
 from __future__ import annotations
 
 import csv
@@ -70,7 +71,10 @@ def asr_summary(rows, lang):
 
 
 def grid_table(grid):
-    out = ["| condition | clean | 15 dB | 10 dB | 5 dB | 0 dB |", "|---|---|---|---|---|---|"]
+    out = [
+        "| condition | clean | 15 dB | 10 dB | 5 dB | 0 dB |",
+        "|---|---|---|---|---|---|",
+    ]
     for noise in NOISES:
         cells = [md(mean(grid[(noise, s)])) if grid[(noise, s)] else "-" for s in SNRS]
         out.append(f"| {noise} | " + " | ".join(cells) + " |")
@@ -84,7 +88,9 @@ def fleurs_asr_sections():
         for lang in sorted({r["language"] for r in rows}):
             w, la, rt, rm = asr_summary(rows, lang)
             out.append(f"### `{cid}` · {lang.upper()}\n")
-            out.append(f"mean WER {w} | mean latency {la} s | RTF {rt} | peak RAM {rm} MB\n")
+            out.append(
+                f"mean WER {w} | mean latency {la} s | RTF {rt} | peak RAM {rm} MB\n"
+            )
             out.append(grid_table(asr_grid(rows, lang)))
             out.append("")
     return out
@@ -99,7 +105,9 @@ def mt_table():
         rows = [r for r in MT if r["run"] == run]
         bs = [float(r["bleu"]) for r in rows if r["bleu"] not in ("", None)]
         lats = [float(r["latency_s"]) for r in rows if r["latency_s"] not in ("", None)]
-        ram = [float(r["peak_ram_mb"]) for r in rows if r["peak_ram_mb"] not in ("", None)]
+        ram = [
+            float(r["peak_ram_mb"]) for r in rows if r["peak_ram_mb"] not in ("", None)
+        ]
         out.append(
             f"| {run} | {len(bs)} | {fnum(mean(bs))} | {fnum(st.median(bs))} | "
             f"{fnum(min(bs))} | {fnum(max(bs))} | {fnum(mean(lats))} | "
@@ -114,7 +122,9 @@ def vivos_sections():
         rows = [r for r in VV if r["run"].endswith(cid)]
         w, la, rt, rm = asr_summary(rows, "vi")
         out.append(f"### `{cid}`\n")
-        out.append(f"mean WER {w} | mean latency {la} s | RTF {rt} | peak RAM {rm} MB\n")
+        out.append(
+            f"mean WER {w} | mean latency {la} s | RTF {rt} | peak RAM {rm} MB\n"
+        )
         out.append(grid_table(asr_grid(rows, "vi")))
         out.append("")
     return out
@@ -171,23 +181,39 @@ def gen_detailed():
     out.extend(inventory_table())
     append("")
     append(BEAM_NOTE + "\n")
-    append("All ASR runs cover the full SNR grid: **clean + steady/impulsive @ 15/10/5/0 dB** (60 items/condition FLEURS, 100 VIVOS).\n")
+    append(
+        "All ASR runs cover the full SNR grid: **clean + steady/impulsive @ 15/10/5/0 dB** (60 items/condition FLEURS, 100 VIVOS).\n"
+    )
     append("## 1. FLEURS ASR — mean WER by condition\n")
     out.extend(fleurs_asr_sections())
     append("## 2. FLEURS MT (vi→en) — BLEU\n")
     append(mt_table())
     gold = [r for r in MT if r["item_id"].startswith("gold")]
     append("")
-    append(f"Gold items across runs: {len(gold)} rows (`gold-mt-00..11` × candidates).\n")
+    append(
+        f"Gold items across runs: {len(gold)} rows (`gold-mt-00..11` × candidates).\n"
+    )
     append("## 3. VIVOS ASR (vi) — mean WER by condition\n")
     out.extend(vivos_sections())
     append("## 4. Notes & caveats\n")
-    append("- Aggregated from `docs/benchmark/raw-results/` CSVs; ASR skip/error rows and non-MT rows in MT runs are excluded (see the CSVs for full per-item detail).")
-    append("- Steady noise is the dominant degradation; impulsive noise degrades WER only mildly even at 0 dB.")
-    append("- VIVOS whisper RTF (~0.9) is not comparable to FLEURS (~0.3): whisper costs ~3.3 s per item regardless of clip length; use absolute latency across datasets.")
-    append("- 3 FLEURS whisper items exceed WER 1.0 (`vi-asr-1899-steady-0`, `vi-asr-1730-steady-10`, one en steady-0) — low-SNR repetition loops (real model behavior).")
-    append("- Archive parity: per-item WER/BLEU on items shared with `bench-results/archive/` reproduce exactly (zipformer-vi 0.1375, zipformer-en 0.2404, m2m 17.19).")
-    append("- On-device candidates (qnn-*, rtranslator) are not included — they require Qualcomm HTP hardware.")
+    append(
+        "- Aggregated from `docs/benchmark/raw-results/` CSVs; ASR skip/error rows and non-MT rows in MT runs are excluded (see the CSVs for full per-item detail)."
+    )
+    append(
+        "- Steady noise is the dominant degradation; impulsive noise degrades WER only mildly even at 0 dB."
+    )
+    append(
+        "- VIVOS whisper RTF (~0.9) is not comparable to FLEURS (~0.3): whisper costs ~3.3 s per item regardless of clip length; use absolute latency across datasets."
+    )
+    append(
+        "- 3 FLEURS whisper items exceed WER 1.0 (`vi-asr-1899-steady-0`, `vi-asr-1730-steady-10`, one en steady-0) — low-SNR repetition loops (real model behavior)."
+    )
+    append(
+        "- Archive parity: per-item WER/BLEU on items shared with `bench-results/archive/` reproduce exactly (zipformer-vi 0.1375, zipformer-en 0.2404, m2m 17.19)."
+    )
+    append(
+        "- On-device candidates (qnn-*, rtranslator) are not included — they require Qualcomm HTP hardware."
+    )
     return "\n".join(out)
 
 
@@ -195,7 +221,9 @@ def gen_raw_tables():
     out = []
     append = out.append
     append("# Benchmark Results — aggregated tables\n")
-    append(f"_Generated {datetime.date.today().isoformat()} from `docs/benchmark/raw-results/*.csv`_\n")
+    append(
+        f"_Generated {datetime.date.today().isoformat()} from `docs/benchmark/raw-results/*.csv`_\n"
+    )
     append("## Run inventory\n")
     out.extend(inventory_table())
     append("")

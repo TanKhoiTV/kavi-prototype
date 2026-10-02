@@ -367,7 +367,9 @@ def _load_vivos_utterances(
 
     # prompts.txt: "<ID> <TRANSCRIPT>" per line
     prompts: dict[str, str] = {}
-    for line in (test_dir / "prompts.txt").read_text(encoding="utf-8").strip().split("\n"):
+    for line in (
+        (test_dir / "prompts.txt").read_text(encoding="utf-8").strip().split("\n")
+    ):
         parts = line.split(" ", 1)
         if len(parts) == 2:
             prompts[parts[0]] = parts[1].strip()
@@ -378,16 +380,16 @@ def _load_vivos_utterances(
         speakers.setdefault(uid.rsplit("_", 1)[0], []).append(uid)
     for spk in list(speakers):
         speakers[spk] = [
-            uid
-            for uid in speakers[spk]
-            if (waves_dir / spk / f"{uid}.wav").exists()
+            uid for uid in speakers[spk] if (waves_dir / spk / f"{uid}.wav").exists()
         ]
         if not speakers[spk]:
             del speakers[spk]
     n_total = sum(len(v) for v in speakers.values())
     n_speakers = len(speakers)
     if n_total < n_items:
-        raise ValueError(f"Only {n_total} VIVOS test utterances available, need {n_items}")
+        raise ValueError(
+            f"Only {n_total} VIVOS test utterances available, need {n_items}"
+        )
     if n_items < n_speakers:
         raise ValueError(
             f"n_items ({n_items}) must be >= number of VIVOS speakers ({n_speakers})"
@@ -396,8 +398,7 @@ def _load_vivos_utterances(
     # Allocate counts per speaker: base + remainder to first speakers
     base, rem = divmod(n_items, n_speakers)
     counts = {
-        spk: base + (1 if i < rem else 0)
-        for i, spk in enumerate(sorted(speakers))
+        spk: base + (1 if i < rem else 0) for i, spk in enumerate(sorted(speakers))
     }
     # Evenly-spaced picks within each speaker's ordered list
     selected: list[str] = []

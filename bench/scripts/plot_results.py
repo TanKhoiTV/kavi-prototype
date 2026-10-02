@@ -10,6 +10,7 @@ Produces PNG charts into docs/benchmark/report/charts/:
 
 Reads the same cleaned CSVs as bench/scripts/aggregate_results.py.
 """
+
 from __future__ import annotations
 
 import csv
@@ -87,13 +88,18 @@ def _grid(rows, lang: str | None):
 def _line_chart(ax, grid, title: str) -> None:
     """Steady + impulsive WER lines over clean/15/10/5/0 dB with clean marker."""
     x = np.arange(len(SNR_TICKS))
-    for noise, color, marker in (("steady", "tab:red", "o"), ("impulsive", "tab:blue", "s")):
+    for noise, color, marker in (
+        ("steady", "tab:red", "o"),
+        ("impulsive", "tab:blue", "s"),
+    ):
         ys = [grid.get((noise, k)) for k in SNR_KEYS[1:]]
         if any(y is not None for y in ys):
             ax.plot(x[1:], ys, color=color, marker=marker, label=noise, linewidth=1.6)
     clean = grid.get(("clean", None))
     if clean is not None:
-        ax.scatter([x[0]], [clean], color="black", marker="*", s=110, label="clean", zorder=5)
+        ax.scatter(
+            [x[0]], [clean], color="black", marker="*", s=110, label="clean", zorder=5
+        )
     ax.set_xticks(x, SNR_TICKS)
     ax.set_ylabel("mean WER")
     ax.set_title(title, fontsize=10)
@@ -102,22 +108,30 @@ def _line_chart(ax, grid, title: str) -> None:
 
 
 def chart_asr_lines(fleurs: list[dict], vivos: list[dict]) -> None:
-    fleurs_rows = {c: [r for r in fleurs if _candidate_of(r["run"]) == c]
-                   for c in sorted({_candidate_of(r["run"]) for r in fleurs})}
+    fleurs_rows = {
+        c: [r for r in fleurs if _candidate_of(r["run"]) == c]
+        for c in sorted({_candidate_of(r["run"]) for r in fleurs})
+    }
     # subplot grid: one cell per (candidate, language)
-    cells = [(c, lg) for c, rows in fleurs_rows.items() for lg in sorted({r["language"] for r in rows})]
+    cells = [
+        (c, lg)
+        for c, rows in fleurs_rows.items()
+        for lg in sorted({r["language"] for r in rows})
+    ]
     fig, axes = plt.subplots(2, 3, figsize=(13, 7.5))
     fig.suptitle("FLEURS ASR — mean WER by condition", fontsize=13)
     for ax, (c, lg) in zip(axes.flat, cells, strict=False):
         _line_chart(ax, _grid(fleurs_rows[c], lg), f"{short_label(c)} · {lg.upper()}")
-    for ax in axes.flat[len(cells):]:
+    for ax in axes.flat[len(cells) :]:
         ax.set_visible(False)
     fig.tight_layout(rect=(0, 0, 1, 0.95))
     fig.savefig(OUT / "asr-wer-vs-snr-fleurs.png", dpi=150)
     plt.close(fig)
 
-    vivos_rows = {c: [r for r in vivos if _candidate_of(r["run"]) == c]
-                  for c in sorted({_candidate_of(r["run"]) for r in vivos})}
+    vivos_rows = {
+        c: [r for r in vivos if _candidate_of(r["run"]) == c]
+        for c in sorted({_candidate_of(r["run"]) for r in vivos})
+    }
     cells = sorted(vivos_rows)
     fig, axes = plt.subplots(1, 3, figsize=(13, 3.8))
     fig.suptitle("VIVOS ASR (vi) — mean WER by condition", fontsize=13)
@@ -142,7 +156,9 @@ def chart_latency_wer(fleurs: list[dict], vivos: list[dict]) -> None:
             a[0].append(w)
             a[1].append(la)
             a[2].append(rm)
-        return {c: (np.mean(v[0]), np.mean(v[1]), np.mean(v[2])) for c, v in agg.items()}
+        return {
+            c: (np.mean(v[0]), np.mean(v[1]), np.mean(v[2])) for c, v in agg.items()
+        }
 
     fig, axes = plt.subplots(1, 2, figsize=(12, 5))
     fig.suptitle("ASR quality vs speed (vi; bubble = peak RAM)", fontsize=13)
@@ -153,8 +169,16 @@ def chart_latency_wer(fleurs: list[dict], vivos: list[dict]) -> None:
     ):
         pts = points(rows, "vi")
         for i, (c, (w, la, rm)) in enumerate(sorted(pts.items())):
-            ax.scatter(la, w, s=max(rm / 8, 60), color=colors[i % 8], alpha=0.75,
-                       edgecolors="black", linewidths=0.8, label=short_label(c))
+            ax.scatter(
+                la,
+                w,
+                s=max(rm / 8, 60),
+                color=colors[i % 8],
+                alpha=0.75,
+                edgecolors="black",
+                linewidths=0.8,
+                label=short_label(c),
+            )
         ax.set_xscale("log")
         ax.set_xlabel("mean latency (s, log)")
         ax.set_ylabel("mean WER")
@@ -179,12 +203,22 @@ def chart_mt(fleurs_mt: list[dict]) -> None:
     fig, ax = plt.subplots(figsize=(9, 5.5))
     colors = plt.cm.tab10(np.linspace(0, 1, 8))
     for i, (run, (bs, las, rms)) in enumerate(sorted(runs.items())):
-        ax.scatter(np.mean(las), np.mean(bs), s=max(np.mean(rms) / 8, 60),
-                   color=colors[i % 8], alpha=0.75, edgecolors="black",
-                   linewidths=0.8)
-        ax.annotate(run.replace("fleurs-mt/", "").replace("100-vi-en-ct2-cpu", "100"),
-                    (np.mean(las), np.mean(bs)), fontsize=8,
-                    xytext=(6, 6), textcoords="offset points")
+        ax.scatter(
+            np.mean(las),
+            np.mean(bs),
+            s=max(np.mean(rms) / 8, 60),
+            color=colors[i % 8],
+            alpha=0.75,
+            edgecolors="black",
+            linewidths=0.8,
+        )
+        ax.annotate(
+            run.replace("fleurs-mt/", "").replace("100-vi-en-ct2-cpu", "100"),
+            (np.mean(las), np.mean(bs)),
+            fontsize=8,
+            xytext=(6, 6),
+            textcoords="offset points",
+        )
     ax.set_xscale("log")
     ax.set_xlabel("mean latency (s, log)")
     ax.set_ylabel("mean BLEU (sacrebleu)")
@@ -224,7 +258,9 @@ def chart_heatmap(rows, out_stub: str, title_prefix: str, cand_lang_pairs) -> No
     for noise in ("steady", "impulsive"):
         heat_rows = _heatmap_rows_for_noise(rows, cand_lang_pairs, noise)
         labels = [lbl for lbl, _ in heat_rows]
-        mat = np.array([[np.nan if v is None else v for v in vals] for _, vals in heat_rows])
+        mat = np.array(
+            [[np.nan if v is None else v for v in vals] for _, vals in heat_rows]
+        )
 
         fig, ax = plt.subplots(figsize=(9, 0.5 * len(labels) + 2))
         vmax = np.nanmax(mat) if np.isfinite(np.nanmax(mat)) else 0.6
@@ -253,16 +289,22 @@ def main() -> None:
     chart_latency_wer(fleurs, vivos)
     chart_mt(fleurs_mt)
 
-    fleurs_pairs = sorted(
-        {(_candidate_of(r["run"]), r["language"]) for r in fleurs}
+    fleurs_pairs = sorted({(_candidate_of(r["run"]), r["language"]) for r in fleurs})
+    chart_heatmap(
+        fleurs,
+        "asr-wer-heatmap-fleurs",
+        "FLEURS ASR — mean WER (candidate x condition)",
+        fleurs_pairs,
     )
-    chart_heatmap(fleurs, "asr-wer-heatmap-fleurs",
-                  "FLEURS ASR — mean WER (candidate x condition)", fleurs_pairs)
 
     vivos_cands = sorted({_candidate_of(r["run"]) for r in vivos})
     vivos_pairs = [(c, "vi") for c in vivos_cands]
-    chart_heatmap(vivos, "asr-wer-heatmap-vivos",
-                  "VIVOS ASR (vi) — mean WER (candidate x condition)", vivos_pairs)
+    chart_heatmap(
+        vivos,
+        "asr-wer-heatmap-vivos",
+        "VIVOS ASR (vi) — mean WER (candidate x condition)",
+        vivos_pairs,
+    )
     print("charts written to", OUT)
 
 
