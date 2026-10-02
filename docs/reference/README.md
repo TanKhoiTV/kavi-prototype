@@ -10,6 +10,7 @@ architecture — the ADRs in `../decisions/` are.
 | `benchmarking-todo.md` | v0 harness implemented (PR #28/#36); superseded by `.pi/PLAN.md` | Historical checklist |
 | `phase-4-qnn-plan.md` | Superseded scope — Whisper/Piper QNN paths obsolete (ADR-008, ADR-024 + ADR-009) | **Opus-MT encoder conversion path only** (§2 pipeline, §8 verified QAIRT commands, §9 calibration) |
 | `denoising-gate-results.md` | One-off Phase-6 gate result | Wiener-adoption evidence for ADR-018 / android plan Risk R1 |
+| `beam-sweep-host-aggregate.md` | Citable reduction of the host beam sweep (raw output is gitignored) | Quality-vs-latency evidence for ADR-020 open parameter #6 |
 | `contest-info.md` | Byte-identical copy of the canonical parent-repo doc (`aivoice-2026/docs/contest-info.md`) | n/a |
 | `additional-reading.md` | Static reading list | n/a |
 | `rtranslator-comparison.md` | Relocated from `decisions/` (was `ADR-007-vs-RTranslator-comparison.md`); records no decision | Architecture map (§1), per-dimension comparison (§3), learnings (§4) |
