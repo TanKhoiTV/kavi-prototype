@@ -624,11 +624,33 @@ def build_lean_manifest(
     )
 
 
+def _resolve_out(out: str | None, default_name: str) -> str:
+    """Honour ``--out`` in every mode, falling back to that mode's default.
+
+    ``--vivos`` and ``--mt-only`` used to hard-code their output path under
+    ``eval_data/`` and ignore ``--out`` while honouring ``--workdir``, so
+    ``--workdir /tmp/x --vivos`` read from ``/tmp/x`` and wrote into the
+    repository. None of the builders create the parent directory either, so a
+    caller pointing at a fresh path would have hit FileNotFoundError.
+    """
+    path = Path(out) if out else Path("eval_data") / default_name
+    path.parent.mkdir(parents=True, exist_ok=True)
+    return str(path)
+
+
 def main() -> None:
     import argparse
 
     ap = argparse.ArgumentParser(description="Kavi bench data prep (Phase 1)")
-    ap.add_argument("--out", default="eval_data/eval_manifest_v1.json")
+    ap.add_argument(
+        "--out",
+        default=None,
+        help=(
+            "manifest output path (default: eval_data/eval_manifest_v1.json; "
+            "eval_data/vivos_vi_eval_manifest.json with --vivos; "
+            "eval_data/mt_vi_en_eval_manifest.json with --mt-only)"
+        ),
+    )
     ap.add_argument("--workdir", default="eval_data")
     ap.add_argument("--n-per-lang", type=int, default=30)
     ap.add_argument(
@@ -682,7 +704,7 @@ def main() -> None:
     args = ap.parse_args()
     if args.vivos is not None:
         build_vivos_manifest(
-            "eval_data/vivos_vi_eval_manifest.json",
+            _resolve_out(args.out, "vivos_vi_eval_manifest.json"),
             workdir=args.workdir,
             n_items=args.vivos,
             real_noise_dir=args.noise_dir,
@@ -691,7 +713,7 @@ def main() -> None:
         return
     if args.mt_only is not None:
         build_mt_manifest(
-            "eval_data/mt_vi_en_eval_manifest.json",
+            _resolve_out(args.out, "mt_vi_en_eval_manifest.json"),
             workdir=args.workdir,
             n_items=(args.mt_only or None),
         )
@@ -700,7 +722,7 @@ def main() -> None:
         langs = tuple(args.lang) if args.lang else ("vi_vn", "en_us")
         download_fleurs(args.workdir, langs=langs)
     build_lean_manifest(
-        args.out,
+        _resolve_out(args.out, "eval_manifest_v1.json"),
         workdir=args.workdir,
         n_per_lang=args.n_per_lang,
         use_fleurs=not args.no_fleurs,

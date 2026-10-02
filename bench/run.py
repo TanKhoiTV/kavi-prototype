@@ -156,7 +156,7 @@ def main() -> None:
     ap.add_argument("--candidate", help="only run this candidate_id")
     ap.add_argument(
         "--config-override",
-        help='JSON dict merged into every item.config, e.g. \'{"beam_size": 4}\'',
+        help="JSON dict merged into every item.config, e.g. '{\"beam_size\": 4}'",
     )
     args = ap.parse_args()
 
@@ -170,7 +170,21 @@ def main() -> None:
     else:
         ap.error("either --manifest PATH or --smoke required")
 
-    config_override = json.loads(args.config_override) if args.config_override else None
+    config_override: dict | None = None
+    if args.config_override:
+        try:
+            config_override = json.loads(args.config_override)
+        except json.JSONDecodeError as exc:
+            ap.error(f"--config-override is not valid JSON: {exc}")
+        # A non-dict (e.g. `--config-override 4`) would raise inside
+        # run_manifest's merge, which sits outside the per-item try — so it
+        # would abort the whole run instead of degrading one item. Reject it
+        # here, where the message can name the fix.
+        if not isinstance(config_override, dict):
+            ap.error(
+                "--config-override must be a JSON object, "
+                "e.g. '{\"beam_size\": 4}' — got " + type(config_override).__name__
+            )
     records = run_manifest(manifest, out_dir, args.candidate, config_override)
     (out_dir / "run_results.json").write_text(
         json.dumps(records, indent=2, ensure_ascii=False), encoding="utf-8"
