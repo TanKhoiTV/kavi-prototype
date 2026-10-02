@@ -126,6 +126,8 @@ Worth knowing:
 2. Make focused commits using **Conventional Commits**:
    - `feat:` new feature · `fix:` bugfix · `chore:` maintenance ·
      `docs:` documentation · `refactor:` restructure · `test:` tests.
+   - Never write `[skip ci]` (or `[ci skip]`) unless you mean to skip CI: GitHub
+     then suppresses **all** workflow runs for that push, changelog included.
 3. Keep changes offline/on-device friendly.
 4. Open a PR into `main`. Use the PR template.
 5. Run `make check` and `make test` before pushing — CI runs both.
@@ -164,7 +166,13 @@ Piper-CPU). On-device QNN candidates land in Phase 4 — see
 - **Line endings**: governed by [`.gitattributes`](.gitattributes) — LF for
   scripts, `Makefile` and source, regardless of `core.autocrlf`.
 - **Changelog**: [`git-cliff`](https://git-cliff.org/) generates `CHANGELOG.md`
-  from Conventional Commits. CI regenerates it on every push to `main`.
+  from Conventional Commits. The `Changelog` workflow regenerates it after every
+  push to `main` and commits the result. That push needs a **GitHub App** on the
+  `main` ruleset bypass list — `github-actions[bot]` cannot be a bypass actor —
+  so the workflow mints a short-lived App token rather than using `GITHUB_TOKEN`.
+  One-time setup (the `CHANGELOG_SYNC_APP_ID` variable and the
+  `CHANGELOG_SYNC_APP_PRIVATE_KEY` secret) is documented in the header comment of
+  `.github/workflows/changelog.yml`.
 - **CI**: `.github/workflows/ci.yml` runs `make check` and `make test` on
   PRs/pushes to `main`.
 - **License**: MIT (see `LICENSE`). Third-party attributions: `NOTICE`.

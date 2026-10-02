@@ -22,11 +22,11 @@ ADR-007 and ADR-008 reserve a TTS slot in the inference pipeline but leave the m
 | Requirement | Detail |
 | ----------- | ------ |
 | **Languages** | Vietnamese (primary) + English (translated output). Must cover both directions. |
-| **Runtime** | On-device, CPU via ONNX Runtime (NPU not required — TTS decoder graphs are autoregressive and map poorly to HTP fixed-graph paradigm, similar to the ASR/MT decoder pattern in ADR-005/008) |
+| **Runtime** | On-device, CPU via ONNX Runtime (NPU not required — TTS decoder graphs are autoregressive and map poorly to HTP fixed-graph paradigm, similar to the ASR/MT decoder pattern in ADR-023/ADR-027) |
 | **Latency** | RTF < 1.0 (real-time); RTF < 0.5 preferred for snappy UX |
 | **License** | Must permit commercial use (MIT, Apache-2.0, or CC BY 4.0 with attribution) |
 | **Android** | Must integrate via sherpa-onnx JNI with the existing Kotlin `OfflineTts` API |
-| **Memory** | Must fit within the 4 GB peak budget established in ADR-007 Decision 5, shared with ASR (~60 MB dual Zipformer int8, per ADR-008 deployment section), MT (~500 MB encoder+decoder+KV cache, per ADR-007 Decision 5), denoiser (~50 MB), and runtime overhead |
+| **Memory** | Must fit within the 4 GB peak budget established in ADR-016, shared with ASR (~60 MB dual Zipformer int8, per ADR-008 deployment section), MT (~500 MB encoder+decoder+KV cache, per ADR-016), denoiser (~50 MB), and runtime overhead |
 | **Multi-speaker** | At minimum one male and one female voice for each language (optional but strongly preferred) |
 | **Prosody control** | Nice-to-have, not a requirement |
 
@@ -220,7 +220,7 @@ For the initial v1 release, use **SupertonicTTS 3** as the single-model TTS engi
 ### Integration architecture (Phase 1 — Supertonic)
 
 ```text
-TranslationService pipeline (from ADR-007 Decision 1)
+TranslationService pipeline (ADR-007)
     ↓ (translated text from Opus-MT decoder)
 ┌────────────────────────────────────────────────────────────┐
 │ TTS: SupertonicTTS 3 (single ONNX session via sherpa-onnx) │
@@ -353,6 +353,7 @@ consequences and risks.
 - **Piper GitHub (active):** <https://github.com/rhasspy/piper>
 - **VAIS1000 dataset license (CC BY 4.0):** <https://zenodo.org/records/14034235>
 - **ADR-003:** Hexagon runtime / compiler strategy (toolchain sprawl risk — relevant to Phase 2 GGUF/llama.cpp addition)
-- **ADR-007:** Production Inference Architecture & Service Layer (TTS slot reserved, Decision 5 memory budget)
+- **ADR-007:** TranslationService — two-mode foreground service (the pipeline stage this TTS plugs into)
 - **ADR-008:** v1 Android ASR Decision — Dual Zipformer (TTS remains TBD in pipeline, corrected ASR memory ~60 MB)
-- **ADR-004:** Speech-to-Speech Architecture / Tech-Stack (deferred decisions)
+- **ADR-016:** Peak memory budget (the 4 GB ceiling this model must fit within)
+- **ADR-004:** *withdrawn* — the deferred tech-stack parameters moved to [`README.md#open-parameters`](README.md#open-parameters)

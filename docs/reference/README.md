@@ -12,3 +12,4 @@ architecture — the ADRs in `../decisions/` are.
 | `denoising-gate-results.md` | One-off Phase-6 gate result | Wiener-adoption evidence for ADR-018 / android plan Risk R1 |
 | `contest-info.md` | Byte-identical copy of the canonical parent-repo doc (`aivoice-2026/docs/contest-info.md`) | n/a |
 | `additional-reading.md` | Static reading list | n/a |
+| `rtranslator-comparison.md` | Relocated from `decisions/` (was `ADR-007-vs-RTranslator-comparison.md`); records no decision | Architecture map (§1), per-dimension comparison (§3), learnings (§4) |
