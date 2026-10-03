@@ -34,7 +34,7 @@ across host operating systems is not guaranteed.
 | Item | Value | Notes |
 | --- | --- | --- |
 | **QAIRT SDK** | `2.31.0.250130`, Linux or Windows host package at `QAIRT_SDK_ROOT` | **Must match** the device `qnn-2.31` / **HTP v73** runtime. Do **not** upgrade — ABI drift breaks on-device loading. Outside the repo. |
-| **ANDROID_NDK_ROOT** | NDK r26c (`26.1.10909125`) | Matches `archive/`/`sdk.yaml` pin. |
+| **ANDROID_NDK_ROOT** | NDK `26.1.10909125` | Matches `archive/`/`sdk.yaml` pin. |
 | **Linux env helper** | `scripts/qairt-env.sh` | `source`s `bin/envsetup.sh` (sets `QNN_SDK_ROOT`, `SNPE_ROOT`) and exports `LD_LIBRARY_PATH` (venv `libpython3.10` + `$QAIRT_SDK_ROOT/lib/x86_64-linux-clang`). |
 | **Converter venv** | Python 3.10 (`.venv-qairt/`, auto-created by the host env helper) | `onnx 1.16.1`, `onnxruntime 1.17.1`, `numpy<2`, `onnx-simplifier`, `scipy`, `lxml`, `absl-py`, `pandas`, `pyyaml`. |
 | **Linux converters** | `qnn-onnx-converter`, `qnn-model-lib-generator`, `qnn-context-binary-generator` | Under `$QAIRT_SDK_ROOT/bin/x86_64-linux-clang`. |
