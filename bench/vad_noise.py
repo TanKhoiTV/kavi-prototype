@@ -2,11 +2,16 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 import numpy as np
 import soundfile as sf
 from scipy import signal
 
 SR = 16000
+LEAD_SAMPLES = 16000
+TRAIL_SAMPLES = 16000
+PEAK_LIMIT = 0.99
 
 
 def load_mono(path: str, sr: int = SR) -> np.ndarray:
@@ -113,3 +118,87 @@ def run_case(
         "speech_peak": float(np.max(np.abs(reverbed))),
         "noise_peak_before_scale": float(np.max(np.abs(aligned_noise))),
     }
+
+
+@dataclass
+class TimelineAudio:
+    audio: np.ndarray
+    reference: np.ndarray
+    noise_component: np.ndarray | None
+    gt_segments: list[tuple[int, int]]
+    snr_db_construction: float | None
+    peak_limited: bool
+
+
+def speech_mask(length: int, segments: list[tuple[int, int]]) -> np.ndarray:
+    mask = np.zeros(length, dtype=bool)
+    for start, end in segments:
+        mask[start:end] = True
+    return mask
+
+
+def rms(x: np.ndarray) -> float:
+    return float(np.sqrt(np.mean(np.asarray(x, dtype=np.float64) ** 2)))
+
+
+def build_timeline_audio(
+    speech_a: np.ndarray,
+    speech_b: np.ndarray,
+    pause_ms: int,
+    noise: np.ndarray | None = None,
+    rir: np.ndarray | None = None,
+    snr_db: float | None = None,
+) -> TimelineAudio:
+    """Build lead + A + pause + B + trail, then apply RIR and noise to all of it.
+
+    SNR definition: RMS of the reverberated clean timeline over the GT speech
+    segments versus RMS of the aligned noise over the whole timeline.
+    """
+    if (noise is None) != (snr_db is None):
+        raise ValueError("noise and snr_db must be given together")
+
+    pause_samples = int(pause_ms * 16)
+    a_start = LEAD_SAMPLES
+    a_end = a_start + len(speech_a)
+    b_start = a_end + pause_samples
+    b_end = b_start + len(speech_b)
+    total = b_end + TRAIL_SAMPLES
+
+    timeline = np.zeros(total, dtype=np.float32)
+    timeline[a_start:a_end] = speech_a
+    timeline[b_start:b_end] = speech_b
+    segments = [(a_start, a_end), (b_start, b_end)]
+
+    reference = apply_rir(timeline, rir) if rir is not None else timeline
+    reference = np.asarray(reference, dtype=np.float64)
+
+    noise_component = None
+    snr_construction = None
+    mixed = reference
+    if noise is not None and snr_db is not None:
+        aligned = np.asarray(align_noise(noise, total), dtype=np.float64)
+        s_rms = rms(reference[speech_mask(total, segments)])
+        n_rms = rms(aligned)
+        if s_rms == 0 or n_rms == 0:
+            raise ValueError("Zero RMS for SNR calculation")
+        noise_component = aligned * (s_rms / (10 ** (snr_db / 20.0)) / n_rms)
+        mixed = reference + noise_component
+        snr_construction = float(20 * np.log10(s_rms / rms(noise_component)))
+
+    peak = float(np.max(np.abs(mixed)))
+    peak_limited = peak > PEAK_LIMIT
+    if peak_limited:
+        gain = PEAK_LIMIT / peak
+        mixed = mixed * gain
+        reference = reference * gain
+        if noise_component is not None:
+            noise_component = noise_component * gain
+
+    return TimelineAudio(
+        audio=mixed.astype(np.float32),
+        reference=reference,
+        noise_component=noise_component,
+        gt_segments=segments,
+        snr_db_construction=snr_construction,
+        peak_limited=peak_limited,
+    )

@@ -127,8 +127,8 @@ def build_vad_manifest(
 
     rng = random.Random(seed)
 
-    vi_dir = Path("eval_data/vad_audio/fleurs/vi")
-    en_dir = Path("eval_data/vad_audio/fleurs/en")
+    vi_dir = Path(workdir) / "vad_audio" / "fleurs" / "vi"
+    en_dir = Path(workdir) / "vad_audio" / "fleurs" / "en"
     vi_all = sorted(vi_dir.glob("*.wav"))
     en_all = sorted(en_dir.glob("*.wav"))
     if len(vi_all) < n_per_lang or len(en_all) < n_per_lang:

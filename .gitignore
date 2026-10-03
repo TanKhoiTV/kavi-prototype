@@ -62,3 +62,7 @@ RTranslator/
 /android
 assets/noise/musan/
 assets/noise/rirs/
+
+# macOS / IDE local files
+.DS_Store
+.idea/

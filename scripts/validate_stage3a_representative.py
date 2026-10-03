@@ -1,114 +1,164 @@
-"""Representative Stage 3A validation script (7 representative items)."""
+"""Representative Stage 3A audio validation (one item per condition x SNR cell).
+
+Builds each item with bench.vad_noise.build_timeline_audio, writes the WAV,
+reads it back, and verifies structure, noise coverage and SNR from the file.
+Run: PYTHONPATH=. uv run python scripts/validate_stage3a_representative.py
+"""
+
 from __future__ import annotations
-import soundfile as sf
-import numpy as np
+
+import sys
 from pathlib import Path
-from bench.vad_manifest import VadManifest
-from bench.vad_noise import load_mono, apply_rir
 
-SR = 16000
-LEADING = 16000
-TRAILING = 16000
+import numpy as np
+import soundfile as sf
+
+from bench.vad_manifest import VadItem, VadManifest
+from bench.vad_noise import (
+    LEAD_SAMPLES,
+    PEAK_LIMIT,
+    SR,
+    TRAIL_SAMPLES,
+    align_noise,
+    build_timeline_audio,
+    load_mono,
+    rms,
+    speech_mask,
+)
+
 MANIFEST_PATH = "eval_data/vad_manifest_v2.json"
+OUT_DIR = Path("/tmp/kavi_stage3a_rep")
+SNR_TOL_DB = 0.05
+CORR_MIN = 0.999
+RIR_CONDITIONS = ("indoors", "near-field", "far-field")
 
-def main():
+CASES = [
+    ("vi", "quiet", None, 200),
+    ("en", "quiet", 15.0, 350),
+    ("vi", "street", 10.0, 500),
+    ("en", "street", 5.0, 700),
+    ("vi", "indoors", 10.0, 200),
+    ("en", "indoors", 5.0, 350),
+    ("vi", "near-field", 5.0, 500),
+    ("en", "near-field", 0.0, 700),
+    ("vi", "far-field", 0.0, 200),
+    ("en", "far-field", -5.0, 500),
+]
+
+
+def find_item(m: VadManifest, lang: str, cond: str, snr, pause: int) -> VadItem:
+    for it in m.items:
+        if (
+            it.language == lang
+            and it.condition == cond
+            and it.snr_db == snr
+            and it.pause_ms == pause
+            and it.id.endswith("-000")
+        ):
+            return it
+    raise LookupError(f"no manifest item for {lang} {cond} {snr} {pause}")
+
+
+def check_item(item: VadItem) -> tuple[list[str], dict]:
+    fails: list[str] = []
+
+    expect_noise = item.noise_type != "clean"
+    expect_rir = item.condition in RIR_CONDITIONS
+    if expect_noise != (item.noise_path is not None):
+        fails.append("noise_path presence does not match noise_type")
+    if expect_rir != (item.rir_path is not None):
+        fails.append("rir_path presence does not match condition")
+    if item.noise_path and "musan" not in item.noise_path:
+        fails.append(f"noise_path is not MUSAN: {item.noise_path}")
+    if item.rir_path and "rirs" not in item.rir_path:
+        fails.append(f"rir_path is not RIRS: {item.rir_path}")
+    if item.speech_b_path is None:
+        raise ValueError(f"speech_b_path missing for {item.id}")
+
+    a = load_mono(item.clean_audio_path)
+    b = load_mono(item.speech_b_path)
+    noise = load_mono(item.noise_path) if item.noise_path else None
+    rir = load_mono(item.rir_path) if item.rir_path else None
+
+    built = build_timeline_audio(
+        a, b, item.pause_ms, noise=noise, rir=rir, snr_db=item.snr_db
+    )
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    out = OUT_DIR / f"{item.id}.wav"
+    sf.write(str(out), built.audio, SR)
+    wav, sr = sf.read(str(out), dtype="float64")
+
+    pause = int(item.pause_ms * 16)
+    (a0, a1), (b0, b1) = built.gt_segments
+    total = LEAD_SAMPLES + len(a) + pause + len(b) + TRAIL_SAMPLES
+
+    if sr != SR:
+        fails.append(f"sample rate {sr}")
+    if len(wav) != total:
+        fails.append(f"length {len(wav)} != {total}")
+    if [tuple(s) for s in item.ground_truth_segments] != built.gt_segments:
+        fails.append("manifest GT != construction GT")
+    if a0 != LEAD_SAMPLES or b0 - a1 != pause:
+        fails.append("GT start/gap wrong")
+    if float(np.max(np.abs(wav))) > PEAK_LIMIT + 1e-4:
+        fails.append("peak above limit")
+
+    lead = wav[:LEAD_SAMPLES]
+    gap = wav[a1:b0]
+    trail = wav[-TRAIL_SAMPLES:]
+    snr_wav = None
+    err = None
+    corr = None
+
+    if not expect_noise:
+        if float(np.max(np.abs(wav - built.reference))) > 2e-4:
+            fails.append("clean item differs from reference")
+        if max(rms(lead), rms(gap), rms(trail)) != 0.0:
+            fails.append("clean item has energy in silence")
+    else:
+        residual = wav - built.reference
+        mask = speech_mask(len(wav), built.gt_segments)
+        snr_wav = float(20 * np.log10(rms(built.reference[mask]) / rms(residual)))
+        err = snr_wav - float(item.snr_db)
+        ref_noise = np.asarray(align_noise(noise, len(wav)), dtype=np.float64)
+        corr = float(np.corrcoef(residual, ref_noise)[0, 1])
+        if abs(err) > SNR_TOL_DB:
+            fails.append(f"SNR error {err:.4f} dB")
+        if corr < CORR_MIN:
+            fails.append(f"whole-timeline noise correlation {corr:.5f}")
+
+    if expect_rir and float(np.max(np.abs(built.reference[a1:b0]))) == 0.0:
+        fails.append("no reverb tail in pause")
+
+    info = {
+        "snr_wav": snr_wav,
+        "err": err,
+        "corr": corr,
+        "peak_limited": built.peak_limited,
+        "out": str(out),
+    }
+    return fails, info
+
+
+def main() -> int:
     m = VadManifest.from_json(MANIFEST_PATH)
-    picks = [
-        ("vi-quiet-clean-200-000", "quiet/clean"),
-        ("vi-quiet-15-200-000", "quiet/+15"),
-        ("vi-street-10-350-003", "street/+10"),
-        ("vi-indoors-10-500-001", "indoors/+10"),
-        ("vi-near-field-5-700-002", "near-field/+5"),
-        ("vi-far-field-0-200-000", "far-field/0"),
-        ("vi-far-field-m5-700-009", "far-field/-5"),
-    ]
-    results = []
-    for item_id, label in picks:
-        item = next(i for i in m.items if i.id == item_id)
-        speech_a = load_mono(item.clean_audio_path)
-        if item.speech_b_path is None:
-            raise ValueError(f"speech_b_path missing for {item_id}")
-        speech_b = load_mono(item.speech_b_path)
+    bad = 0
+    for lang, cond, snr, pause in CASES:
+        item = find_item(m, lang, cond, snr, pause)
+        fails, info = check_item(item)
+        status = "FAIL" if fails else "PASS"
+        bad += bool(fails)
+        err = "n/a" if info["err"] is None else f"{info['err']:+.5f}"
+        corr = "n/a" if info["corr"] is None else f"{info['corr']:.6f}"
+        print(
+            f"{status} {item.id} | target={item.snr_db} | err_dB={err} | "
+            f"corr={corr} | peak_limited={info['peak_limited']} | {info['out']}"
+        )
+        for f in fails:
+            print(f"    - {f}")
+    print(f"\n{len(CASES) - bad}/{len(CASES)} cases PASS")
+    return 1 if bad else 0
 
-        lead = np.zeros(LEADING, dtype=np.float32)
-        trail = np.zeros(TRAILING, dtype=np.float32)
-
-        if item.rir_path is not None:
-            if not Path(item.rir_path).exists():
-                raise FileNotFoundError(f"RIR missing for {item_id}: {item.rir_path}")
-            rir = load_mono(item.rir_path)
-            speech_a_rev = apply_rir(speech_a, rir)
-        else:
-            speech_a_rev = speech_a
-
-        if item.noise_type == "clean":
-            mixed_a = speech_a_rev
-            measured_snr = None
-        else:
-            if item.noise_path is None or not Path(item.noise_path).exists():
-                raise FileNotFoundError(f"Real noise missing for {item_id}: {item.noise_path}")
-            noise = load_mono(item.noise_path)
-            target_snr = item.snr_db
-            target_len = len(speech_a_rev)
-            if len(noise) < target_len:
-                repeats = (target_len + len(noise) - 1) // len(noise)
-                noise = np.tile(noise, repeats)
-            noise_aligned = noise[:target_len]
-            s_rms = np.sqrt(np.mean(speech_a_rev**2))
-            n_rms = np.sqrt(np.mean(noise_aligned**2))
-            if s_rms == 0 or n_rms == 0:
-                raise ValueError("Zero RMS for SNR calculation")
-            target_noise_rms = s_rms / (10**(target_snr / 20.0))
-            scaled_noise = noise_aligned * (target_noise_rms / (n_rms + 1e-12))
-            mixed_a = speech_a_rev + scaled_noise[:len(speech_a_rev)]
-            peak = np.max(np.abs(mixed_a))
-            clipping = peak > 0.99
-            if clipping:
-                mixed_a = mixed_a * (0.99 / peak)
-            measured_snr = float(20 * np.log10(s_rms / (np.sqrt(np.mean(scaled_noise**2)) + 1e-12)))
-
-        pause_samples = int(item.pause_ms * 16)
-        mixed = np.concatenate([lead, mixed_a, np.zeros(pause_samples, dtype=np.float32), speech_b, trail])
-        out_path = f"/tmp/kavi_rep_{item_id}.wav"
-        sf.write(out_path, mixed, SR)
-
-        info = sf.info(out_path)
-        assert info.samplerate == SR, f"Sample rate mismatch: {info.samplerate}"
-        assert info.frames > 0, f"Empty output for {item_id}"
-
-        s1, e1 = item.ground_truth_segments[0]
-        s2, e2 = item.ground_truth_segments[1]
-        expected_gap = int(item.pause_ms * 16)
-        actual_gap = s2 - e1
-        assert actual_gap == expected_gap, f"GT gap mismatch {item_id}: {actual_gap} != {expected_gap}"
-        assert s2 > e1
-
-        assert item.speech_b_path is not None
-        assert Path(item.speech_b_path).exists(), f"speech_b_path missing for {item_id}"
-
-        if item.noise_type != "clean":
-            assert item.noise_path is not None
-            assert Path(item.noise_path).exists(), f"Real noise missing for {item_id}"
-        if item.condition in ("indoors", "near-field", "far-field"):
-            assert item.rir_path is not None
-            assert Path(item.rir_path).exists(), f"Real RIR missing for {item_id}"
-
-        results.append({
-            "item_id": item_id,
-            "label": label,
-            "condition": item.condition,
-            "snr_target": item.snr_db,
-            "measured_snr": measured_snr,
-            "out_path": out_path,
-            "duration_s": info.duration,
-            "frames": info.frames,
-            "clipping": clipping if item.noise_type != "clean" else False,
-        })
-        print(f"PASS {label} | {item_id} | target={item.snr_db} | meas={measured_snr} | out={out_path} | dur={info.duration:.2f}s")
-
-    print("\n=== All 7 representative materializations PASS ===")
-    for r in results:
-        print(f"  {r['label']:12} | target={r['snr_target']} | meas={r['measured_snr']} | clip={r['clipping']} | file={r['out_path']}")
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
