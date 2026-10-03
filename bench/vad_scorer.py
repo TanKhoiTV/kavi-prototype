@@ -27,8 +27,8 @@ class VadMetrics:
 
 
 def _is_in_collar(vad_boundary: float, gt_boundary: float, collar: float) -> bool:
-    """Return True if the VAD boundary falls within +/- collar seconds of the ground-truth boundary."""
-    return abs(vad_boundary - gt_boundary) <= collar
+    """Return True if the VAD boundary falls within +/- collar seconds of the ground-truth boundary (inclusive, with float tolerance)."""
+    return abs(vad_boundary - gt_boundary) <= collar + 1e-9
 
 
 def _segments_overlap(
@@ -38,24 +38,27 @@ def _segments_overlap(
     return seg_a_start < seg_b_end and seg_b_start < seg_a_end
 
 
-def _is_false_trigger(vad_seg, gt_segments: list[tuple[float, float]]) -> bool:
-    """Return True if the VAD segment does not overlap any ground-truth segment (after collar expansion)."""
+def _is_false_trigger(
+    vad_seg, gt_segments: list[tuple[float, float]], collar: float
+) -> bool:
+    """Return True when VAD start occurs in non-speech (no GT onset within collar, not inside GT segment)."""
     vs, _ve = vad_seg
-    return all(not _segments_overlap(vs, _ve, gs, ge) for gs, ge in gt_segments)
+    for gs, ge in gt_segments:
+        if abs(vs - gs) <= collar:
+            return False
+        if gs <= vs <= ge:
+            return False
+    return True
 
 
 def _is_missed_onset(
     gt_onset: float, vad_segments: list[tuple[float, float]], collar: float
 ) -> bool:
     """Return True if no VAD segment onset falls within +/- collar seconds of the ground-truth onset."""
-    return all(
-        not _is_in_collar(vs, gt_onset, collar) for vs, _ve in vad_segments
-    )
+    return all(not _is_in_collar(vs, gt_onset, collar) for vs, _ve in vad_segments)
 
 
-def _clip_at_start(
-    vad_seg, gt_seg, collar: float
-) -> float:
+def _clip_at_start(vad_seg, gt_seg, collar: float) -> float:
     """Return the milliseconds of the ground-truth segment lost before the VAD segment onset (after collar), or 0.0 if none."""
     vs, _ve = vad_seg
     gs, _ge = gt_seg
@@ -63,9 +66,7 @@ def _clip_at_start(
     return max(0.0, delay * 1000.0)
 
 
-def _clip_at_end(
-    vad_seg, gt_seg, collar: float
-) -> float:
+def _clip_at_end(vad_seg, gt_seg, collar: float) -> float:
     """Return the milliseconds of the ground-truth segment lost after the VAD segment offset (after collar), or 0.0 if none."""
     _vs, ve = vad_seg
     _gs, ge = gt_seg
@@ -74,17 +75,26 @@ def _clip_at_end(
 
 
 def _is_split_utterance(
-    gt_seg, vad_segments: list[tuple[float, float]], collar: float
+    gt_seg,
+    vad_segments: list[tuple[float, float]],
+    collar: float,
+    speech_timeout_s: float = 0.500,
 ) -> bool:
-    """Return True if a single ground-truth segment is broken into more than one VAD segment by an in-utterance pause."""
+    """Return True when a GT utterance is broken into multiple VAD segments by a real in-utterance gap (> speech_timeout_s)."""
     gs, ge = gt_seg
-    overlapping = [
-        vs
-        for vs, ve in vad_segments
-        if _segments_overlap(vs, ve, gs, ge)
+    overlaps = [
+        (vs, ve) for vs, ve in vad_segments if _segments_overlap(vs, ve, gs, ge)
     ]
-    expanded = sorted(v for v in overlapping if v < ge + collar)
-    return len(expanded) > 1
+    if len(overlaps) < 2:
+        return False
+    overlaps_sorted = sorted(overlaps, key=lambda s: s[0])
+    for i in range(1, len(overlaps_sorted)):
+        prev_end = overlaps_sorted[i - 1][1]
+        curr_start = overlaps_sorted[i][0]
+        gap = curr_start - prev_end
+        if gap > 0 and gap > speech_timeout_s:
+            return True
+    return False
 
 
 def score_vad_item(
@@ -93,6 +103,7 @@ def score_vad_item(
     total_duration_s: float,
     non_speech_duration_s: float,
     collar: float = 0.150,
+    speech_timeout_s: float = 0.500,
 ) -> VadMetrics:
     """Score a single utterance's VAD output against ground-truth speech segments.
 
@@ -108,6 +119,9 @@ def score_vad_item(
         Duration of non-speech audio in seconds (for false-trigger rate).
     collar:
         Symmetric tolerance in seconds applied to all boundary comparisons.
+    speech_timeout_s:
+        Speech timeout in seconds (default 0.500 s, from .kavi.yaml timing); used
+        only for split-utterance evaluation, not for collar-based boundary checks.
 
     Returns
     -------
@@ -117,23 +131,28 @@ def score_vad_item(
     metrics = VadMetrics()
 
     if non_speech_duration_s <= 0:
-        metrics.errors.append("non_speech_duration_s is zero; false-trigger rate undefined")
+        metrics.errors.append(
+            "non_speech_duration_s is zero; false-trigger rate undefined"
+        )
         return metrics
 
     if total_duration_s <= 0:
-        metrics.errors.append("total_duration_s is zero; cannot compute duration-based metrics")
+        metrics.errors.append(
+            "total_duration_s is zero; cannot compute duration-based metrics"
+        )
         return metrics
 
     gt_segments_sorted = sorted(gt_segments, key=lambda s: s[0])
     vad_segments_sorted = sorted(vad_segments, key=lambda s: s[0])
 
     false_triggers = [
-        seg for seg in vad_segments_sorted
-        if _is_false_trigger(seg, gt_segments_sorted)
+        seg
+        for seg in vad_segments_sorted
+        if _is_false_trigger(seg, gt_segments_sorted, collar)
     ]
     metrics.false_trigger_count = len(false_triggers)
-    metrics.false_trigger_rate_per_min = (
-        metrics.false_trigger_count / (non_speech_duration_s / 60.0)
+    metrics.false_trigger_rate_per_min = metrics.false_trigger_count / (
+        non_speech_duration_s / 60.0
     )
 
     missed_onsets = [
@@ -148,31 +167,36 @@ def score_vad_item(
     )
 
     for gs, ge in gt_segments_sorted:
-        matching_vad = None
-        for vs, ve in vad_segments_sorted:
-            if _segments_overlap(vs, ve, gs, ge) and not _is_false_trigger(
-                (vs, ve), gt_segments_sorted
-            ):
-                matching_vad = (vs, ve)
-                break
-        if matching_vad is not None:
-            metrics.clipped_start_ms += _clip_at_start(matching_vad, (gs, ge), collar)
-            metrics.clipped_end_ms += _clip_at_end(matching_vad, (gs, ge), collar)
-
-    for gs, ge in gt_segments_sorted:
-        vad_ends = [
-            ve
+        overlapping = [
+            (vs, ve)
             for vs, ve in vad_segments_sorted
             if _segments_overlap(vs, ve, gs, ge)
+            and not _is_false_trigger((vs, ve), gt_segments_sorted, collar)
         ]
-        if vad_ends:
-            vad_end = max(vad_ends)
-            delay = vad_end - ge
-            if delay > metrics.end_of_utterance_delay_ms / 1000.0:
-                metrics.end_of_utterance_delay_ms = delay * 1000.0
+        if overlapping:
+            best_start = min(overlapping, key=lambda s: s[0])
+            best_end = max(overlapping, key=lambda s: s[1])
+            metrics.clipped_start_ms += _clip_at_start(best_start, (gs, ge), collar)
+            metrics.clipped_end_ms += _clip_at_end(best_end, (gs, ge), collar)
+
+    best_delay_s_for_utterance = None
+    for gs, ge in gt_segments_sorted:
+        best_delay_s = None
+        for vs, ve in vad_segments_sorted:
+            if _segments_overlap(vs, ve, gs, ge):
+                delay = ve - ge
+                if best_delay_s is None or delay > best_delay_s:
+                    best_delay_s = delay
+        if best_delay_s is not None and (
+            best_delay_s_for_utterance is None
+            or best_delay_s > best_delay_s_for_utterance
+        ):
+            best_delay_s_for_utterance = best_delay_s
+    if best_delay_s_for_utterance is not None:
+        metrics.end_of_utterance_delay_ms = best_delay_s_for_utterance * 1000.0
 
     for gs, ge in gt_segments_sorted:
-        if _is_split_utterance((gs, ge), vad_segments_sorted, collar):
+        if _is_split_utterance((gs, ge), vad_segments_sorted, collar, speech_timeout_s):
             metrics.split_count += 1
 
     return metrics

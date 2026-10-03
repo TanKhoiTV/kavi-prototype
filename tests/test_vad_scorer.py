@@ -126,13 +126,14 @@ class TestPauseSplitsUtterance:
 
     def test_split_by_pause(self) -> None:
         gt = [(0.5, 3.5)]  # one utterance
-        vad = [(0.5, 1.8), (2.2, 3.5)]  # VAD splits into two segments
+        vad = [(0.5, 1.5), (2.3, 3.5)]  # gap 700 ms (> 500 ms timeout)
         metrics = score_vad_item(
             gt_segments=gt,
             vad_segments=vad,
             total_duration_s=5.0,
             non_speech_duration_s=1.0,
             collar=0.150,
+            speech_timeout_s=0.500,
         )
         assert metrics.split_count == 1
 
@@ -144,15 +145,72 @@ class TestCollarBoundaryDetection:
     def test_on_collar_boundary(self) -> None:
         collar = 0.150
         gt_onset = 1.0
-        vad_onset = gt_onset + (collar - 0.010)
+        # Exact boundary: abs(predicted - ground_truth) == collar => correct (inclusive)
+        vad_onset_exact = gt_onset + collar
         metrics = score_vad_item(
             gt_segments=[(gt_onset, 2.0)],
-            vad_segments=[(vad_onset, 2.0)],
+            vad_segments=[(vad_onset_exact, 2.0)],
             total_duration_s=5.0,
             non_speech_duration_s=3.0,
             collar=collar,
         )
         assert metrics.missed_onset_count == 0
+        # Symmetric negative-side boundary
+        vad_onset_neg = gt_onset - collar
+        metrics = score_vad_item(
+            gt_segments=[(gt_onset, 2.0)],
+            vad_segments=[(vad_onset_neg, 2.0)],
+            total_duration_s=5.0,
+            non_speech_duration_s=3.0,
+            collar=collar,
+        )
+        assert metrics.missed_onset_count == 0
+
+
+class TestFalseTriggerByStart:
+    """False trigger defined by VAD start occurring in non-speech.
+    Start inside GT segment or within collar of GT onset = not false.
+    Start in pure silence = false trigger."""
+
+    def test_vad_start_inside_non_speech(self) -> None:
+        gt = [(2.0, 4.0)]
+        vad = [(5.0, 6.0)]  # start clearly in non-speech
+        metrics = score_vad_item(
+            gt_segments=gt,
+            vad_segments=vad,
+            total_duration_s=7.0,
+            non_speech_duration_s=3.0,
+            collar=0.150,
+        )
+        assert metrics.false_trigger_count == 1
+        assert metrics.false_trigger_rate_per_min == pytest.approx(20.0)
+
+    def test_vad_start_within_collar_of_gt_onset_not_false(self) -> None:
+        gt = [(2.0, 4.0)]
+        vad = [(1.95, 3.5)]  # start 50 ms before GT onset, within 150 ms collar
+        metrics = score_vad_item(
+            gt_segments=gt,
+            vad_segments=vad,
+            total_duration_s=7.0,
+            non_speech_duration_s=3.0,
+            collar=0.150,
+        )
+        assert metrics.false_trigger_count == 0
+
+    def test_vad_segment_overlaps_speech_but_starts_in_non_speech(self) -> None:
+        # VAD starts at 1.5 (before GT 2.0, outside collar of 2.0 -> non-speech start)
+        # but overlaps GT because VAD extends to 3.5.
+        # Per start-based definition: start is in non-speech => false trigger.
+        gt = [(2.0, 4.0)]
+        vad = [(1.5, 3.5)]
+        metrics = score_vad_item(
+            gt_segments=gt,
+            vad_segments=vad,
+            total_duration_s=7.0,
+            non_speech_duration_s=3.0,
+            collar=0.150,
+        )
+        assert metrics.false_trigger_count == 1
 
 
 class TestFalseTrigger:
@@ -210,13 +268,86 @@ class TestSplitWithPause:
 
     def test_split_by_in_utterance_pause(self) -> None:
         gt = [(0.0, 4.0)]
-        vad = [(0.0, 1.8), (2.2, 4.0)]  # pause between 1.8 and 2.2
+        vad = [(0.0, 1.5), (2.3, 4.0)]  # gap 700 ms (> 500 ms timeout)
         metrics = score_vad_item(
             gt_segments=gt,
             vad_segments=vad,
             total_duration_s=5.0,
             non_speech_duration_s=1.0,
             collar=0.150,
+            speech_timeout_s=0.500,
         )
         assert metrics.split_count == 1
         assert metrics.false_trigger_count == 0
+
+
+class TestSplitByTimeout:
+    """Split utterance evaluated with speech-timeout semantics (500 ms)."""
+
+    def test_gap_200_ms_not_split(self) -> None:
+        gt = [(0.0, 4.0)]
+        vad = [(0.0, 1.8), (2.0, 4.0)]  # gap 200 ms
+        metrics = score_vad_item(
+            gt_segments=gt,
+            vad_segments=vad,
+            total_duration_s=5.0,
+            non_speech_duration_s=1.0,
+            collar=0.150,
+            speech_timeout_s=0.500,
+        )
+        assert metrics.split_count == 0
+
+    def test_gap_350_ms_not_split(self) -> None:
+        gt = [(0.0, 4.0)]
+        vad = [(0.0, 1.8), (2.15, 4.0)]  # gap 350 ms
+        metrics = score_vad_item(
+            gt_segments=gt,
+            vad_segments=vad,
+            total_duration_s=5.0,
+            non_speech_duration_s=1.0,
+            collar=0.150,
+            speech_timeout_s=0.500,
+        )
+        assert metrics.split_count == 0
+
+    def test_gap_500_ms_not_split(self) -> None:
+        gt = [(0.0, 4.0)]
+        vad = [(0.0, 1.5), (2.0, 4.0)]  # gap 500 ms
+        metrics = score_vad_item(
+            gt_segments=gt,
+            vad_segments=vad,
+            total_duration_s=5.0,
+            non_speech_duration_s=1.0,
+            collar=0.150,
+            speech_timeout_s=0.500,
+        )
+        assert metrics.split_count == 0
+
+    def test_gap_700_ms_split(self) -> None:
+        gt = [(0.0, 4.0)]
+        vad = [(0.0, 1.8), (2.5, 4.0)]  # gap 700 ms (> 500 ms timeout)
+        metrics = score_vad_item(
+            gt_segments=gt,
+            vad_segments=vad,
+            total_duration_s=5.0,
+            non_speech_duration_s=1.0,
+            collar=0.150,
+            speech_timeout_s=0.500,
+        )
+        assert metrics.split_count == 1
+
+
+class TestEOUDelayNegative:
+    """End-of-utterance delay preserves negative values when VAD ends before true end."""
+
+    def test_vad_ends_before_true_end(self) -> None:
+        gt = [(0.5, 2.5)]
+        vad = [(0.5, 2.3)]  # VAD ends 200 ms before GT end
+        metrics = score_vad_item(
+            gt_segments=gt,
+            vad_segments=vad,
+            total_duration_s=5.0,
+            non_speech_duration_s=3.0,
+            collar=0.150,
+        )
+        assert metrics.end_of_utterance_delay_ms == pytest.approx(-200.0, abs=1.0)
