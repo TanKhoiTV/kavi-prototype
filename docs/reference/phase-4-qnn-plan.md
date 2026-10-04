@@ -31,6 +31,9 @@ so developers can build the app without the SDK. Intermediate model libraries
 are host-specific (`.so` on Linux, `.dll` on Windows); byte-identical output
 across host operating systems is not guaranteed.
 
+Both hosts are documented as supported, but **neither has been validated
+end-to-end yet** — see the caveat at the head of §8.
+
 | Item | Value | Notes |
 | --- | --- | --- |
 | **QAIRT SDK** | `2.31.0.250130`, Linux or Windows host package at `QAIRT_SDK_ROOT` | **Must match** the device `qnn-2.31` / **HTP v73** runtime. Do **not** upgrade — ABI drift breaks on-device loading. Outside the repo. |
@@ -215,9 +218,13 @@ that finalize the **tech-stack register**.
 ## 8. Verified conversion command reference (QAIRT 2.31.0.250130)
 
 > The Linux flag forms below were previously checked against the installed SDK
-> (`qnn-onnx-converter --help`, `qnn-model-lib-generator` source). The Windows
-> guidance describes platform selection; it has not been executed on Windows.
-> Check the installed 2.31 SDK help for platform-specific options.
+> (`qnn-onnx-converter --help`, `qnn-model-lib-generator` source). Checking flag
+> forms is **not** the same as completing a conversion: neither host has been
+> run end-to-end through steps 2–3 yet. The Windows guidance describes platform
+> selection; it has not been executed on Windows either. Check the installed
+> 2.31 SDK help for platform-specific options, and treat the **first-validation
+> target** below (Whisper encoder, static `[1,80,3000]`) as the first end-to-end
+> proof of the Linux-host path.
 
 **Quantization (w8a16, `tf`):** `--param_quantizer tf --act_quantizer tf
 --weights_bitwidth 8 --act_bitwidth 16` (all four confirmed present).
