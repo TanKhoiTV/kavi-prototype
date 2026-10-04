@@ -54,6 +54,8 @@ class ItemResult:
     n_vad_segments: int
     eos_delay_ms: float | None
     violation: bool
+    junction_split: bool
+    junction_violation: bool
 
 
 def load_collar(path: str = COLLAR_PATH) -> tuple[float, bool]:
@@ -150,6 +152,11 @@ def evaluate_item(
     timing["score_s"] += t3 - t2
 
     gt_start, gt_end = gt[0]
+    (_, a_end_sample), (b_start_sample, _) = item.ground_truth_segments[:2]
+    a_end_s, b_start_s = a_end_sample / SR, b_start_sample / SR
+    junction_split = not any(
+        seg[0] <= a_end_s and seg[1] >= b_start_s for seg in result.segments
+    )
     overlapping = [s for s in result.segments if s[0] < gt_end and s[1] > gt_start]
     eos_delay_ms = None
     if result.eos_s and result.eos_s[-1] is not None:
@@ -166,6 +173,8 @@ def evaluate_item(
         n_vad_segments=len(result.segments),
         eos_delay_ms=eos_delay_ms,
         violation=item.pause_ms <= vad.speech_timeout_ms and len(overlapping) > 1,
+        junction_split=junction_split,
+        junction_violation=junction_split and item.pause_ms <= vad.speech_timeout_ms,
     )
 
 
@@ -205,6 +214,9 @@ def summarize(results: list[ItemResult]) -> dict:
     for r in results:
         by_pause[r.pause_ms].append(r.metrics.split_count > 0)
     eos = [r.eos_delay_ms for r in results if r.eos_delay_ms is not None]
+    by_pause_junction: dict[int, list[bool]] = defaultdict(list)
+    for r in results:
+        by_pause_junction[r.pause_ms].append(r.junction_split)
     return {
         "n_items": n,
         "false_trigger_count": false_triggers,
@@ -221,6 +233,11 @@ def summarize(results: list[ItemResult]) -> dict:
             str(p): sum(v) / len(v) for p, v in sorted(by_pause.items())
         },
         "pause_violations": sum(r.violation for r in results),
+        "utterance_split_rate": sum(r.metrics.split_count > 0 for r in results) / n,
+        "junction_split_rate_by_pause": {
+            str(p): sum(v) / len(v) for p, v in sorted(by_pause_junction.items())
+        },
+        "junction_violations": sum(r.junction_violation for r in results),
         "eou_delay_ms": _stats([r.metrics.end_of_utterance_delay_ms for r in results]),
         "eos_delay_ms": _stats(eos),
         "eos_undeclared": n - len(eos),
@@ -283,9 +300,13 @@ def print_report(
         "reference-VAD speech bounds"
     )
     print("reference limits: false-trigger<=0.1/min, missed-onset<=5%, clip<=50ms/utt")
+    print(
+        "jsplit/jviol: VAD did not bridge the A-B pause (jviol = pause <= timeout); "
+        "anySpl%: any gap > timeout anywhere in the utterance"
+    )
     head = (
         f"{'cond/snr':<16}{'n':>4}{'FT/min':>8}{'miss%':>7}{'clipMean':>9}"
-        f"{'clipP95':>8}{'clipMax':>8}{'split% by pause':>20}{'viol':>5}"
+        f"{'clipP95':>8}{'clipMax':>8}{'jsplit% by pause':>20}{'jviol':>6}{'anySpl%':>8}"
         f"{'EOUmed':>8}{'EOUp95':>8}{'EOSmed':>8}{'noEOS':>6}"
     )
     print(head)
@@ -293,7 +314,9 @@ def print_report(
     rows = [(f"{c['condition']}/{c['snr_db']}", c) for c in summary["cells"]]
     rows.append(("OVERALL", summary["overall"]))
     for label, c in rows:
-        split = "/".join(f"{v * 100:.0f}" for v in c["split_rate_by_pause"].values())
+        split = "/".join(
+            f"{v * 100:.0f}" for v in c["junction_split_rate_by_pause"].values()
+        )
         print(
             f"{label:<16}{c['n_items']:>4}"
             f"{_fmt(c['false_trigger_rate_per_min'], '.2f'):>8}"
@@ -301,7 +324,8 @@ def print_report(
             f"{c['clipped_ms_per_utterance']['mean']:>9.1f}"
             f"{_fmt(c['clipped_ms_per_utterance']['p95'], '.1f'):>8}"
             f"{c['clipped_ms_per_utterance']['max']:>8.1f}"
-            f"{split:>20}{c['pause_violations']:>5}"
+            f"{split:>20}{c['junction_violations']:>6}"
+            f"{c['utterance_split_rate'] * 100:>8.0f}"
             f"{_fmt(c['eou_delay_ms']['median'], '.0f'):>8}"
             f"{_fmt(c['eou_delay_ms']['p95'], '.0f'):>8}"
             f"{_fmt(c['eos_delay_ms']['median'], '.0f'):>8}"

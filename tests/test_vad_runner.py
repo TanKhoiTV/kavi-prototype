@@ -99,6 +99,10 @@ def test_run_config_pause_within_and_beyond_timeout(wavs: dict[str, str]) -> Non
     assert long_.n_vad_segments == 2
     assert long_.metrics.split_count == 1
     assert long_.violation is False
+    assert short.junction_split is False
+    assert long_.junction_split is True
+    assert short.junction_violation is False
+    assert long_.junction_violation is False
     for r in results:
         assert r.metrics.false_trigger_count == 0
         assert r.metrics.missed_onset_count == 0
@@ -122,6 +126,9 @@ def test_aggregate_groups_by_condition_and_snr(wavs: dict[str, str]) -> None:
     assert (cell["condition"], cell["snr_db"], cell["n_items"]) == ("quiet", None, 2)
     assert cell["split_rate_by_pause"] == {"200": 0.0, "700": 1.0}
     assert cell["pause_violations"] == 0
+    assert cell["junction_split_rate_by_pause"] == {"200": 0.0, "700": 1.0}
+    assert cell["junction_violations"] == 0
+    assert cell["utterance_split_rate"] == 0.5
     assert cell["missed_onset_rate"] == 0.0
     assert agg["overall"]["n_items"] == 2
 
@@ -181,3 +188,21 @@ def test_run_config_uses_source_bounds(wavs: dict[str, str]) -> None:
 def test_run_config_rejects_stale_manifest_gt(wavs: dict[str, str]) -> None:
     with pytest.raises(RuntimeError, match="stale manifest"):
         run_config([make_trimmed_item(wavs, 200, gt_ok=False)], 0.05, 500, 0.150)
+
+
+def test_inner_gap_is_not_a_junction_split(tmp_path: Path) -> None:
+    rng = np.random.default_rng(5)
+    a = (0.3 * rng.standard_normal(LEN_A)).astype("float32")
+    a[5000 : 5000 + 9600] = 0.0
+    b = (0.3 * rng.standard_normal(LEN_B)).astype("float32")
+    paths = {}
+    for name, x in (("a", a), ("b", b)):
+        p = tmp_path / f"{name}.wav"
+        sf.write(str(p), x, SR)
+        paths[name] = str(p)
+    item = make_item(paths, 200, "hole")
+    result = run_config([item], 0.05, 500, 0.150)[0][0]
+    assert result.metrics.split_count == 1
+    assert result.violation is True
+    assert result.junction_split is False
+    assert result.junction_violation is False

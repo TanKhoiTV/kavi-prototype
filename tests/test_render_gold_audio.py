@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 import soundfile as sf
 
-from scripts.render_gold_audio import parse_snr, pick, render_row
+from scripts.render_gold_audio import parse_snr, pick, readable, render_row
 
 
 def _wav(path: Path, n: int, amp: float, seed: int) -> Path:
@@ -70,3 +70,14 @@ def test_street_row_has_no_rir(assets: dict) -> None:
     _, meta = render_row(row, 0, assets["steady"], assets["impulsive"], assets["rirs"])
     assert Path(meta["noise"]).name == "i0.wav"
     assert meta["rir"] is None
+
+
+def test_readable_skips_unreadable_and_empty_files(
+    tmp_path: Path, assets: dict
+) -> None:
+    bad = tmp_path / "bad.wav"
+    bad.write_bytes(b"this is not a wav file")
+    empty = tmp_path / "empty.wav"
+    sf.write(str(empty), np.zeros(0, dtype="float32"), 16000)
+    good = assets["rirs"]
+    assert readable([good[0], bad, empty, good[1]]) == [good[0], good[1]]

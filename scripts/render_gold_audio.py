@@ -30,6 +30,17 @@ CONDITION_ASSETS = {
 }
 
 
+def readable(paths: list[Path]) -> list[Path]:
+    ok = []
+    for p in paths:
+        try:
+            if sf.info(str(p)).frames > 0:
+                ok.append(p)
+        except (RuntimeError, OSError):
+            continue
+    return ok
+
+
 def parse_snr(text: str) -> float | None:
     if text == "clean":
         return None
@@ -78,9 +89,16 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--labels", default=GOLD_LABELS)
     args = ap.parse_args(argv)
 
-    steady = sorted(Path("assets/noise/musan/steady").glob("*.wav"))
-    impulsive = sorted(Path("assets/noise/musan/impulsive").glob("*.wav"))
-    rirs = sorted(Path("assets/noise/rirs").glob("*.wav"))
+    found = {
+        "steady": sorted(Path("assets/noise/musan/steady").glob("*.wav")),
+        "impulsive": sorted(Path("assets/noise/musan/impulsive").glob("*.wav")),
+        "rirs": sorted(Path("assets/noise/rirs").glob("*.wav")),
+    }
+    steady, impulsive, rirs = (readable(found[k]) for k in found)
+    for name, usable in zip(found, (steady, impulsive, rirs), strict=True):
+        skipped = len(found[name]) - len(usable)
+        if skipped:
+            print(f"skipped {skipped} unreadable {name} file(s)")
     if not steady or not impulsive or not rirs:
         print("real MUSAN / RIRS assets missing", file=sys.stderr)
         return 1

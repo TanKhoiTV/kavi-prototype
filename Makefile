@@ -31,7 +31,7 @@
 #     from whatever is in eval_data/raw/ -- offline, with a built-in fallback
 #     (MT + TTS only) when the FLEURS parquets are absent.
 
-.PHONY: install setup setup-min check fmt test bench bench-data models data verify-assets vad-run vad-smoke vad-bounds vad-manifest vad-gold-audio vad-collar
+.PHONY: install setup setup-min check fmt test bench bench-data models data verify-assets vad-run vad-smoke vad-bounds vad-manifest vad-gold-audio vad-collar vad-audit
 
 install: ## Install dependencies
 	uv sync
@@ -95,3 +95,6 @@ vad-gold-audio: ## Render the 50 gold clips + blank label sheet for hand labelli
 
 vad-collar: ## Stage 3B: reference-vs-hand boundary error and collar -> bench/vad_collar.json (LABELS=...)
 	uv run python -m bench.vad_label_error --labels $(LABELS)
+
+vad-audit: ## Audit eval_data/vad_manifest_v2.json and the gold template against the Stage 3A spec
+	uv run python -m scripts.audit_vad_manifest
