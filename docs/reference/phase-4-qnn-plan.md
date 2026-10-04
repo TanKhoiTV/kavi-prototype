@@ -40,7 +40,7 @@ across host operating systems is not guaranteed.
 | **Linux converters** | `qnn-onnx-converter`, `qnn-model-lib-generator`, `qnn-context-binary-generator` | Under `$QAIRT_SDK_ROOT/bin/x86_64-linux-clang`. |
 | **Windows SDK root / helper** | `$env:QAIRT_SDK_ROOT`, default `$HOME\Qualcomm\AIStack\QAIRT\2.31.0.250130`; dot-source `scripts\qairt-env.ps1` | Creates the Python 3.10 venv, sets `PYTHONPATH` and discovers the converter directory. Run the SDK's Windows environment setup / Visual Studio developer shell first. |
 | **Windows tools / libraries** | `$env:QAIRT_SDK_ROOT\bin\<windows-host-platform>` and `$env:QAIRT_SDK_ROOT\lib\<windows-host-platform>` | Select the installed platform matching the host architecture (e.g. `x86_64-windows-msvc` or `aarch64-windows-msvc`). Confirm it provides the converter, model-lib generator, `qnn-context-binary-generator.exe` and `QnnHtp.dll`; add its library directory to `PATH` for dependent DLLs. See §8. |
-| **Windows compiler** | SDK-compatible Visual Studio C++ build tools and CMake | Build a model DLL for the selected Windows host platform. NDK r26c is for the separate Android model `.so` build. |
+| **Windows compiler** | SDK-compatible Visual Studio C++ build tools and CMake | Build a model DLL for the selected Windows host platform. NDK `26.1.10909125` is for the separate Android model `.so` build. |
 | **Device** | Meizu 21 Note — SD 8 Gen 2 (`kalama`), **Android 16 (API 36)**, **HTP v73**, `qnn-2.31` | Runtime **preinstalled**; app **bundles** `libQnn*.so`. |
 
 **Offline guarantee:** the SDK is build-time only; the on-device runtime is
