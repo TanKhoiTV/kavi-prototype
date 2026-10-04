@@ -86,6 +86,10 @@ def merged_gt_s(item: VadItem) -> list[tuple[float, float]]:
     return [(segs[0][0] / SR, segs[-1][1] / SR)]
 
 
+def _bounds(value) -> tuple[int, int] | None:
+    return None if value is None else (int(value[0]), int(value[1]))
+
+
 class _AudioCache:
     def __init__(self) -> None:
         self._data: dict[str, np.ndarray] = {}
@@ -114,8 +118,15 @@ def evaluate_item(
         noise=cache.get(item.noise_path) if item.noise_path else None,
         rir=cache.get(item.rir_path) if item.rir_path else None,
         snr_db=item.snr_db,
+        bounds_a=_bounds(item.speech_a_bounds),
+        bounds_b=_bounds(item.speech_b_bounds),
     )
     t1 = time.perf_counter()
+    if [tuple(s) for s in item.ground_truth_segments] != built.gt_segments:
+        raise RuntimeError(
+            f"{item.id}: manifest GT differs from the built timeline "
+            "(stale manifest or source-bounds file?)"
+        )
     result = vad.detect(built.audio)
     t2 = time.perf_counter()
 
@@ -267,6 +278,10 @@ def print_report(
     )
     print(f"collar: {collar_s:.3f}s{tag}")
     print(f"speech level: each clip scaled to p99 frame peak {TARGET_P99_PEAK}")
+    print(
+        f"source bounds: {config['n_trimmed']}/{config['n_items']} items use "
+        "reference-VAD speech bounds"
+    )
     print("reference limits: false-trigger<=0.1/min, missed-onset<=5%, clip<=50ms/utt")
     head = (
         f"{'cond/snr':<16}{'n':>4}{'FT/min':>8}{'miss%':>7}{'clipMean':>9}"
@@ -329,6 +344,7 @@ def main(argv: list[str] | None = None) -> int:
         "n_items": len(items),
         "per_cell_per_lang": args.per_cell_per_lang,
         "target_p99_peak": TARGET_P99_PEAK,
+        "n_trimmed": sum(1 for it in items if it.speech_a_bounds is not None),
     }
 
     print_report(summary, config, collar_s, provisional, timing, estimate)

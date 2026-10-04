@@ -1,14 +1,17 @@
 """VAD manifest schema and builder (separate from eval_manifest_v1.json contract).
 
-Reads clean FLEURS audio to construct timelines; builds gold-template CSV
-with empty onset/offset columns for manual labeling. Stops if FLEURS
-parquets or real noise assets are unavailable.
+Ground truth spans the reference-VAD speech bounds of each FLEURS clip
+(bench/vad_source_bounds.json), not the whole clip. The builder also writes the
+gold-template CSV for manual labelling and stops if FLEURS audio, real noise
+assets or the source-bounds file are unavailable.
 """
 
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
+
+from bench.vad_reference import SOURCE_BOUNDS_PATH, load_source_bounds
 
 MANIFEST_VERSION = "vad_manifest_v2"
 
@@ -46,6 +49,8 @@ class VadItem:
     ground_truth_segments: list[tuple[int, int]] = field(default_factory=list)
     energy_threshold: float = 0.05
     speech_timeout_ms: int = 500
+    speech_a_bounds: tuple[int, int] | None = None
+    speech_b_bounds: tuple[int, int] | None = None
 
     def __post_init__(self) -> None:
         if self.language not in {"vi", "en"}:
@@ -98,6 +103,7 @@ def build_vad_manifest(
     use_fleurs: bool = True,
     real_noise_dir: str | None = None,
     seed: int = 42,
+    bounds_path: str = SOURCE_BOUNDS_PATH,
 ) -> VadManifest:
     """Build VAD manifest v2 (800 baseline benchmark items)."""
     # Asset validation
@@ -136,14 +142,19 @@ def build_vad_manifest(
     vi_sel = sorted(rng.sample(vi_all, n_per_lang), key=lambda p: str(p))
     en_sel = sorted(rng.sample(en_all, n_per_lang), key=lambda p: str(p))
 
+    bounds = load_source_bounds(bounds_path)
+    missing = [p.as_posix() for p in vi_sel + en_sel if p.as_posix() not in bounds]
+    if missing:
+        raise FileNotFoundError(
+            f"No reference speech bounds in {bounds_path} for: {missing}; "
+            "run `make vad-bounds`"
+        )
+
     leading_samples = 16000  # 1000 ms
 
-    def get_frames(p):
-        return sf.info(str(p)).frames
-
     def make_gt(src_a, src_b, pause_ms):
-        a_samples = get_frames(src_a)
-        b_samples = get_frames(src_b)
+        a_samples = bounds[src_a.as_posix()][1] - bounds[src_a.as_posix()][0]
+        b_samples = bounds[src_b.as_posix()][1] - bounds[src_b.as_posix()][0]
         pause_samples = int(pause_ms * 16)
         a_start = leading_samples
         a_end = a_start + a_samples
@@ -209,6 +220,8 @@ def build_vad_manifest(
                                 speech_b_path=str(src_b),
                                 pause_ms=pause_ms,
                                 ground_truth_segments=gt,
+                                speech_a_bounds=bounds[src_a.as_posix()],
+                                speech_b_bounds=bounds[src_b.as_posix()],
                             )
                         )
     manifest = VadManifest(items=items)

@@ -31,7 +31,7 @@
 #     from whatever is in eval_data/raw/ -- offline, with a built-in fallback
 #     (MT + TTS only) when the FLEURS parquets are absent.
 
-.PHONY: install setup setup-min check fmt test bench bench-data models data verify-assets vad-run vad-smoke
+.PHONY: install setup setup-min check fmt test bench bench-data models data verify-assets vad-run vad-smoke vad-bounds vad-manifest vad-gold-audio vad-collar
 
 install: ## Install dependencies
 	uv sync
@@ -81,3 +81,17 @@ vad-run: ## One energy-VAD configuration over the full VAD manifest (THRESHOLD, 
 
 vad-smoke: ## VAD smoke test: default config, 1 VI + 1 EN item per cell (not the sweep)
 	uv run python -m bench.vad_runner --per-cell-per-lang 1 --out bench-results/vad-smoke
+
+LABELS ?= eval_data/vad_gold_labels.csv
+
+vad-bounds: ## Reference speech bounds (Silero) for every FLEURS clip -> bench/vad_source_bounds.json
+	uv run python -m scripts.compute_source_bounds
+
+vad-manifest: ## Regenerate eval_data/vad_manifest_v2.json (needs bench/vad_source_bounds.json)
+	uv run python -c "from bench.vad_manifest import build_vad_manifest; build_vad_manifest()"
+
+vad-gold-audio: ## Render the 50 gold clips + blank label sheet for hand labelling
+	uv run python -m scripts.render_gold_audio
+
+vad-collar: ## Stage 3B: reference-vs-hand boundary error and collar -> bench/vad_collar.json (LABELS=...)
+	uv run python -m bench.vad_label_error --labels $(LABELS)

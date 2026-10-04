@@ -62,6 +62,10 @@ def find_item(m: VadManifest, lang: str, cond: str, snr, pause: int) -> VadItem:
     raise LookupError(f"no manifest item for {lang} {cond} {snr} {pause}")
 
 
+def _bounds(value) -> tuple[int, int] | None:
+    return None if value is None else (int(value[0]), int(value[1]))
+
+
 def check_item(item: VadItem) -> tuple[list[str], dict]:
     fails: list[str] = []
 
@@ -83,8 +87,20 @@ def check_item(item: VadItem) -> tuple[list[str], dict]:
     noise = load_mono(item.noise_path) if item.noise_path else None
     rir = load_mono(item.rir_path) if item.rir_path else None
 
+    if item.speech_a_bounds is None or item.speech_b_bounds is None:
+        fails.append("item has no source bounds; regenerate the manifest")
+    bounds_a = _bounds(item.speech_a_bounds)
+    bounds_b = _bounds(item.speech_b_bounds)
+
     built = build_timeline_audio(
-        a, b, item.pause_ms, noise=noise, rir=rir, snr_db=item.snr_db
+        a,
+        b,
+        item.pause_ms,
+        noise=noise,
+        rir=rir,
+        snr_db=item.snr_db,
+        bounds_a=bounds_a,
+        bounds_b=bounds_b,
     )
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     out = OUT_DIR / f"{item.id}.wav"
@@ -93,7 +109,9 @@ def check_item(item: VadItem) -> tuple[list[str], dict]:
 
     pause = int(item.pause_ms * 16)
     (a0, a1), (b0, b1) = built.gt_segments
-    total = LEAD_SAMPLES + len(a) + pause + len(b) + TRAIL_SAMPLES
+    la = bounds_a[1] - bounds_a[0] if bounds_a else len(a)
+    lb = bounds_b[1] - bounds_b[0] if bounds_b else len(b)
+    total = LEAD_SAMPLES + la + pause + lb + TRAIL_SAMPLES
 
     if sr != SR:
         fails.append(f"sample rate {sr}")

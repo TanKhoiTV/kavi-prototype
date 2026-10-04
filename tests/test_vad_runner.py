@@ -157,3 +157,27 @@ def test_main_writes_json_and_marks_collar_provisional(
     assert data["collar_provisional"] is True
     assert data["config"]["n_items"] == 2
     assert data["overall"]["n_items"] == 2
+
+
+def make_trimmed_item(
+    wavs: dict[str, str], pause_ms: int, gt_ok: bool = True
+) -> VadItem:
+    item = make_item(wavs, pause_ms, "trim")
+    item.speech_a_bounds = (2000, 12000)
+    item.speech_b_bounds = (1000, 15000)
+    if gt_ok:
+        a_end = 16000 + 10000
+        b_start = a_end + pause_ms * 16
+        item.ground_truth_segments = [(16000, a_end), (b_start, b_start + 14000)]
+    return item
+
+
+def test_run_config_uses_source_bounds(wavs: dict[str, str]) -> None:
+    results, _ = run_config([make_trimmed_item(wavs, 200)], 0.05, 500, 0.150)
+    assert results[0].metrics.missed_onset_count == 0
+    assert results[0].n_vad_segments == 1
+
+
+def test_run_config_rejects_stale_manifest_gt(wavs: dict[str, str]) -> None:
+    with pytest.raises(RuntimeError, match="stale manifest"):
+        run_config([make_trimmed_item(wavs, 200, gt_ok=False)], 0.05, 500, 0.150)

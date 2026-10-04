@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
+import numpy as np
 import pytest
+import soundfile as sf
 
 from bench.vad_manifest import (
     VadItem,
@@ -197,3 +200,101 @@ def test_vad_item_accepts_quiet_clean():
     assert item.condition == "quiet"
     assert item.noise_type == "clean"
     assert item.snr_db is None
+
+
+BOUNDS_FILE = "bench/vad_source_bounds.json"
+
+
+def _write_wav(path: Path, n: int, seed: int) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    x = 0.1 * np.random.default_rng(seed).standard_normal(n)
+    sf.write(str(path), x.astype("float32"), 16000)
+
+
+def _fake_env(root: Path, with_bounds: bool = True) -> dict[str, tuple[int, int]]:
+    for i in range(12):
+        for kind in ("steady", "impulsive"):
+            _write_wav(root / f"assets/noise/musan/{kind}/{kind[0]}{i}.wav", 4000, i)
+        _write_wav(root / f"assets/noise/rirs/r{i}.wav", 1000, i)
+        for lang in ("vi", "en"):
+            _write_wav(
+                root / f"eval_data/vad_audio/fleurs/{lang}/{lang}_{i}.wav", 20000, i
+            )
+    bounds = {}
+    files = {}
+    for lang in ("vi", "en"):
+        for i in range(12):
+            key = f"eval_data/vad_audio/fleurs/{lang}/{lang}_{i}.wav"
+            bounds[key] = (1000 + i, 15000 + 7 * i)
+            files[key] = {
+                "onset": 1000 + i,
+                "offset": 15000 + 7 * i,
+                "n_samples": 20000,
+            }
+    if with_bounds:
+        (root / "bench").mkdir(exist_ok=True)
+        (root / BOUNDS_FILE).write_text(json.dumps({"files": files}), encoding="utf-8")
+    return bounds
+
+
+def test_builder_ground_truth_uses_reference_bounds(tmp_path, monkeypatch) -> None:
+    bounds = _fake_env(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    manifest = build_vad_manifest(out_path=str(tmp_path / "m.json"))
+    assert len(manifest.items) == 800
+    for item in manifest.items:
+        a = bounds[item.clean_audio_path]
+        b = bounds[item.speech_b_path]
+        assert tuple(item.speech_a_bounds) == a
+        assert tuple(item.speech_b_bounds) == b
+        a_len, b_len = a[1] - a[0], b[1] - b[0]
+        pause = item.pause_ms * 16
+        assert item.ground_truth_segments == [
+            (16000, 16000 + a_len),
+            (16000 + a_len + pause, 16000 + a_len + pause + b_len),
+        ]
+
+
+def test_builder_same_seed_gives_identical_files(tmp_path, monkeypatch) -> None:
+    _fake_env(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    build_vad_manifest(out_path=str(tmp_path / "a.json"), seed=42)
+    build_vad_manifest(out_path=str(tmp_path / "b.json"), seed=42)
+    build_vad_manifest(out_path=str(tmp_path / "c.json"), seed=43)
+    a = (tmp_path / "a.json").read_bytes()
+    assert a == (tmp_path / "b.json").read_bytes()
+    assert a != (tmp_path / "c.json").read_bytes()
+
+
+def test_builder_roundtrip_keeps_bounds(tmp_path, monkeypatch) -> None:
+    _fake_env(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    build_vad_manifest(out_path=str(tmp_path / "m.json"))
+    back = VadManifest.from_json(tmp_path / "m.json")
+    assert all(i.speech_a_bounds is not None for i in back.items)
+
+
+def test_builder_requires_bounds_file(tmp_path, monkeypatch) -> None:
+    _fake_env(tmp_path, with_bounds=False)
+    monkeypatch.chdir(tmp_path)
+    with pytest.raises(FileNotFoundError, match="vad-bounds"):
+        build_vad_manifest(out_path=str(tmp_path / "m.json"))
+
+
+def test_builder_stops_when_a_selected_clip_has_no_bounds(
+    tmp_path, monkeypatch
+) -> None:
+    _fake_env(tmp_path)
+    path = tmp_path / BOUNDS_FILE
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data["files"].pop("eval_data/vad_audio/fleurs/vi/vi_3.wav")
+    data["files"].pop("eval_data/vad_audio/fleurs/vi/vi_4.wav")
+    path.write_text(json.dumps(data), encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    for seed in range(40):
+        try:
+            build_vad_manifest(out_path=str(tmp_path / "m.json"), seed=seed)
+        except FileNotFoundError as exc:
+            assert "No reference speech bounds" in str(exc)
+            return
+    raise AssertionError("no seed selected a clip without bounds")

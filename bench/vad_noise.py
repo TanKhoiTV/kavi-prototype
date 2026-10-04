@@ -165,6 +165,15 @@ def rms(x: np.ndarray) -> float:
     return float(np.sqrt(np.mean(np.asarray(x, dtype=np.float64) ** 2)))
 
 
+def _cut(x: np.ndarray, bounds: tuple[int, int] | None) -> np.ndarray:
+    if bounds is None:
+        return x
+    onset, offset = int(bounds[0]), int(bounds[1])
+    if not 0 <= onset < offset <= len(x):
+        raise ValueError(f"bounds {bounds} outside clip of {len(x)} samples")
+    return x[onset:offset]
+
+
 def build_timeline_audio(
     speech_a: np.ndarray,
     speech_b: np.ndarray,
@@ -173,8 +182,14 @@ def build_timeline_audio(
     rir: np.ndarray | None = None,
     snr_db: float | None = None,
     target_p99_peak: float | None = TARGET_P99_PEAK,
+    bounds_a: tuple[int, int] | None = None,
+    bounds_b: tuple[int, int] | None = None,
 ) -> TimelineAudio:
     """Build lead + A + pause + B + trail, then apply RIR and noise to all of it.
+
+    Bounds: when bounds_a / bounds_b are given as (onset, offset) sample indices
+    into the source clip, the clip is cut to that span first, so the timeline holds
+    only speech (reference-VAD boundaries) and pauses are real silences.
 
     Level: unless target_p99_peak is None, speech A and speech B are each scaled
     so the 99th percentile of their 10 ms frame peaks equals target_p99_peak,
@@ -186,6 +201,9 @@ def build_timeline_audio(
     """
     if (noise is None) != (snr_db is None):
         raise ValueError("noise and snr_db must be given together")
+
+    speech_a = _cut(speech_a, bounds_a)
+    speech_b = _cut(speech_b, bounds_b)
 
     gain_a = gain_b = 1.0
     if target_p99_peak is not None:
@@ -203,7 +221,19 @@ def build_timeline_audio(
     timeline[a_start:a_end] = speech_a
     timeline[b_start:b_end] = speech_b
     segments = [(a_start, a_end), (b_start, b_end)]
+    return _render(timeline, segments, noise, rir, snr_db, gain_a, gain_b)
 
+
+def _render(
+    timeline: np.ndarray,
+    segments: list[tuple[int, int]],
+    noise: np.ndarray | None,
+    rir: np.ndarray | None,
+    snr_db: float | None,
+    gain_a: float,
+    gain_b: float,
+) -> TimelineAudio:
+    total = len(timeline)
     reference = apply_rir(timeline, rir) if rir is not None else timeline
     reference = np.asarray(reference, dtype=np.float64)
 
@@ -239,3 +269,26 @@ def build_timeline_audio(
         gain_a=gain_a,
         gain_b=gain_b,
     )
+
+
+def build_clip_audio(
+    speech: np.ndarray,
+    noise: np.ndarray | None = None,
+    rir: np.ndarray | None = None,
+    snr_db: float | None = None,
+    target_p99_peak: float | None = TARGET_P99_PEAK,
+    margin_samples: int = 8000,
+) -> TimelineAudio:
+    """Render one whole clip (for hand labelling) with margin_samples of silence
+    on each side. The SNR speech reference is the whole clip; the level and
+    noise rules are those of build_timeline_audio."""
+    if (noise is None) != (snr_db is None):
+        raise ValueError("noise and snr_db must be given together")
+    gain = 1.0
+    if target_p99_peak is not None:
+        speech, gain = normalize_level(speech, target_p99_peak)
+    start = margin_samples
+    end = start + len(speech)
+    timeline = np.zeros(end + margin_samples, dtype=np.float32)
+    timeline[start:end] = speech
+    return _render(timeline, [(start, end)], noise, rir, snr_db, gain, 1.0)
