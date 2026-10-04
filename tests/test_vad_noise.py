@@ -13,6 +13,8 @@ from bench.vad_noise import (
     TRAIL_SAMPLES,
     align_noise,
     build_timeline_audio,
+    frame_peak_p99,
+    normalize_level,
     rms,
     run_case,
     speech_mask,
@@ -114,7 +116,9 @@ def test_timeline_identity_rir_keeps_speech() -> None:
 def test_timeline_peak_limited_keeps_snr() -> None:
     a, b = 4 * _speech(3200, 10), 4 * _speech(3200, 11)
     noise = np.random.default_rng(12).standard_normal(4000).astype(np.float32)
-    built = build_timeline_audio(a, b, 200, noise=noise, snr_db=-5.0)
+    built = build_timeline_audio(
+        a, b, 200, noise=noise, snr_db=-5.0, target_p99_peak=None
+    )
     assert built.peak_limited
     assert float(np.max(np.abs(built.audio))) <= 0.99 + 1e-6
     residual = built.audio.astype(np.float64) - built.reference
@@ -127,3 +131,45 @@ def test_timeline_noise_requires_snr() -> None:
     a, b = _speech(1600, 13), _speech(1600, 14)
     with pytest.raises(ValueError):
         build_timeline_audio(a, b, 200, noise=np.ones(100, dtype=np.float32))
+
+
+def test_normalize_level_hits_target() -> None:
+    quiet = 0.002 * np.random.default_rng(20).standard_normal(32000)
+    out, gain = normalize_level(quiet.astype(np.float32), 0.35)
+    assert frame_peak_p99(out) == pytest.approx(0.35, rel=1e-4)
+    assert gain == pytest.approx(0.35 / frame_peak_p99(quiet), rel=1e-4)
+
+
+def test_normalize_level_rejects_near_silence() -> None:
+    with pytest.raises(ValueError):
+        normalize_level(np.full(3200, 1e-6, dtype=np.float32))
+
+
+def test_timeline_balances_weak_and_strong_clips() -> None:
+    weak = 0.003 * _speech(32000, 21) / 0.1
+    strong = 0.8 * _speech(32000, 22) / 0.1
+    built = build_timeline_audio(weak, strong, 200)
+    (a0, a1), (b0, b1) = built.gt_segments
+    level_a = frame_peak_p99(built.audio[a0:a1])
+    level_b = frame_peak_p99(built.audio[b0:b1])
+    assert level_a == pytest.approx(0.35, rel=0.05)
+    assert level_b == pytest.approx(0.35, rel=0.05)
+    assert built.gain_a > 10 * built.gain_b
+
+
+def test_timeline_target_none_keeps_source_level() -> None:
+    a, b = _speech(3200, 23), _speech(3200, 24)
+    built = build_timeline_audio(a, b, 200, target_p99_peak=None)
+    (a0, a1), _ = built.gt_segments
+    assert np.allclose(built.audio[a0:a1], a)
+    assert (built.gain_a, built.gain_b) == (1.0, 1.0)
+
+
+def test_timeline_snr_holds_after_level_normalisation() -> None:
+    a, b = 0.004 * _speech(16000, 25) / 0.1, 0.9 * _speech(16000, 26) / 0.1
+    noise = np.random.default_rng(27).standard_normal(8000).astype(np.float32)
+    built = build_timeline_audio(a, b, 350, noise=noise, snr_db=5.0)
+    residual = built.audio.astype(np.float64) - built.reference
+    mask = speech_mask(len(built.audio), built.gt_segments)
+    measured = 20 * np.log10(rms(built.reference[mask]) / rms(residual))
+    assert abs(measured - 5.0) < 0.01

@@ -32,7 +32,7 @@ from bench.vad_energy import (
     EnergyVad,
 )
 from bench.vad_manifest import VadItem, VadManifest
-from bench.vad_noise import SR, build_timeline_audio, load_mono
+from bench.vad_noise import SR, TARGET_P99_PEAK, build_timeline_audio, load_mono
 from bench.vad_scorer import VadMetrics, score_vad_item
 
 DEFAULT_MANIFEST = "eval_data/vad_manifest_v2.json"
@@ -266,6 +266,7 @@ def print_report(
         f"speech_timeout_ms={config['timeout_ms']} | items={config['n_items']}"
     )
     print(f"collar: {collar_s:.3f}s{tag}")
+    print(f"speech level: each clip scaled to p99 frame peak {TARGET_P99_PEAK}")
     print("reference limits: false-trigger<=0.1/min, missed-onset<=5%, clip<=50ms/utt")
     head = (
         f"{'cond/snr':<16}{'n':>4}{'FT/min':>8}{'miss%':>7}{'clipMean':>9}"
@@ -327,6 +328,7 @@ def main(argv: list[str] | None = None) -> int:
         "timeout_ms": args.timeout_ms,
         "n_items": len(items),
         "per_cell_per_lang": args.per_cell_per_lang,
+        "target_p99_peak": TARGET_P99_PEAK,
     }
 
     print_report(summary, config, collar_s, provisional, timing, estimate)

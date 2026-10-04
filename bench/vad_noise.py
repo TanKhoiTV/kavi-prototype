@@ -12,6 +12,9 @@ SR = 16000
 LEAD_SAMPLES = 16000
 TRAIL_SAMPLES = 16000
 PEAK_LIMIT = 0.99
+LEVEL_FRAME_SAMPLES = 160
+TARGET_P99_PEAK = 0.35
+MIN_P99_PEAK = 1e-4
 
 
 def load_mono(path: str, sr: int = SR) -> np.ndarray:
@@ -128,6 +131,27 @@ class TimelineAudio:
     gt_segments: list[tuple[int, int]]
     snr_db_construction: float | None
     peak_limited: bool
+    gain_a: float = 1.0
+    gain_b: float = 1.0
+
+
+def frame_peak_p99(x: np.ndarray) -> float:
+    a = np.abs(np.asarray(x, dtype=np.float64))
+    n = len(a) // LEVEL_FRAME_SAMPLES
+    if n == 0:
+        return float(a.max()) if len(a) else 0.0
+    peaks = a[: n * LEVEL_FRAME_SAMPLES].reshape(n, LEVEL_FRAME_SAMPLES).max(axis=1)
+    return float(np.percentile(peaks, 99))
+
+
+def normalize_level(
+    x: np.ndarray, target_p99_peak: float = TARGET_P99_PEAK
+) -> tuple[np.ndarray, float]:
+    p99 = frame_peak_p99(x)
+    if p99 < MIN_P99_PEAK:
+        raise ValueError(f"Clip too quiet to normalise (p99 frame peak {p99:.2e})")
+    gain = target_p99_peak / p99
+    return (np.asarray(x, dtype=np.float64) * gain).astype(np.float32), float(gain)
 
 
 def speech_mask(length: int, segments: list[tuple[int, int]]) -> np.ndarray:
@@ -148,14 +172,25 @@ def build_timeline_audio(
     noise: np.ndarray | None = None,
     rir: np.ndarray | None = None,
     snr_db: float | None = None,
+    target_p99_peak: float | None = TARGET_P99_PEAK,
 ) -> TimelineAudio:
     """Build lead + A + pause + B + trail, then apply RIR and noise to all of it.
+
+    Level: unless target_p99_peak is None, speech A and speech B are each scaled
+    so the 99th percentile of their 10 ms frame peaks equals target_p99_peak,
+    before the timeline is built. Absolute level is otherwise the FLEURS source
+    level, which varies by about 100x between recordings.
 
     SNR definition: RMS of the reverberated clean timeline over the GT speech
     segments versus RMS of the aligned noise over the whole timeline.
     """
     if (noise is None) != (snr_db is None):
         raise ValueError("noise and snr_db must be given together")
+
+    gain_a = gain_b = 1.0
+    if target_p99_peak is not None:
+        speech_a, gain_a = normalize_level(speech_a, target_p99_peak)
+        speech_b, gain_b = normalize_level(speech_b, target_p99_peak)
 
     pause_samples = int(pause_ms * 16)
     a_start = LEAD_SAMPLES
@@ -201,4 +236,6 @@ def build_timeline_audio(
         gt_segments=segments,
         snr_db_construction=snr_construction,
         peak_limited=peak_limited,
+        gain_a=gain_a,
+        gain_b=gain_b,
     )

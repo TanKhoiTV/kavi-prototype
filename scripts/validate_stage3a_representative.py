@@ -18,9 +18,11 @@ from bench.vad_noise import (
     LEAD_SAMPLES,
     PEAK_LIMIT,
     SR,
+    TARGET_P99_PEAK,
     TRAIL_SAMPLES,
     align_noise,
     build_timeline_audio,
+    frame_peak_p99,
     load_mono,
     rms,
     speech_mask,
@@ -30,6 +32,7 @@ MANIFEST_PATH = "eval_data/vad_manifest_v2.json"
 OUT_DIR = Path("/tmp/kavi_stage3a_rep")
 SNR_TOL_DB = 0.05
 CORR_MIN = 0.999
+LEVEL_TOL = 0.10
 RIR_CONDITIONS = ("indoors", "near-field", "far-field")
 
 CASES = [
@@ -103,6 +106,13 @@ def check_item(item: VadItem) -> tuple[list[str], dict]:
     if float(np.max(np.abs(wav))) > PEAK_LIMIT + 1e-4:
         fails.append("peak above limit")
 
+    level = frame_peak_p99(built.reference[speech_mask(len(wav), built.gt_segments)])
+    if not (built.gain_a > 0 and built.gain_b > 0):
+        fails.append("non-positive level gain")
+    level_off = abs(level / TARGET_P99_PEAK - 1.0) > LEVEL_TOL
+    if level_off and not expect_rir and not built.peak_limited:
+        fails.append(f"speech level p99 {level:.3f} != {TARGET_P99_PEAK}")
+
     lead = wav[:LEAD_SAMPLES]
     gap = wav[a1:b0]
     trail = wav[-TRAIL_SAMPLES:]
@@ -135,6 +145,7 @@ def check_item(item: VadItem) -> tuple[list[str], dict]:
         "err": err,
         "corr": corr,
         "peak_limited": built.peak_limited,
+        "level": level,
         "out": str(out),
     }
     return fails, info
@@ -152,7 +163,8 @@ def main() -> int:
         corr = "n/a" if info["corr"] is None else f"{info['corr']:.6f}"
         print(
             f"{status} {item.id} | target={item.snr_db} | err_dB={err} | "
-            f"corr={corr} | peak_limited={info['peak_limited']} | {info['out']}"
+            f"corr={corr} | lvl_p99={info['level']:.3f} | "
+            f"peak_limited={info['peak_limited']} | {info['out']}"
         )
         for f in fails:
             print(f"    - {f}")
