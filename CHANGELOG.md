@@ -63,6 +63,7 @@
 - **adr:** Repoint ADR cross-references after the split
 - Tag code-fence languages in repo markdown
 - Correct stale references and index gaps in docs and ADRs([#109](https://github.com/TanKhoiTV/kavi-prototype/pull/109))
+- Phase-4 conversion does not require a Windows host([#119](https://github.com/TanKhoiTV/kavi-prototype/pull/119))
 
 ### Features
 
