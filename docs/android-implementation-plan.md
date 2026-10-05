@@ -45,11 +45,12 @@ speech-to-speech translator meeting the 2.0 s turnaround budget on a Snapdragon 
 - **Correction (2026-08-05):** `opus_mt_vi_en_encoder.bin` is a **tar of raw
   `.raw` weights** (converter intermediate), **not** the on-device HTP v73
   context binary — that binary does **not** exist yet and is the M3
-  deliverable (`qnn-context-binary-generator`, Windows host, `phase-4-qnn-plan`
-  §8). **Runbook:** `docs/ndk-conversion-runbook.md` (step-by-step NDK + QAIRT
-  setup, conversion command, delivery into `kavi-android`). All `models/qnn/*`
-  artifacts are **gitignored & uncommitted**
-  (`.gitignore` `models/qnn/*`) — provenance is unverifiable locally.
+  deliverable (`qnn-context-binary-generator`, Linux/WSL or Windows host,
+  `phase-4-qnn-plan.md` §8). **Runbook:** `docs/ndk-conversion-runbook.md`
+  (step-by-step NDK + QAIRT setup, conversion command, delivery into
+  `kavi-android`). All `models/qnn/*` artifacts are **gitignored &
+  uncommitted** (`.gitignore` `models/qnn/*`) — provenance is unverifiable
+  locally.
 - **Denoiser**: Phase-6 gate adopted Wiener (`noisereduce`, `prop_decrease=0.5`) —
   `docs/reference/denoising-gate-results.md`.
 - **Superseded, do NOT vendor**: Whisper QNN artifacts (`models/qnn/whisper-small/`,
