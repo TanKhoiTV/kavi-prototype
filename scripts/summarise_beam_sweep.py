@@ -4,7 +4,7 @@ The raw per-item sweep output lives under ``bench-results/``, which is
 gitignored, so it is not reproducible from the repository. This script reduces
 a finished sweep to the small table that *is* committed (see
 ``docs/reference/beam-sweep-host-aggregate.md``), so the figures quoted in
-[ADR-020](../../../decisions/ADR-020-pipeline-concurrency.md) have a source a
+[ADR-020](../docs/decisions/ADR-020-pipeline-concurrency.md) have a source a
 future reader can re-derive.
 
 It also reports the two things that make the sweep's own latency column
@@ -63,8 +63,13 @@ def corpus_bleu(per_beam: dict[int, dict[str, dict]]) -> dict[int, float]:
         for entry in records.values():
             hyp = entry["result"].get("output_text")
             ref = entry["item"].get("reference_text")
-            if hyp and ref:
-                hyps.append(hyp)
+            # `None` and `0.0` are different states in the scorer: an absent
+            # reference is unscoreable (bleu is None), while an empty hypothesis
+            # against a real reference is a *failed* translation scoring 0.0.
+            # Filtering on truthiness drops the second kind, which is exactly the
+            # sample that must count against the aggregate.
+            if ref:
+                hyps.append(hyp or "")
                 refs.append(ref)
         out[beam] = round(sacrebleu.corpus_bleu(hyps, [refs]).score, 2)
     return out
@@ -90,7 +95,11 @@ def main() -> int:
     for beam in args.beams:
         recs = per_beam[beam]
         lat = [e["result"]["latency_s"] for e in recs.values()]
-        sent = [e["metrics"]["bleu"] for e in recs.values() if e["metrics"]["bleu"]]
+        sent = [
+            e["metrics"]["bleu"]
+            for e in recs.values()
+            if e["metrics"]["bleu"] is not None
+        ]
         mean_s, med_s = statistics.mean(lat), statistics.median(lat)
         base_lat = [e["result"]["latency_s"] for e in per_beam[base].values()]
         print(
