@@ -77,8 +77,9 @@ Examples, all five beams, seconds:
 | `vi-en-mt-1675` | 0.840 | 1.339 | **0.472** | 0.607 | 1.511 |
 | `vi-en-mt-1951` | 0.874 | 1.063 | **0.549** | 0.693 | 1.825 |
 
-In all three, beam=4 is faster than **beam=1**, then beam=5 jumps roughly 9×. No
-caching or batching behaviour produces that shape.
+In all three, beam=4 is faster than **beam=1**. What happens next is not uniform:
+`vi-en-mt-1730` jumps roughly 9× at beam=5, while the other two rise by only about
+1.3×. No caching or batching behaviour produces that shape.
 
 **Root cause: one timing sample per item.** The records hold exactly one
 `latency_s` per item (30 items → 30 samples). `Candidate.run()` wraps a single
