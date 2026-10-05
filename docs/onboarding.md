@@ -208,7 +208,7 @@ under `archive/` for reference.
 | `docs/android-kotlin-cpp-implementation-plan.md` | The same plan at file level (Kotlin/C++ layout, JNI contract, Build A–F). |
 | `docs/ndk-conversion-runbook.md` | Runbook for the one remaining QNN artifact (Opus-MT encoder → HTP v73). |
 | `docs/reference/` | Superseded / deprecated docs (benchmarking-plan, phase-4-qnn-plan, …). |
-| `.pi/AGENTS.md`, `CONTRIBUTING.md`, `README.md` | Project / agent guidance, how we work, quickstart. |
+| `AGENTS.md`, `CONTRIBUTING.md`, `README.md` | Project / agent guidance, how we work, quickstart. |
 | `Makefile`, `pyproject.toml`, `LICENSE` | Build / run, deps (uv), MIT license. |
 | `.github/` | CI (lint + changelog) and PR / issue templates. |
 

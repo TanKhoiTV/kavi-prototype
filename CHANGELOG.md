@@ -17,6 +17,7 @@
 - **android:** Remove stale .dlc reference in MainActivity.kt
 - **bench:** Guard peak_ram_mb against missing resource module on Windows (#80)
 - **qnn:** Use repo-root-relative paths in calibration input lists (#85)
+- **changelog:** Stop duplicating the PR link in generated entries([#127](https://github.com/TanKhoiTV/kavi-prototype/pull/127))
 
 ### Documentation
 
@@ -61,7 +62,8 @@
 - **adr:** Add the ADR index, withdraw ADR-004, move the comparison doc
 - **adr:** Repoint ADR cross-references after the split
 - Tag code-fence languages in repo markdown
-- Correct stale references and index gaps in docs and ADRs (#109)([#109](https://github.com/TanKhoiTV/kavi-prototype/pull/109))
+- Correct stale references and index gaps in docs and ADRs([#109](https://github.com/TanKhoiTV/kavi-prototype/pull/109))
+- Phase-4 conversion does not require a Windows host([#119](https://github.com/TanKhoiTV/kavi-prototype/pull/119))
 
 ### Features
 
@@ -74,6 +76,8 @@
 - **qnn:** Add Piper surgery script, calibration lists, and QNN adapter stubs
 - **qnn:** Whisper decoder patch + Opus-MT encoder conversion (#75)
 - Add .kavi.yaml — single source of truth for pinned config values (#98)
+- **scripts:** Add PR review-status dashboard, restore root AGENTS.md([#125](https://github.com/TanKhoiTV/kavi-prototype/pull/125))
+- **qnn:** Prepare the Opus-MT w8a16/w8a8 A/B (P0-P2)([#123](https://github.com/TanKhoiTV/kavi-prototype/pull/123))
 
 ### Miscellaneous
 
@@ -102,7 +106,8 @@
 - Stop tracking third-party artifacts and personal docs
 - Normalize line endings and make local checks deterministic
 - **env:** Make the QAIRT helper portable and add a Windows one
-- **env:** Default ANDROID_NDK_ROOT to the installer's SDK root (#118)([#118](https://github.com/TanKhoiTV/kavi-prototype/pull/118))
+- **env:** Default ANDROID_NDK_ROOT to the installer's SDK root([#118](https://github.com/TanKhoiTV/kavi-prototype/pull/118))
+- Add CODEOWNERS so PRs auto-request a reviewer([#130](https://github.com/TanKhoiTV/kavi-prototype/pull/130))
 
 ### Refactoring
 
@@ -135,5 +140,6 @@
 - Pin GitHub Action tags to full commit SHAs
 - Stop recursing into the private kavi-android submodule
 - **changelog:** Serialise changelog runs and rebase before pushing
+- Push CHANGELOG.md with a GitHub App token([#126](https://github.com/TanKhoiTV/kavi-prototype/pull/126))
 [unreleased]: https://github.com/TanKhoiTV/kavi-prototype/compare/v0.1.0...HEAD
 

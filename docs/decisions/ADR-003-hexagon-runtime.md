@@ -80,8 +80,9 @@ The detailed, step-by-step spec lives in `docs/reference/phase-4-qnn-plan.md`. I
    - **ASR** — *evaluate* re-sourcing Whisper Small to ONNX (fixed-shape decoder,
      KV-cache / padded decode; no dynamic shapes). `faster-whisper`/ggml and
      CTranslate2 are **not** QNN-convertible.
-   - **MT** — re-export Opus-MT (Helsinki-NLP PyTorch) → ONNX → `<model>.cpp` (w8a16); the HTP v73 context binary is built on Windows.
-     the current CTranslate2 build is not QNN-convertible.
+   - **MT** — re-export Opus-MT (Helsinki-NLP PyTorch) → ONNX → `<model>.cpp`
+     (w8a16); the HTP v73 context binary is built on a Linux/WSL or Windows
+     host. The current CTranslate2 build is not QNN-convertible.
    - **TTS** — Piper is ONNX but **not** a short hop (deterministic-decoder surgery required; see phase-4 plan §3.3 / §10); convert to `<model>.cpp`.
    - Toolchain: QAIRT SDK `2.31.0.250130` (**must match** device `qnn-2.31` /
      **HTP v73**), `qnn-onnx-converter` → `<model>.cpp`, `qnn-model-lib-generator` → model `.so`, `qnn-context-binary-generator

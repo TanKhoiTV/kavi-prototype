@@ -126,6 +126,8 @@ Worth knowing:
 2. Make focused commits using **Conventional Commits**:
    - `feat:` new feature · `fix:` bugfix · `chore:` maintenance ·
      `docs:` documentation · `refactor:` restructure · `test:` tests.
+   - Never write `[skip ci]` (or `[ci skip]`) unless you mean to skip CI: GitHub
+     then suppresses **all** workflow runs for that push, changelog included.
 3. Keep changes offline/on-device friendly.
 4. Open a PR into `main`. Use the PR template.
 5. Run `make check` and `make test` before pushing — CI runs both.
@@ -164,7 +166,13 @@ Piper-CPU). On-device QNN candidates land in Phase 4 — see
 - **Line endings**: governed by [`.gitattributes`](.gitattributes) — LF for
   scripts, `Makefile` and source, regardless of `core.autocrlf`.
 - **Changelog**: [`git-cliff`](https://git-cliff.org/) generates `CHANGELOG.md`
-  from Conventional Commits. CI regenerates it on every push to `main`.
+  from Conventional Commits. The `Changelog` workflow regenerates it after every
+  push to `main` and commits the result. That push needs a **GitHub App** on the
+  `main` ruleset bypass list — `github-actions[bot]` cannot be a bypass actor —
+  so the workflow mints a short-lived App token rather than using `GITHUB_TOKEN`.
+  One-time setup (the `CHANGELOG_SYNC_APP_ID` variable and the
+  `CHANGELOG_SYNC_APP_PRIVATE_KEY` secret) is documented in the header comment of
+  `.github/workflows/changelog.yml`.
 - **CI**: `.github/workflows/ci.yml` runs `make check` and `make test` on
   PRs/pushes to `main`.
 - **License**: MIT (see `LICENSE`). Third-party attributions: `NOTICE`.
@@ -203,11 +211,13 @@ identically on Windows, Linux, and macOS. The OS-specific pieces are the
   for Git Bash/WSL. In PowerShell set the variables directly, or use
   `scripts\qairt-env.ps1`.
 
-**Our setup (reference, not a requirement):** the assistant builds the Android
-app on **Windows** and runs QAIRT conversion in **WSL2** — only because this
-box's WSL environment cannot launch the Windows `.exe` converters. A human
-Windows developer runs conversion natively on Windows; the split is an
-environment quirk, not a project requirement.
+**Our setup (reference, not a requirement):** everything runs in **WSL2** on
+this box — the Android app is built there against a Linux SDK/NDK (app repo:
+`scripts/setup-android-sdk.sh`) and QAIRT conversion uses the **Linux** QAIRT
+SDK, whose `x86_64-linux-clang` converters and host libs run natively. The
+earlier split (app on Windows, conversion in WSL2) applied while only the
+Windows QAIRT SDK was installed; the Linux SDK is now the one in use, so no OS
+hopping is required.
 
 **QAIRT conversion toolchain (Phase 4):** host build-time only, needed solely
 when producing HTP v73 context binaries. See `docs/reference/phase-4-qnn-plan.md`

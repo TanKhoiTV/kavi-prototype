@@ -24,18 +24,26 @@ greenfield build.
 
 ## 1. Environment contract (host, build-time only)
 
-All conversion happens **off-device** on a Linux x86_64 host. The artifacts
-(model `.so` library, HTP v73 context binary, `libQnn*.so` runtime) are **host-independent** — byte
-identical regardless of the developer's OS — and are committed so every commit
-builds.
+All conversion happens **off-device** on Linux x86_64 (including WSL) or
+Windows with the matching host SDK and toolchain below. Android artifacts
+(model `.so` library, HTP v73 context binary, `libQnn*.so` runtime) are committed
+so developers can build the app without the SDK. Intermediate model libraries
+are host-specific (`.so` on Linux, `.dll` on Windows); byte-identical output
+across host operating systems is not guaranteed.
+
+Both hosts are documented as supported, but **neither has been validated
+end-to-end yet** — see the caveat at the head of §8.
 
 | Item | Value | Notes |
 | --- | --- | --- |
-| **QAIRT SDK** | `2.31.0.250130` (Linux x86_64) at `QAIRT_SDK_ROOT` | **Must match** the device `qnn-2.31` / **HTP v73** runtime. Do **not** upgrade — ABI drift breaks on-device loading. Outside the repo. |
-| **ANDROID_NDK_ROOT** | NDK r26c (`26.1.10909125`) | Matches `archive/`/`sdk.yaml` pin. |
-| **Env helper** | `qairt-env.sh` | `source`s `bin/envsetup.sh` (sets `QNN_SDK_ROOT`, `SNPE_ROOT`) and exports `LD_LIBRARY_PATH` (venv `libpython3.10` + `$QAIRT_SDK_ROOT/lib/x86_64-linux-clang`). |
-| **Converter venv** | Python 3.10 (`.venv-qairt/`, auto-created by `scripts/qairt-env.sh`) | `onnx 1.16.1`, `onnxruntime 1.17.1`, `numpy<2`, `onnx-simplifier`, `scipy`, `lxml`, `absl-py`, `pandas`, `pyyaml`. |
-| **Converters** | `qnn-onnx-converter`, `qnn-model-lib-generator`, `qnn-context-binary-generator` | Under `$QAIRT_SDK_ROOT/bin/x86_64-linux-clang`. |
+| **QAIRT SDK** | `2.31.0.250130`, Linux or Windows host package at `QAIRT_SDK_ROOT` | **Must match** the device `qnn-2.31` / **HTP v73** runtime. Do **not** upgrade — ABI drift breaks on-device loading. Outside the repo. |
+| **ANDROID_NDK_ROOT** | NDK `26.1.10909125` | Matches `archive/`/`sdk.yaml` pin. |
+| **Linux env helper** | `scripts/qairt-env.sh` | `source`s `bin/envsetup.sh` (sets `QNN_SDK_ROOT`, `SNPE_ROOT`) and exports `LD_LIBRARY_PATH` (venv `libpython3.10` + `$QAIRT_SDK_ROOT/lib/x86_64-linux-clang`). |
+| **Converter venv** | Python 3.10 (`.venv-qairt/`, auto-created by the host env helper) | `onnx 1.16.1`, `onnxruntime 1.17.1`, `numpy<2`, `onnx-simplifier`, `scipy`, `lxml`, `absl-py`, `pandas`, `pyyaml`. |
+| **Linux converters** | `qnn-onnx-converter`, `qnn-model-lib-generator`, `qnn-context-binary-generator` | Under `$QAIRT_SDK_ROOT/bin/x86_64-linux-clang`. |
+| **Windows SDK root / helper** | `$env:QAIRT_SDK_ROOT`, default `$HOME\Qualcomm\AIStack\QAIRT\2.31.0.250130`; dot-source `scripts\qairt-env.ps1` | Creates the Python 3.10 venv, sets `PYTHONPATH` and discovers the converter directory. Run the SDK's Windows environment setup / Visual Studio developer shell first. |
+| **Windows tools / libraries** | `$env:QAIRT_SDK_ROOT\bin\<windows-host-platform>` and `$env:QAIRT_SDK_ROOT\lib\<windows-host-platform>` | Select the installed platform matching the host architecture (e.g. `x86_64-windows-msvc` or `aarch64-windows-msvc`). Confirm it provides the converter, model-lib generator, `qnn-context-binary-generator.exe` and `QnnHtp.dll`; add its library directory to `PATH` for dependent DLLs. See §8. |
+| **Windows compiler** | SDK-compatible Visual Studio C++ build tools and CMake | Build a model DLL for the selected Windows host platform. NDK `26.1.10909125` is for the separate Android model `.so` build. |
 | **Device** | Meizu 21 Note — SD 8 Gen 2 (`kalama`), **Android 16 (API 36)**, **HTP v73**, `qnn-2.31` | Runtime **preinstalled**; app **bundles** `libQnn*.so`. |
 
 **Offline guarantee:** the SDK is build-time only; the on-device runtime is
@@ -67,7 +75,8 @@ sourceable model (PyTorch / TFLite / ONNX)
 - **Artifact choice:** `qnn-onnx-converter` emits `<model>.cpp` (graph source) +
   `<model>_net.json` + a QNN_CPU `.bin` — **not** a `.dlc`. The on-device NPU
   artifact is the **HTP v73 context binary** (plus the model `.so` library), built
-  on Windows via `qnn-model-lib-generator` + `qnn-context-binary-generator`. (A
+  via `qnn-model-lib-generator` + `qnn-context-binary-generator` on a host with
+  the QAIRT toolchain — Linux/WSL or Windows. (A
   `.dlc` is a separate SNPE-era format loaded via `libQnnModelDlc.so --dlc_path`
   and is **not** produced by `qnn-onnx-converter`.)
 
@@ -92,7 +101,7 @@ benchmark below is what decides.
 - **Hard part:** the autoregressive decoder needs **fixed-sequence handling** —
   KV-cache / padded decoding, because **no dynamic shapes** are allowed. This is
   the riskiest conversion; budget time for it.
-- **Output:** encoder `.cpp` (graph) → Windows builds model `.so` + HTP v73 context binary.
+- **Output:** encoder `.cpp` (graph) → host builds model `.so` + HTP v73 context binary.
 
 ### 3.2 MT — Opus-MT vi↔en (Helsinki-NLP, PyTorch, Apache-2.0)
 
@@ -103,7 +112,7 @@ benchmark below is what decides.
   the en-es recipe is a template.
 - **Scope:** export **vi→en** (v0 need) and **en→vi** if the bidirectional eval
   set requires it.
-- **Output:** `<model>.cpp` (graph) → HTP v73 context binary (Windows).
+- **Output:** `<model>.cpp` (graph) → HTP v73 context binary (Linux/WSL or Windows).
 
 ### 3.3 TTS — Piper (MIT-era `rhasspy/piper`, ONNX) — **Deferred** (ADR-024)
 
@@ -123,7 +132,7 @@ benchmark below is what decides.
   reference tensor), then pin the data-dependent output length by normalizing
   the duration-sum to a fixed `T_FIXED` (see §10).
 - **Output (if ever re-evaluated):** `<model>.cpp` (graph) → HTP v73 context
-  binary (Windows).
+  binary (Linux/WSL or Windows).
 
 ---
 
@@ -189,9 +198,11 @@ that finalize the **tech-stack register**.
   Whisper-Small-Quantized-QNN re-source proving the path; (2) **Opus-MT vi→en** —
   same autoregressive decoder pattern, no sampling op. **(3) Piper — Deferred**
   per ADR-024 (cyclic graph, unsupported ops, already fast on CPU).
-  The WSL host runs `qnn-onnx-converter` → `<model>.cpp`; the model
-  `.so` + HTP v73 context binary are built on Windows (clang++ / NDK / MSVC), per
-  the §1 env split.
+  The host runs `qnn-onnx-converter` → `<model>.cpp`, then builds the model
+  `.so` + HTP v73 context binary with `qnn-model-lib-generator` /
+  `qnn-context-binary-generator` (clang / NDK on Linux/WSL, MSVC / NDK on
+  Windows) — verify the installed host tools and libraries against §1 before
+  starting.
 - **Risks:**
   - ASR decoder **fixed-shape reformulation** (KV-cache / padded decode) — the
     heaviest lift.
@@ -206,9 +217,14 @@ that finalize the **tech-stack register**.
 
 ## 8. Verified conversion command reference (QAIRT 2.31.0.250130)
 
-> Flag forms below were verified against the installed SDK (`qnn-onnx-converter
-> --help`, `qnn-model-lib-generator` source). Use them verbatim — do not substitute
-> variants.
+> The Linux flag forms below were previously checked against the installed SDK
+> (`qnn-onnx-converter --help`, `qnn-model-lib-generator` source). Checking flag
+> forms is **not** the same as completing a conversion: neither host has been
+> run end-to-end through steps 2–3 yet. The Windows guidance describes platform
+> selection; it has not been executed on Windows either. Check the installed
+> 2.31 SDK help for platform-specific options, and treat the **first-validation
+> target** below (Whisper encoder, static `[1,80,3000]`) as the first end-to-end
+> proof of the Linux-host path.
 
 **Quantization (w8a16, `tf`):** `--param_quantizer tf --act_quantizer tf
 --weights_bitwidth 8 --act_bitwidth 16` (all four confirmed present).
@@ -237,13 +253,14 @@ qnn-onnx-converter \
   ONNX graph + `input_list`. For data-dependent outputs (Piper TTS), pin the
   length **inside the ONNX graph** (§10), not via a converter flag.
 
-**Model lib + HTP v73 context binary (build host: Windows, NDK r26c + MSVC/clang):**
+**Model lib + HTP v73 context binary (Linux/WSL reference; NDK `26.1.10909125` for the Android model library):**
 
 ```bash
 qnn-model-lib-generator -c <model>.cpp -t aarch64-android -n <model> -o <model>_libs/
+qnn-model-lib-generator -c <model>.cpp -t x86_64-linux-clang -n <model> -o <model>_libs/
 qnn-context-binary-generator \
-  --model <model>_libs/aarch64-android/lib<model>.so \
-  --backend %QAIRT_SDK_ROOT%\lib\aarch64-android\libQnnHtp.so \
+  --model <model>_libs/x86_64-linux-clang/lib<model>.so \
+  --backend "$QAIRT_SDK_ROOT/lib/x86_64-linux-clang/libQnnHtp.so" \
   --htp_arch v73 --binary_file <model>_v73.bin --output_dir <model>_ctx/
 ```
 
@@ -251,15 +268,42 @@ qnn-context-binary-generator \
   required** — without it the `.so` is named `libqnn_model.so` (SDK default), and
   every downstream `--model` path breaks. The `aarch64-android/` subdir is
   auto-appended inside `-o`.
-- `--backend` needs the **full path** to `libQnnHtp.so` (on Windows
-  `%QAIRT_SDK_ROOT%\lib\aarch64-android\libQnnHtp.so`); a bare `libQnnHtp.so`
-  will not resolve.
+- `--backend` needs the **full path** to the backend for the platform running
+  the generator. Android uses `lib/aarch64-android/libQnnHtp.so`; a Linux x86_64
+  generator needs `lib/x86_64-linux-clang/libQnnHtp.so` and an x86_64 model
+  library. Windows uses the DLL paths described below.
 - `--htp_arch v73` is accepted **only** with `--model <compiled .so>` (passing a
   `.dlc` directly errors with "Unused Arguments").
 
+**Windows context-binary generation:**
+
+1. Select `<windows-host-platform>` from the installed Windows SDK as described
+   in §1. Use `bin\<windows-host-platform>\qnn-context-binary-generator.exe`
+   with `lib\<windows-host-platform>\QnnHtp.dll` from the same SDK version and
+   architecture. If either is absent, use the Linux/WSL toolchain; do not
+   substitute an Android or Linux backend.
+2. Run the Windows `qnn-onnx-converter` and `qnn-model-lib-generator` from that
+   platform's `bin` directory (invoke SDK Python scripts with the Python 3.10
+   venv). Build the model for that Windows platform using MSVC/CMake, passing
+   the converter's weights file if required. Use the generated **model DLL** as
+   `--model`, not the `aarch64-android` model `.so`.
+3. Pass the full PowerShell backend path
+   `"$env:QAIRT_SDK_ROOT\lib\<windows-host-platform>\QnnHtp.dll"` to
+   `--backend`, and put that same library directory on `PATH` so dependent DLLs
+   resolve. Configure the HTP v73 target using the installed SDK's supported
+   options and write the context binary to the model's context output directory.
+   The Android model `.so` and `libQnn*.so` remain separate device artifacts.
+
+Platform layout and Windows build prerequisites are described in Qualcomm's
+[Windows setup](https://docs.qualcomm.com/bundle/publicresource/80-63442-50/topics/windows_setup.md)
+and [QNN tools reference](https://docs.qualcomm.com/bundle/publicresource/80-63442-50/topics/tools.md);
+the installed **2.31.0.250130** SDK remains the authority for available platforms
+and flags.
+
 **First validation target = Whisper encoder** (static `[1,80,3000]`, no decoder
-loop — lowest risk). Convert on WSL, build + generate the context binary on
-Windows (build model `.so` + HTP v73 context binary there), run on-device via
+loop — lowest risk). Convert, build the model `.so` and generate the context
+binary on the same host (WSL/Linux here; Windows uses the DLL workflow above), then run
+on-device via
 `qnn-net-run --model <model>_libs/aarch64-android/lib<model>.so --backend libQnnHtp.so
 --binary_file <model>_v73.bin --input_list input_features:<real_fleurs_mel>.raw`. Save the FP32 `whisper.audio.log_mel_spectrogram`
 reference on WSL (`np.save`) so the on-device HTP output can be diffed (max abs
