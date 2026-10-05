@@ -102,13 +102,22 @@ class _AudioCache:
         return self._data[path]
 
 
-def evaluate_item(
-    item: VadItem,
-    vad: EnergyVad,
-    collar_s: float,
-    cache: _AudioCache,
-    timing: dict[str, float],
-) -> ItemResult:
+@dataclass
+class PreparedItem:
+    item: VadItem
+    energy: np.ndarray
+    n_samples: int
+    gt: list[tuple[float, float]]
+    total_s: float
+    non_speech_s: float
+    a_end_s: float
+    b_start_s: float
+
+
+def prepare_item(
+    item: VadItem, cache: _AudioCache, timing: dict[str, float]
+) -> PreparedItem:
+    """Build the item's audio once and keep only what the VAD needs: frame energy."""
     if item.speech_b_path is None:
         raise ValueError(f"{item.id}: speech_b_path missing")
 
@@ -123,39 +132,56 @@ def evaluate_item(
         bounds_a=_bounds(item.speech_a_bounds),
         bounds_b=_bounds(item.speech_b_bounds),
     )
-    t1 = time.perf_counter()
     if [tuple(s) for s in item.ground_truth_segments] != built.gt_segments:
         raise RuntimeError(
             f"{item.id}: manifest GT differs from the built timeline "
             "(stale manifest or source-bounds file?)"
         )
-    result = vad.detect(built.audio)
-    t2 = time.perf_counter()
+    energy = EnergyVad().frame_energy(built.audio)
+    timing["build_s"] += time.perf_counter() - t0
 
     gt = merged_gt_s(item)
     total_s = len(built.audio) / SR
-    non_speech_s = total_s - (gt[0][1] - gt[0][0])
+    (_, a_end_sample), (b_start_sample, _) = item.ground_truth_segments[:2]
+    return PreparedItem(
+        item=item,
+        energy=energy,
+        n_samples=len(built.audio),
+        gt=gt,
+        total_s=total_s,
+        non_speech_s=total_s - (gt[0][1] - gt[0][0]),
+        a_end_s=a_end_sample / SR,
+        b_start_s=b_start_sample / SR,
+    )
+
+
+def score_prepared(
+    prep: PreparedItem,
+    vad: EnergyVad,
+    collar_s: float,
+    timing: dict[str, float],
+) -> ItemResult:
+    item = prep.item
+    t1 = time.perf_counter()
+    result = vad.detect_energy(prep.energy, prep.n_samples)
+    t2 = time.perf_counter()
     metrics = score_vad_item(
-        gt_segments=gt,
+        gt_segments=prep.gt,
         vad_segments=result.segments,
-        total_duration_s=total_s,
-        non_speech_duration_s=non_speech_s,
+        total_duration_s=prep.total_s,
+        non_speech_duration_s=prep.non_speech_s,
         collar=collar_s,
         speech_timeout_s=vad.speech_timeout_ms / 1000.0,
     )
     t3 = time.perf_counter()
     if metrics.errors:
         raise RuntimeError(f"{item.id}: scorer errors {metrics.errors}")
-
-    timing["build_s"] += t1 - t0
     timing["vad_s"] += t2 - t1
     timing["score_s"] += t3 - t2
 
-    gt_start, gt_end = gt[0]
-    (_, a_end_sample), (b_start_sample, _) = item.ground_truth_segments[:2]
-    a_end_s, b_start_s = a_end_sample / SR, b_start_sample / SR
+    gt_start, gt_end = prep.gt[0]
     junction_split = not any(
-        seg[0] <= a_end_s and seg[1] >= b_start_s for seg in result.segments
+        seg[0] <= prep.a_end_s and seg[1] >= prep.b_start_s for seg in result.segments
     )
     overlapping = [s for s in result.segments if s[0] < gt_end and s[1] > gt_start]
     eos_delay_ms = None
@@ -169,13 +195,23 @@ def evaluate_item(
         pause_ms=item.pause_ms,
         language=item.language,
         metrics=metrics,
-        non_speech_s=non_speech_s,
+        non_speech_s=prep.non_speech_s,
         n_vad_segments=len(result.segments),
         eos_delay_ms=eos_delay_ms,
         violation=item.pause_ms <= vad.speech_timeout_ms and len(overlapping) > 1,
         junction_split=junction_split,
         junction_violation=junction_split and item.pause_ms <= vad.speech_timeout_ms,
     )
+
+
+def evaluate_item(
+    item: VadItem,
+    vad: EnergyVad,
+    collar_s: float,
+    cache: _AudioCache,
+    timing: dict[str, float],
+) -> ItemResult:
+    return score_prepared(prepare_item(item, cache, timing), vad, collar_s, timing)
 
 
 def run_config(

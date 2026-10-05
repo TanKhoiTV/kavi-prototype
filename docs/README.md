@@ -27,6 +27,8 @@ tree.
   (Opus-MT encoder → HTP v73 context binary); required reading for the plan above.
 - `specifications.md` — the six objective metrics + hard thresholds; cited by
   every plan as the gate contract.
+- `vad-benchmark.md` — VAD benchmark: construction, energy VAD (ADR-022
+  gap-fills), metrics, collar, borderline rule, commands, known limits.
 
 ## Hot reference — source of truth
 

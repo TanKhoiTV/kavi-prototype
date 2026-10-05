@@ -43,6 +43,17 @@ def test_align_noise_equal():
     assert np.array_equal(out, arr)
 
 
+REAL_NOISY_CASE_FILES = (
+    "eval_data/vad_audio/fleurs/vi/vi_1660.wav",
+    "assets/noise/musan/steady/noise-free-sound-0030.wav",
+    "assets/noise/rirs/air_type1_air_binaural_aula_carolina_1_1_90_3.wav",
+)
+
+
+@pytest.mark.skipif(
+    not all(Path(p).exists() for p in REAL_NOISY_CASE_FILES),
+    reason="needs the materialised FLEURS clip, MUSAN noise and RIRS file",
+)
 def test_noisy_output() -> None:
     out = "/tmp/kavi_vad_test_noisy.wav"
     if Path(out).exists():

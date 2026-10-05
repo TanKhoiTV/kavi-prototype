@@ -112,3 +112,20 @@ def test_invalid_timeout_rejected(timeout_ms: int) -> None:
 def test_invalid_threshold_rejected() -> None:
     with pytest.raises(ValueError):
         EnergyVad(0.0, 500)
+
+
+@pytest.mark.parametrize("threshold", [0.01, 0.05, 0.2])
+@pytest.mark.parametrize("timeout_ms", [200, 350, 1000])
+def test_detect_energy_matches_detect(threshold: float, timeout_ms: int) -> None:
+    rng = np.random.default_rng(3)
+    audio = cat(
+        silence(300),
+        (0.4 * rng.standard_normal(4000)).astype(np.float32),
+        silence(450),
+        tone(300, amp=0.08),
+        silence(900),
+    )[:-37]
+    vad = EnergyVad(threshold, timeout_ms)
+    direct = vad.detect(audio)
+    via_energy = vad.detect_energy(vad.frame_energy(audio), len(audio))
+    assert via_energy == direct

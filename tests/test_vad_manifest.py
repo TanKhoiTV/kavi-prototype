@@ -98,6 +98,11 @@ def test_build_stops_when_fleurs_missing(tmp_path) -> None:
         )
 
 
+@pytest.mark.skipif(
+    not any(Path("eval_data/vad_audio/fleurs/vi").glob("*.wav"))
+    or not any(Path("eval_data/vad_audio/fleurs/en").glob("*.wav")),
+    reason="needs the materialised FLEURS WAVs",
+)
 def test_gold_template_exists_and_fields() -> None:
     build_gold_template(path="/tmp/vad_gold.csv")
     content = Path("/tmp/vad_gold.csv").read_text(encoding="utf-8")

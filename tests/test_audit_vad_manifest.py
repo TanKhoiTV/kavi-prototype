@@ -22,7 +22,7 @@ def _wav(path: Path, n: int, seed: int) -> None:
 @pytest.fixture
 def built(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     files = {}
-    for i in range(12):
+    for i in range(22):
         for kind in ("steady", "impulsive"):
             _wav(tmp_path / f"assets/noise/musan/{kind}/{kind[0]}{i}.wav", 4000, i)
         _wav(tmp_path / f"assets/noise/rirs/r{i}.wav", 1000, i)
@@ -89,3 +89,15 @@ def test_audit_gold_flags_wrong_size(tmp_path: Path) -> None:
     )
     problems = audit_gold(str(f))["problems"]
     assert any("expected 50" in p for p in problems)
+
+
+def test_audit_checks_forty_items_per_cell(built: Path, tmp_path: Path) -> None:
+    big = tmp_path / "m40.json"
+    build_vad_manifest(out_path=str(big), n_per_lang=20)
+    ok = audit_manifest(str(big), per_cell_per_lang=20)
+    assert ok["problems"] == []
+    assert ok["total"] == ok["expected_total"] == 1600
+    assert ok["cells_off_size"] == 0
+    wrong = audit_manifest(str(big), per_cell_per_lang=10)
+    assert wrong["cells_off_size"] == 80
+    assert wrong["total"] != wrong["expected_total"]

@@ -61,8 +61,12 @@ class EnergyVad:
         return padded.reshape(n_frames, FRAME_SAMPLES).max(axis=1)
 
     def detect(self, audio: np.ndarray) -> EnergyVadResult:
-        is_speech = self.frame_energy(audio) >= self.energy_threshold
-        n_audio_s = len(audio) / SAMPLE_RATE
+        return self.detect_energy(self.frame_energy(audio), len(audio))
+
+    def detect_energy(self, energy: np.ndarray, n_samples: int) -> EnergyVadResult:
+        """Run the state machine on precomputed frame_energy(); identical to detect()."""
+        is_speech = energy >= self.energy_threshold
+        n_audio_s = n_samples / SAMPLE_RATE
         frame_s = FRAME_MS / 1000.0
 
         segments: list[tuple[float, float]] = []

@@ -34,7 +34,7 @@ NOISE = {
 PER_CELL_PER_LANG = 10
 
 
-def audit_manifest(path: str) -> dict:
+def audit_manifest(path: str, per_cell_per_lang: int = PER_CELL_PER_LANG) -> dict:
     manifest = VadManifest.from_json(path)
     problems: list[str] = []
     cells: collections.Counter = collections.Counter()
@@ -101,10 +101,11 @@ def audit_manifest(path: str) -> dict:
         for p in PAUSE_LENGTHS_MS
         for lang in ("vi", "en")
     }
-    off_cells = [k for k, v in cells.items() if v != PER_CELL_PER_LANG]
+    off_cells = [k for k, v in cells.items() if v != per_cell_per_lang]
     return {
         "version": manifest.version,
         "total": len(manifest.items),
+        "expected_total": 80 * per_cell_per_lang,
         "unique_ids": len({i.id for i in manifest.items}),
         "by_language": dict(collections.Counter(i.language for i in manifest.items)),
         "cells": len({k[:3] for k in cells}),
@@ -146,9 +147,10 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--manifest", default="eval_data/vad_manifest_v2.json")
     ap.add_argument("--gold", default="eval_data/vad_gold_template.csv")
+    ap.add_argument("--per-cell-per-lang", type=int, default=PER_CELL_PER_LANG)
     args = ap.parse_args(argv)
 
-    m = audit_manifest(args.manifest)
+    m = audit_manifest(args.manifest, args.per_cell_per_lang)
     g = audit_gold(args.gold)
     print(f"MANIFEST {m['version']}: total={m['total']} unique_ids={m['unique_ids']}")
     print(f"  by_language={m['by_language']} cells={m['cells']}")
@@ -166,7 +168,8 @@ def main(argv: list[str] | None = None) -> int:
     for line in g["problems"]:
         print(f"    {line}")
     bad = m["problems"] or g["problems"] or m["cells_off_size"] or m["cells_missing"]
-    return 1 if bad or m["total"] != 800 or m["unique_ids"] != 800 else 0
+    wrong_size = m["total"] != m["expected_total"] or m["unique_ids"] != m["total"]
+    return 1 if bad or wrong_size else 0
 
 
 if __name__ == "__main__":

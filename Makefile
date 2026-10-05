@@ -31,7 +31,7 @@
 #     from whatever is in eval_data/raw/ -- offline, with a built-in fallback
 #     (MT + TTS only) when the FLEURS parquets are absent.
 
-.PHONY: install setup setup-min check fmt test bench bench-data models data verify-assets vad-run vad-smoke vad-bounds vad-manifest vad-gold-audio vad-collar vad-audit
+.PHONY: install setup setup-min check fmt test bench bench-data models data verify-assets vad-run vad-smoke vad-bounds vad-manifest vad-gold-audio vad-collar vad-audit vad-sweep vad-sweep-smoke vad-manifest-40
 
 install: ## Install dependencies
 	uv sync
@@ -98,3 +98,14 @@ vad-collar: ## Stage 3B: reference-vs-hand boundary error and collar -> bench/va
 
 vad-audit: ## Audit eval_data/vad_manifest_v2.json and the gold template against the Stage 3A spec
 	uv run python -m scripts.audit_vad_manifest
+
+MANIFEST ?= eval_data/vad_manifest_v2.json
+
+vad-sweep: ## Full threshold x timeout sweep (Stage 1 grid) over MANIFEST; audio built once
+	uv run python -m bench.vad_sweep --manifest $(MANIFEST) --out bench-results/vad-sweep
+
+vad-sweep-smoke: ## Same sweep on 1 VI + 1 EN item per cell (quick check, not the result)
+	uv run python -m bench.vad_sweep --manifest $(MANIFEST) --per-cell-per-lang 1 --out bench-results/vad-sweep-smoke
+
+vad-manifest-40: ## Borderline follow-up: 40 items per cell -> eval_data/vad_manifest_v2_n20.json
+	uv run python -c "from bench.vad_manifest import build_vad_manifest; build_vad_manifest(n_per_lang=20, out_path='eval_data/vad_manifest_v2_n20.json')"
