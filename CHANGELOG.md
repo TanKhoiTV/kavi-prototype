@@ -142,5 +142,6 @@
 - **changelog:** Serialise changelog runs and rebase before pushing
 - Push CHANGELOG.md with a GitHub App token([#126](https://github.com/TanKhoiTV/kavi-prototype/pull/126))
 - Scope the lint job to read-only and stop persisting credentials([#121](https://github.com/TanKhoiTV/kavi-prototype/pull/121))
+- Scope changelog permissions to the job that needs write([#122](https://github.com/TanKhoiTV/kavi-prototype/pull/122))
 [unreleased]: https://github.com/TanKhoiTV/kavi-prototype/compare/v0.1.0...HEAD
 
