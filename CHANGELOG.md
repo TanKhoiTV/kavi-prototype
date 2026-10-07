@@ -64,6 +64,7 @@
 - Tag code-fence languages in repo markdown
 - Correct stale references and index gaps in docs and ADRs([#109](https://github.com/TanKhoiTV/kavi-prototype/pull/109))
 - Phase-4 conversion does not require a Windows host([#119](https://github.com/TanKhoiTV/kavi-prototype/pull/119))
+- **adr:** Flag ADR-020 beam-width claim as unmeasured([#120](https://github.com/TanKhoiTV/kavi-prototype/pull/120))
 
 ### Features
 
