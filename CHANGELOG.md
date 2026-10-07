@@ -63,6 +63,8 @@
 - **adr:** Repoint ADR cross-references after the split
 - Tag code-fence languages in repo markdown
 - Correct stale references and index gaps in docs and ADRs([#109](https://github.com/TanKhoiTV/kavi-prototype/pull/109))
+- Phase-4 conversion does not require a Windows host([#119](https://github.com/TanKhoiTV/kavi-prototype/pull/119))
+- **adr:** Flag ADR-020 beam-width claim as unmeasured([#120](https://github.com/TanKhoiTV/kavi-prototype/pull/120))
 
 ### Features
 
@@ -144,5 +146,7 @@
 - Stop recursing into the private kavi-android submodule
 - **changelog:** Serialise changelog runs and rebase before pushing
 - Push CHANGELOG.md with a GitHub App token([#126](https://github.com/TanKhoiTV/kavi-prototype/pull/126))
+- Scope the lint job to read-only and stop persisting credentials([#121](https://github.com/TanKhoiTV/kavi-prototype/pull/121))
+- Scope changelog permissions to the job that needs write([#122](https://github.com/TanKhoiTV/kavi-prototype/pull/122))
 [unreleased]: https://github.com/TanKhoiTV/kavi-prototype/compare/v0.1.0...HEAD
 

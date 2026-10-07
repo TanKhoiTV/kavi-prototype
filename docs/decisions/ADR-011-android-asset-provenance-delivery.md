@@ -38,9 +38,9 @@ Host-side conversion outputs under `prototype/models/qnn/*` are **gitignored and
 regenerable** (`.gitignore` line 20, commit 3502156) and can only be reproduced
 with the QAIRT SDK (2.31.0.250130, not installed on every host). Treating them
 as deliverables breaks fresh clones. The on-device HTP v73 context binary does
-**not exist yet** — it is a Windows-host `qnn-context-binary-generator` output
-(`reference/phase-4-qnn-plan.md` §8). The contest grading requires a buildable,
-fully offline APK with no runtime network.
+**not exist yet** — it is a `qnn-context-binary-generator` output for a
+Linux/WSL or Windows host (`reference/phase-4-qnn-plan.md` §8). The contest
+grading requires a buildable, fully offline APK with no runtime network.
 
 ## Decision
 
