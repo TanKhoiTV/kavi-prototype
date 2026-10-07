@@ -46,8 +46,9 @@ the ladder:
   and beam=8 climbing back to 6.42 — non-monotonic where sentence-BLEU was flat
 
 The published "beam=4 sweet spot" survives under corpus BLEU, but it is not the
-conclusion the sweep's own column supports, and it rests on a margin of 0.50 over
-beam=8 on 30 items. Anything quoted from this sweep should name its BLEU
+conclusion the sweep's own column supports. The margin is 0.16 over beam=8 and
+0.50 over beam=5, on 30 items — small enough that beams 4, 5 and 8 are not
+separable on quality. Anything quoted from this sweep should name its BLEU
 definition.
 
 ## Why the latency column is not citable
@@ -117,4 +118,5 @@ why the host column cannot stand in for the device measurement.
   it at 2026-07-27, and its retrospective table carries the same year error.
 - The Opus-MT report there also averages per-sentence BLEU, which is what section
   *The two BLEU columns disagree* is about. Its `beam=4` verdict holds under
-  corpus BLEU, on a 0.50 margin over beam=8 across 30 items.
+  corpus BLEU, but on a 0.16 margin over beam=8 (0.50 over beam=5) across 30
+  items.
