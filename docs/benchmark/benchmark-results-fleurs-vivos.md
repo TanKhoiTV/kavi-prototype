@@ -1,6 +1,6 @@
 # Benchmark Results — FLEURS + VIVOS
 
-_Generated 2026-10-02 from `docs/benchmark/raw-results/*.csv` (error/skip rows removed). WER case-normalized; BLEU = mean per-item sacrebleu (not corpus BLEU). RTF = latency / audio duration._
+_Generated 2026-10-07 from `docs/benchmark/raw-results/*.csv` (error/skip rows removed). WER case-normalized; BLEU = mean per-item sacrebleu (not corpus BLEU). RTF = latency / audio duration._
 
 ## Run inventory
 

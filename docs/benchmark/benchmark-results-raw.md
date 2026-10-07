@@ -1,6 +1,6 @@
 # Benchmark Results — aggregated tables
 
-_Generated 2026-10-02 from `docs/benchmark/raw-results/*.csv`_
+_Generated 2026-10-07 from `docs/benchmark/raw-results/*.csv`_
 
 ## Run inventory
 
