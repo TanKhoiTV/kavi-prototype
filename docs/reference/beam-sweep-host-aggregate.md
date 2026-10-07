@@ -29,11 +29,11 @@ uv run python -m scripts.summarise_beam_sweep \
 
 | beam | n | sentence-BLEU | corpus BLEU | mean s | mean ratio | median s | median ratio | p95 s |
 |---|---|---|---|---|---|---|---|---|
-| 1 (greedy) | 30 | 6.22 | 3.98 | 0.558 | 1.00× | 0.475 | 1.00× | 1.130 |
-| 2 | 30 | 7.81 | 5.39 | 0.911 | 1.63× | 0.813 | 1.71× | 1.837 |
-| 4 | 30 | 8.80 | 6.58 | 1.396 | 2.50× | 0.616 | 1.30× | 3.226 |
-| 5 | 30 | 9.01 | 6.08 | 1.686 | 3.02× | 0.861 | 1.81× | 3.403 |
-| 8 | 30 | 8.97 | 6.42 | 2.489 | 4.46× | 1.536 | 3.23× | 5.793 |
+| 1 (greedy) | 30 | 6.22 | 3.98 | 0.558 | 1.00× | 0.475 | 1.00× | 1.248 |
+| 2 | 30 | 7.81 | 5.39 | 0.911 | 1.63× | 0.813 | 1.71× | 1.878 |
+| 4 | 30 | 8.80 | 6.58 | 1.396 | 2.50× | 0.616 | 1.30× | 3.238 |
+| 5 | 30 | 9.01 | 6.08 | 1.686 | 3.02× | 0.861 | 1.81× | 3.482 |
+| 8 | 30 | 8.97 | 6.42 | 2.489 | 4.46× | 1.536 | 3.23× | 6.560 |
 
 **The two BLEU columns disagree, and not only in magnitude.** The sweep's own
 figure is a *mean of per-sentence* BLEU; `corpus BLEU` is SacreBLEU over the whole
@@ -62,8 +62,10 @@ which statistic you pick — beam=2 is *slower* than beam=4 at the median, faste
 at the mean.
 
 **2. Per-item latency is not monotonic in beam width.** Beam search increases
-decoder work monotonically, so `b1 ≤ b2 ≤ b4 ≤ b5 ≤ b8` must hold per item. It
-does not:
+decoder work monotonically *at a fixed output length*, so
+`b1 ≤ b2 ≤ b4 ≤ b5 ≤ b8` is the expected ordering. It is not guaranteed per item,
+though: beams can emit outputs of different lengths, and decoder steps scale with
+output length. It does not hold:
 
 - **18 of 30 items (60%)** break the ordering
 - across the four adjacent transitions, **24 pairs** have the wider beam finishing
@@ -79,15 +81,17 @@ Examples, all five beams, seconds:
 
 In all three, beam=4 is faster than **beam=1**. What happens next is not uniform:
 `vi-en-mt-1730` jumps roughly 9× at beam=5, while the other two rise by only about
-1.3×. No caching or batching behaviour produces that shape.
+1.3×.
 
 **Root cause: one timing sample per item.** The records hold exactly one
 `latency_s` per item (30 items → 30 samples). `Candidate.run()` wraps a single
 `_infer()` call in `time.perf_counter()` — no repeats, no warmup discard. beam=1
-min is 0.049 s against a 0.475 s median, so first-item framework warmup is inside
-the sample set. This is a separate defect from the memory-profiling issue raised
-in the sweep's own retrospective, and it is not fixed by a clean clock reading of a
-single noisy run.
+min is 0.049 s against a 0.475 s median. That spread is consistent with the mix
+of item lengths in this set (3-word alongside 40-word items); it does not by itself
+show that framework warmup is inside the sample, which would need the first item's
+reading shown as anomalous. This is a separate defect from the memory-profiling
+issue raised in the sweep's own retrospective, and it is not fixed by a clean clock
+reading of a single noisy run.
 
 ## What this does and does not support
 
