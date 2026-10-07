@@ -349,3 +349,44 @@ def test_run_manifest_config_override(monkeypatch, tmp_path: Path) -> None:
     )
     bench_run.run_manifest(_fake_manifest(), tmp_path, None, {"beam_size": 7})
     assert captured["config"]["beam_size"] == 7
+
+
+def test_resolve_model_file_prefers_int8_over_fp32(tmp_path: Path) -> None:
+    """Two matching builds must resolve to the int8 one, not to glob order.
+
+    The trained -epoch-N-avg-N exports ship an int8/fp32 pair for the same
+    component. Path.glob order is filesystem-dependent, so picking matches[0]
+    would let the filesystem decide which model is benchmarked.
+    """
+    from bench.candidates.zipformer_asr import _resolve_model_file
+
+    (tmp_path / "decoder-epoch-99-avg-1.onnx").write_bytes(b"fp32")
+    (tmp_path / "decoder-epoch-99-avg-1.int8.onnx").write_bytes(b"int8")
+
+    picked = _resolve_model_file(tmp_path, "decoder")
+    assert picked.name == "decoder-epoch-99-avg-1.int8.onnx"
+
+
+def test_resolve_model_file_single_match(tmp_path: Path) -> None:
+    from bench.candidates.zipformer_asr import _resolve_model_file
+
+    (tmp_path / "encoder.int8.onnx").write_bytes(b"x")
+    assert _resolve_model_file(tmp_path, "encoder").name == "encoder.int8.onnx"
+
+
+def test_resolve_model_file_raises_when_genuinely_ambiguous(tmp_path: Path) -> None:
+    """Two different epochs is not a precision choice — refuse rather than guess."""
+    from bench.candidates.zipformer_asr import _resolve_model_file
+
+    (tmp_path / "encoder-epoch-1-avg-1.int8.onnx").write_bytes(b"a")
+    (tmp_path / "encoder-epoch-2-avg-1.int8.onnx").write_bytes(b"b")
+
+    with pytest.raises(ValueError, match="several encoder"):
+        _resolve_model_file(tmp_path, "encoder")
+
+
+def test_resolve_model_file_missing_raises(tmp_path: Path) -> None:
+    from bench.candidates.zipformer_asr import _resolve_model_file
+
+    with pytest.raises(FileNotFoundError):
+        _resolve_model_file(tmp_path, "encoder")

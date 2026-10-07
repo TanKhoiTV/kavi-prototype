@@ -34,6 +34,34 @@ def decoding_method_for_beam(beam: int) -> str:
     return "greedy_search" if beam == 1 else "modified_beam_search"
 
 
+def _resolve_model_file(model_dir: Path, component: str) -> Path:
+    """Pick one ONNX file for ``component`` deterministically.
+
+    ``Path.glob`` yields filesystem order, so taking ``matches[0]`` lets a
+    directory holding both a quantised and an fp32 build decide which model is
+    benchmarked while the candidate id stays the same — a silent swap that makes
+    a result irreproducible. The trained ``-epoch-N-avg-N`` exports ship exactly
+    such pairs, so when more than one file matches, prefer the int8 build
+    explicitly and refuse to guess at anything more ambiguous than that.
+    """
+    matches = sorted(model_dir.glob(f"{component}*.onnx"))
+    if not matches:
+        raise FileNotFoundError(
+            f"no {component}*.onnx under {model_dir}; expected {component}.onnx "
+            f"or {component}.int8.onnx"
+        )
+    if len(matches) == 1:
+        return matches[0]
+    int8 = [m for m in matches if ".int8.onnx" in m.name]
+    if len(int8) == 1:
+        return int8[0]
+    raise ValueError(
+        f"{model_dir} holds several {component}*.onnx "
+        f"({[m.name for m in matches]}); point model_path at a directory with a "
+        f"single intended build so the benchmark is reproducible"
+    )
+
+
 class ZipformerCandidateBase(Candidate):
     stage = "ASR"
     _model_dir_attr: str = ""
@@ -50,22 +78,11 @@ class ZipformerCandidateBase(Candidate):
         decoding_method = decoding_method_for_beam(beam)
 
         model_dir = Path(model_path) if model_path else Path(self._model_dir_attr)
-        # Allow int8 encoder/joiner with fallback to fp32
-        encoder = model_dir / "encoder.int8.onnx"
-        if not encoder.exists():
-            # Try fp32
-            enc_candidates = list(model_dir.glob("encoder*.onnx"))
-            encoder = enc_candidates[0] if enc_candidates else encoder
-
-        decoder = model_dir / "decoder.onnx"
-        if not decoder.exists():
-            dec_candidates = list(model_dir.glob("decoder*.onnx"))
-            decoder = dec_candidates[0] if dec_candidates else decoder
-
-        joiner = model_dir / "joiner.int8.onnx"
-        if not joiner.exists():
-            join_candidates = list(model_dir.glob("joiner*.onnx"))
-            joiner = join_candidates[0] if join_candidates else joiner
+        # int8 encoder/joiner with an fp32 fallback, resolved deterministically
+        # rather than by glob order.
+        encoder = _resolve_model_file(model_dir, "encoder")
+        decoder = _resolve_model_file(model_dir, "decoder")
+        joiner = _resolve_model_file(model_dir, "joiner")
 
         tokens = model_dir / "tokens.txt"
 
