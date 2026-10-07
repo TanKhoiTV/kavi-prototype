@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import statistics
 from pathlib import Path
 
@@ -44,7 +45,7 @@ def load_beam(root: Path, beam: int) -> dict[str, dict]:
 def percentile(values: list[float], q: float) -> float:
     """Nearest-rank percentile; avoids an interpolation dependency."""
     ordered = sorted(values)
-    idx = max(0, min(len(ordered) - 1, int(round(q * len(ordered))) - 1))
+    idx = max(0, min(len(ordered) - 1, math.ceil(q * len(ordered)) - 1))
     return ordered[idx]
 
 
