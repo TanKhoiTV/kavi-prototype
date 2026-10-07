@@ -351,6 +351,38 @@ def test_run_manifest_config_override(monkeypatch, tmp_path: Path) -> None:
     assert captured["config"]["beam_size"] == 7
 
 
+def test_run_manifest_config_override_preserves_existing_keys(
+    monkeypatch, tmp_path: Path
+) -> None:
+    """--config-override merges: unrelated existing keys survive the override.
+
+    The test above only proves a new key reaches the candidate. The contract that
+    actually matters is ``{**item.config, **override}``: keys the override does
+    not mention must be preserved, and keys it mentions must win.
+    """
+    from bench import run as bench_run
+
+    captured: dict = {}
+
+    def fake_build(item):  # noqa: ANN001
+        captured["config"] = dict(item.config or {})
+        return _FakeCandidate()
+
+    manifest = _fake_manifest()
+    for item in manifest.items:
+        item.config = {"beam_size": 2, "some_existing_option": "keep"}
+
+    monkeypatch.setattr(bench_run, "build_candidate", fake_build)
+    monkeypatch.setattr(
+        bench_run, "default_candidate_id_for_stage", lambda stage: "fake-cand"
+    )
+    bench_run.run_manifest(manifest, tmp_path, None, {"beam_size": 7})
+    assert captured["config"] == {"beam_size": 7, "some_existing_option": "keep"}
+
+
+# --- winterSolstice review on #124: deterministic model pick, distinct sampling ---
+
+
 def test_resolve_model_file_prefers_int8_over_fp32(tmp_path: Path) -> None:
     """Two matching builds must resolve to the int8 one, not to glob order.
 
@@ -390,3 +422,30 @@ def test_resolve_model_file_missing_raises(tmp_path: Path) -> None:
 
     with pytest.raises(FileNotFoundError):
         _resolve_model_file(tmp_path, "encoder")
+
+
+def test_evenly_spaced_indices_are_distinct_when_k_approaches_n() -> None:
+    """Regression: rounding + clamping used to collapse picks into duplicates."""
+    from bench.data_prep import _evenly_spaced_indices
+
+    for n_available in (5, 7, 12, 40):
+        for k in range(1, n_available + 1):
+            picks = _evenly_spaced_indices(n_available, k)
+            assert len(picks) == k, f"n={n_available} k={k}"
+            assert len(set(picks)) == k, f"n={n_available} k={k} produced duplicates"
+            assert all(0 <= p < n_available for p in picks)
+            assert picks == sorted(picks)
+
+
+def test_evenly_spaced_indices_rejects_k_larger_than_available() -> None:
+    from bench.data_prep import _evenly_spaced_indices
+
+    with pytest.raises(ValueError):
+        _evenly_spaced_indices(5, 6)
+
+
+def test_evenly_spaced_indices_rejects_non_positive_k() -> None:
+    from bench.data_prep import _evenly_spaced_indices
+
+    with pytest.raises(ValueError):
+        _evenly_spaced_indices(5, 0)

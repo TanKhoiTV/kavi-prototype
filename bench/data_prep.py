@@ -299,6 +299,41 @@ def _emit_asr_items(
             )
 
 
+def _evenly_spaced_indices(n_available: int, k: int) -> list[int]:
+    """k deterministic, evenly spaced, distinct indices from ``range(n_available)``.
+
+    The naive expression ``round(step / 2 + i * step)`` can collapse two
+    different ``i`` onto the same index, and clamping to ``n_available - 1`` can
+    fold several onto the last one. Once ``k`` approaches ``n_available`` that
+    returns fewer than k picks and the caller emits duplicate utterances while
+    still reporting the requested count. Deduplicate, then top up in index
+    order so the caller always gets exactly k distinct picks.
+    """
+    if k <= 0:
+        raise ValueError(f"k must be positive, got {k}")
+    if k > n_available:
+        raise ValueError(f"cannot pick {k} distinct indices from {n_available}")
+    step = n_available / k
+    picks: list[int] = []
+    seen: set[int] = set()
+    for i in range(k):
+        p = min(round(step / 2 + i * step), n_available - 1)
+        if p not in seen:
+            seen.add(p)
+            picks.append(p)
+    for p in range(n_available):
+        if len(picks) >= k:
+            break
+        if p not in seen:
+            seen.add(p)
+            picks.append(p)
+    picks.sort()
+    assert len(picks) == k == len(set(picks)), (
+        f"expected {k} distinct indices, got {len(set(picks))}"
+    )
+    return picks
+
+
 def _load_vivos_utterances(
     vivos_root: str | Path,
     n_items: int = 100,
@@ -359,10 +394,9 @@ def _load_vivos_utterances(
     for spk in sorted(speakers):
         uids = speakers[spk]
         k = counts[spk]
-        step = len(uids) / k
-        picks = sorted(round(step / 2 + i * step) for i in range(k))
-        for p in picks:
-            selected.append(uids[min(p, len(uids) - 1)])
+        # Evenly-spaced distinct picks within each speaker's ordered list.
+        for p in _evenly_spaced_indices(len(uids), k):
+            selected.append(uids[p])
     selected.sort()  # deterministic output order
 
     out: list = []
