@@ -29,6 +29,8 @@ tree.
   every plan as the gate contract.
 - `vad-benchmark.md` — VAD benchmark: construction, energy VAD (ADR-022
   gap-fills), metrics, collar, borderline rule, commands, known limits.
+- `vad-results.md` — VAD benchmark results: what was measured, what holds
+  without the collar, what is undetermined (Stage 3B not performed).
 
 ## Hot reference — source of truth
 

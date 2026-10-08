@@ -181,6 +181,13 @@ def main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     hand, blank = load_labels(args.labels)
+    if not hand:
+        print(
+            f"no labelled clips in {args.labels} ({blank} blank rows); "
+            "fill onset_s and offset_s for at least one clip first",
+            file=sys.stderr,
+        )
+        return 1
     if len(hand) != args.expect_clips and not args.allow_partial:
         print(
             f"{len(hand)} labelled clips ({blank} blank), expected {args.expect_clips}; "

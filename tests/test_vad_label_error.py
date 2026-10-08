@@ -160,3 +160,18 @@ def test_main_writes_collar_file_that_the_runner_reads(
     assert data["stage1"]["collar_exceeds_clipping_limit"] is True
     assert data["stage1"]["collar_exceeds_onset_tolerance"] is True
     assert load_collar(str(out)) == (pytest.approx(0.20), False)
+
+
+def test_main_with_no_labels_fails_clearly_even_when_partial_is_allowed(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    f = tmp_path / "labels.csv"
+    f.write_text(
+        "id,audio_path,onset_s,offset_s,annotator\ng1,a.wav,,,\ng2,b.wav,,,\n",
+        encoding="utf-8",
+    )
+    out = tmp_path / "c.json"
+    rc = vle.main(["--labels", str(f), "--allow-partial", "--out", str(out)])
+    assert rc == 1
+    assert "no labelled clips" in capsys.readouterr().err
+    assert not out.exists()
