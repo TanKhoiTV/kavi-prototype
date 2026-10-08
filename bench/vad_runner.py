@@ -30,6 +30,7 @@ from bench.vad_energy import (
     DEFAULT_ENERGY_THRESHOLD,
     DEFAULT_SPEECH_TIMEOUT_MS,
     EnergyVad,
+    EnergyVadResult,
 )
 from bench.vad_manifest import VadItem, VadManifest
 from bench.vad_noise import SR, TARGET_P99_PEAK, build_timeline_audio, load_mono
@@ -160,10 +161,12 @@ def score_prepared(
     vad: EnergyVad,
     collar_s: float,
     timing: dict[str, float],
+    result: EnergyVadResult | None = None,
 ) -> ItemResult:
     item = prep.item
     t1 = time.perf_counter()
-    result = vad.detect_energy(prep.energy, prep.n_samples)
+    if result is None:
+        result = vad.detect_energy(prep.energy, prep.n_samples)
     t2 = time.perf_counter()
     metrics = score_vad_item(
         gt_segments=prep.gt,

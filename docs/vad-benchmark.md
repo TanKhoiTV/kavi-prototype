@@ -18,6 +18,7 @@ documents, which are not in this repository.
 | One configuration | `make vad-run THRESHOLD=0.05 TIMEOUT_MS=500` | `bench-results/vad/` |
 | Smoke test, ADR defaults | `make vad-smoke` | `bench-results/vad-smoke/` |
 | Full 5 x 5 sweep | `make vad-sweep` | `bench-results/vad-sweep/sweep.{json,csv}` |
+| Sensitivity of the sweep to the collar (no labels) | `make vad-collar-sensitivity` | `bench-results/vad-collar-sensitivity/` |
 | Borderline follow-up, 40 items per cell | `make vad-manifest-40`, then `make vad-sweep MANIFEST=eval_data/vad_manifest_v2_n20.json` | |
 
 ## Benchmark construction
@@ -80,6 +81,17 @@ is the 95th percentile (nearest rank) of the absolute errors pooled over onsets 
 offsets (**assumption**; the confirmed Stage 1b rule takes precedence). It is compared
 with the 150 ms onset tolerance and the 50 ms clipped-speech criterion and reported,
 never adjusted. `make vad-collar` refuses to run unless all 50 clips are labelled.
+
+## Collar sensitivity
+
+The collar changes three scorer outputs: a VAD onset further than the collar from the
+ground-truth onset is a missed onset, the delay beyond the collar is clipped speech,
+and a VAD segment starting outside the collar and the ground truth is a false trigger.
+`bench/vad_collar_sensitivity.py` scores the same VAD output at collars of 0 to
+200 ms and reports the smallest collar from which every criterion is met. It shows
+which conclusions depend on the collar; it does not estimate the true collar, which
+only Stage 3B (hand labels) can. Collars above 150 ms exceed the Stage 1 onset
+tolerance.
 
 ## Borderline rule
 

@@ -31,7 +31,7 @@
 #     from whatever is in eval_data/raw/ -- offline, with a built-in fallback
 #     (MT + TTS only) when the FLEURS parquets are absent.
 
-.PHONY: install setup setup-min check fmt test bench bench-data models data verify-assets vad-run vad-smoke vad-bounds vad-manifest vad-gold-audio vad-collar vad-audit vad-sweep vad-sweep-smoke vad-manifest-40
+.PHONY: install setup setup-min check fmt test bench bench-data models data verify-assets vad-run vad-smoke vad-bounds vad-manifest vad-gold-audio vad-collar vad-audit vad-sweep vad-sweep-smoke vad-manifest-40 vad-collar-sensitivity
 
 install: ## Install dependencies
 	uv sync
@@ -109,3 +109,6 @@ vad-sweep-smoke: ## Same sweep on 1 VI + 1 EN item per cell (quick check, not th
 
 vad-manifest-40: ## Borderline follow-up: 40 items per cell -> eval_data/vad_manifest_v2_n20.json
 	uv run python -c "from bench.vad_manifest import build_vad_manifest; build_vad_manifest(n_per_lang=20, out_path='eval_data/vad_manifest_v2_n20.json')"
+
+vad-collar-sensitivity: ## Score the 5x5 sweep at several collars (no hand labels needed)
+	uv run python -m bench.vad_collar_sensitivity --manifest $(MANIFEST) --out bench-results/vad-collar-sensitivity
